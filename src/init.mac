@@ -1,0 +1,49 @@
+;#######   Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com #####
+;#                                                                                                                                #
+;#       See LICENSE for licensing information                                                                                    #
+;##################################################################################################################################
+
+;;; Initialization code discarded after start
+
+START:
+START2:	MOV	#GREET, R1
+	CLR	R2
+	EMT	20
+CKBK10:	CMP	132716, #033070		; Check some Vilnus BASIC ROM - specific word
+	BEQ	INIT
+	MOV	#NOBK10, R1
+	CLR	R2
+	EMT	20
+	RETURN
+
+INIT:	MOV	#GREET - STATUS, R1
+1$:	MOVB	STATUS-1(R1), R0
+	EMT	22			; write to Status Line
+	SOB	R1, 1$
+
+	MOV	#I.PCHR, @#10
+	MOV	#M.BIT, @#20		; Init IOT vector
+	MOV	#I.TRAP, @#34
+	CLR	@#36
+	CLR	R1
+	CLR	(R1)+
+	CLR	(R1)+			; Init NIL
+	MOV	#I.STOP, (R1)+		; Init STOP key vector
+	CLR	(R1)+
+	MOV	#S.ISTM + 1, R1
+;	MOV	#400 + <RESET-START>/2 - 2, START		; `BR RESET` opcode
+	CLR	@#$TMLIM
+	MOV	#$TMMOD, @#$TMCSR
+	TSTB	@#$EXTM
+	BEQ	2$		; non-ExtMem mode
+	MOVB	#1, @#$EXTM	; Lock ExtMem mode
+;	MOV	#HIMEME, EHEAP
+2$:
+;!!!T	.SUBR	LOAD			; (LOAD init-stream)
+	JMP	RESET
+
+STATUS:	.ASCII	"Lisp v.2021  ufasoft.com/bklisp"
+GREET:	.ASCII	"Lisp v.2021 for "<C.CY.B><C.CY.K>"-0010.01 ufasoft.com/bklisp"<C.NL>
+GREET1:	.ASCIZ	"(c) Sergey Pavlov  dev@ufasoft.com 2021"<C.NL>
+NOBK10:	.ASCII	<C.NL>/ERROR!/<C.NL>/Incompatible System detected/
+	.ASCIZ	<C.NL>/This software requires Vilnus BASIC 1986 firmware (/<C.CY.B><C.CY.K>/-0010.01)/<C.NL>

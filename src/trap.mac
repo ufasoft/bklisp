@@ -1,0 +1,745 @@
+;;; Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
+;;;
+;;; SPDX-License-Identifier: MIT
+
+
+;;; TRAP HANDLERS
+
+;; Offsets in Stack insie TRAP handler
+
+; R4.OFF	= 0	; to avoid explicit 0
+R3.OFF	= 2
+R2.OFF	= 4
+R0.OFF	= 6
+PC.OFF	= 10
+R5.OFF	= 12
+ST.OFF	= 14	; FIRST WORK BEFORE STACK FRAME ;   NUMBER OF SAVED BYTES IN STACK FRAME
+
+
+;;----------Order does matter. Used in PRESUB
+SUBRS:	.WORD	LENGTH, CONS, FUNCALL, PRIN1, EVAL1, READ1, PEEKCH, CHRUP
+	.WORD	SYVAL, SET, R.CHRT, R.CHR0, P5EVL, MKAR, FORMAT, LAST
+	.WORD	CPTREE, SUBST1
+.IIF DF C$MDAR,	.WORD	ARDIMS
+
+
+;;---------------------------
+
+PREDS: 	.WORD	SYMP	, VECP	, W.CH2	, WRITE1, STREQ, ZEROP, MEMBER, INTP
+	.WORD	EQL	, UNR.CH, PRINT	, CSTITP, GC, P.STR., CONSP, LISTP
+	.WORD	BOUNDP, FRESHL, FUNAMP, PROGN, SORT34
+.IIF DF C$MDAR,	.WORD	ARP
+
+
+;; Starts with TRAP 60
+TRAPS:
+BIND$:	.WORD	BIND.
+BASIC$:	.WORD	BASIC.
+;CALL3$:	.WORD	CALL3.
+;FI16R$:	.WORD	FI16R.
+LISTN$:	.WORD	LISTN.
+LISTA$:	.WORD	LISTA.
+BETWE$:	.WORD	BETWE.
+PU.FL$:	.WORD	PU.FL.
+PO.FL$:	.WORD	PO.FL.
+RPOFL$:	.WORD	R.POFL
+ALL.2$:	.WORD	ALL.2.
+ALL.1$:	.WORD	ALL.1.
+ALLOC$:	.WORD	ALLOC.
+DF2$:	.WORD	DF2.
+DF1NI$:	.WORD	DF1NI.
+TYCOD$:	.WORD	TYCOD.
+ATRUE$:	.WORD	ATRUE.
+F.U16$:	.WORD	F.U16.
+;DF3NI$:	.WORD	DF3NI.
+POP1$:	.WORD	POP1.
+;POP5$:	.WORD	POP5.
+;STMTO$:	.WORD	STM.TO
+PLACE$:	.WORD	PLACE.
+GPLAC$:	.WORD	GPLAC.
+TOU16$:	.WORD	TOU16.
+NOWPU$:	.WORD	NOW.PU
+FUNTO$:	.WORD	FUN.TO
+TCASE$:	.WORD	TCASE.
+;CCASE$:	.WORD	CCASE.
+SUBR$:	.WORD	SUBR.
+SYVAL$:	.WORD	SYVAL.
+
+
+
+
+;; TRAP instruction handler.
+;; Savas all registers except R1
+I.TRAP:	PUSH	R0, R2, R3, R4
+	PUSH	R5.OFF(SP)		; PSW
+	MOV	R5, R5.OFF+2(SP)
+	MOV	PC.OFF+2(SP), R4	; Get PC after CALL instruction.
+	PUSH	-(R4)			; Decode TRAP instruction
+	ASL	(SP)
+	PUSH	(R4)+			; (SP): opcode; (SP+2): opcode * 2; (SP+4): PSW
+	BIC	#177437, (SP)
+	ADD	#TRPSEC, (SP)
+	RETURN
+
+
+NOW.PU:	.SUBR	GETTIM
+;; PU.FL - PUSH FLOAT
+PU.FL.: MOV	#8., R3
+	CALL	INSER.
+	PUSH	R1
+	MOV	SP, R5
+	MOV	SP, R3
+	ADD	#ST.OFF+2, R5
+	.FIXP
+	BCC	PUFL1.
+	SUB	#FIXOFF, R1
+	PUSH	R1
+	.BASN
+	.WORD	$ID, PUFL2.		; Int to Double
+
+
+
+;; Error handlers
+;;-- 10. words
+TRPSEC:	MOV	#ERRN., (SP)
+	RTI
+ERRN.:  MOV	#CATCH, R3
+        TST	(R3)
+	BEQ	ERRN.1
+;; Print error R5 and reset to REPL
+	MOV	(R3), SP
+	CLR	(R3)
+	BR	E.RTI6
+
+;;-- 5 words
+COPY4:	MOV	(R2)+, (R3)+
+	MOV	(R2)+, (R3)+
+	MOV	(R2)+, (R3)+
+	MOV	(R2)+, (R3)+
+	RETURN
+;;--
+
+
+
+;; Space: 1 words
+
+;; Call TRAP 2/4-word TRAP handlers
+.	= TRPSEC + B.2.4
+TRP24:	ASL	(SP)
+	ADD	#A.TRAP - <OP.TRAP + B.2.4 * 4>, (SP)
+	RTI
+
+;;-- 12. words
+ERRN.1:	MOV	#ASTKUP, SP
+	CALL	P.ERR
+	MOVB	-2(R4), R5
+	CALL	$P.INT			; Don't use PRIN here as the state may be corrupted
+I.ST1A:	MOV	#$WNL, R1
+	JMP	I.STO2
+;;-----
+
+
+;; Call TRAP 2/4-word TRAP handlers
+.	= TRPSEC + B.2.4+40
+	BR	TRP24
+
+
+;;-- 7 words
+;; Handler of	.P.CHR ch
+I.PCHR:	PUSH	R1
+	MOV	2(SP), R1
+	MOV	-(R1), R1
+	.W.CH2			; (WRITE-CHAR R1 R2)
+	POP	R1
+	RTI
+;;-----
+
+;;-- 5 words
+DF1NI.:	CMP	R1, #V.U
+	BNE	E.TRP8
+	CLR	R1
+	BR	E.TRP8
+
+
+;;-- 3 words
+SYVAL.:	MOV	(R4)+, R1
+	.SYVAL
+	BR	E.6TRP
+;;----
+
+
+
+
+
+;; Call .SUBR SUBRS(index)
+.	= TRPSEC + B.SUBR
+	ADD	#SUBRS-<OP.TRAP + B.SUBR * 2>, (SP)
+	MOV	@(SP)+, R0
+	BIC	#FLAG.C, (SP)
+	BR	PRESUB
+
+;;-- 8 words
+;; INSERT R3/2 WORDS INTO STACK
+INSER.:	MOV	SP, R2
+	SUB	R3, SP
+	MOV	SP, R5
+	MOV	#ST.OFF/2 + 1, R3	; SIZE OF STACK FRAME
+1$:	MOV	(R2)+, (R5)+
+	SOB	R3, 1$
+RET.1:	RETURN
+;;----
+
+;;-- 2 words
+F.U16B:	PO.FL
+E.RTI6:	BR	E.RTI2
+;; -----
+
+
+;; Call .PRED PREDS(index)
+.	= TRPSEC + B.PRED
+	ADD	#PREDS-<OP.TRAP + B.PRED * 2>, (SP)
+	MOV	@(SP)+, R0
+	BIS	#FLAG.C, (SP)
+PRESUB:	PUSH	#SUBR3.
+	RTI
+
+;	ASL	(SP)
+;	ADD	#A.TRAP - <OP.TRAP + 60 * 4>, (SP)
+;	RTI
+
+;;-- 4 words
+SUBR4.:	PUSH	R0
+	CLR	R0
+	TST	R1		; To set ZF on R1==0
+	JMP	@(SP)+
+;;----
+
+;;-- 4 words
+PUFL1.:	.FLTP
+	BCC	ER.TYP
+	TST	-(R1)
+	BR	PUFL3.
+;;----
+
+
+
+;;-- Space: 1 word
+;;---
+
+
+.	= TRPSEC + B.TYP
+TRPTYP:	MOV	#1$, (SP)
+	RTI
+1$:	.TYCOD
+	ADD	#OP.TRAP + B.TYP, R0
+	CMP	R0, -(R4)
+	BR	B.ZF.
+
+;;---  7 words
+;; TO.FUN macro
+FUN.TO:	.PRED	FUNP
+	BCS	E.RTI2
+	.SUBR	FBOUNDP
+	BEQ.E
+;!!!R	.SYMP
+;!!!R	BCC	2$
+	;!!!RCALL	SYFUN
+;!!!R	BR	E.RTI2
+;!!!R2$:	.POP1
+;!!!R	CMP	R0, #V.SETF
+;!!!R	BNE.E
+	BR	E.RTI2
+;;--------
+
+.	= TRPSEC + B.LONG
+TRPLON:	ADD	#TRAPS - <OP.TRAP + B.LONG * 2>, (SP)
+.IF DF K1801
+	MOV	@(SP)+, -(SP)
+.IFF
+	MOV	@(SP), (SP)
+.ENDC
+	RTI
+
+
+;;---  7 words
+;; Macro .DF2 v
+;; Default value for R2
+DF2.:	MOV	(R4)+, R3
+	CMP	R2, #V.U
+	BNE	1$
+	MOV	R3, R2.OFF(SP)
+1$:
+	BR	E.6TRP
+;;--------
+
+;;-- 5 words
+ATRUE.:	MOV	#V.T, R1
+B.RET1:	MOV	#RET.1, R4
+E.6TRP:	BR	E.4TRP
+;;---
+
+
+.	= TRPSEC + B.TYPP
+TRPTPP:	MOV	#1$, (SP)
+	RTI
+1$:	.TYCOD
+	ADD	#OP.TRAP + B.TYPP, R0
+	CMP	R0, -(R4)
+	BEQ	SEC.
+	BR	CLC.
+
+
+SUBR.:  CLC
+SUBR2.:	MOV	(R4)+, R0
+	MOV	R4, PC.OFF(SP)
+SUBR3.:	MOV	(SP), R4	; Assume R4.OFF == 0
+	PUSH	#E.TRP7
+	BCC	SUBR4.		; .SUBR case
+	MOV	R1, (SP)	; .PRED case
+	CALL	SUBR4.
+	TST	R1
+	BEQ	PCLC1.
+	POP	R1
+SEC.:	SEC
+	BR	E.RTI3
+
+
+
+PUFL2.: MOV	SP, R1
+PUFL3.:	MOV	(R1)+, (R5)+
+	MOV	(R1)+, (R5)+
+	MOV	(R1)+, (R5)+
+	MOV	(R1)+, (R5)+
+	MOV	R3, SP
+PCLC.:	POP	R1
+CLC.:	CLC
+;	BR	E.RTI3		; fallback
+;; Starting 2/4-word TRAP handler address
+A.TRAP:
+;;-- # 0
+BCS.E.:	BCC	E.RTI3
+	.E.UNK
+
+SWP12.:	MOV	R1, R2.OFF(SP)
+	MOV	R2, R1
+E.TRP8:	BR	E.TRP0
+
+
+;; TO.STM
+STM.TO:	.DF1.NIL
+	BEQ	1$
+	CMP	R1, #V.T
+	BNE	2$
+1$:	.SYVAL	V.STDIN		; *STANDARD-INPUT* / *STANDARD-OUTPUT*
+2$:	.TYPEP	U.STM
+ENSTYP:	BCS	E.TRP1
+ER.TYP:	TRAP	13.		; Type error
+
+BEQ.E.:	BNE	E.RTI3
+	.E.UNK
+
+BNE.E.:	BEQ	E.RTI3
+	.E.UNK
+
+BCC.E.:	BCS	E.RTI3
+	.E.UNK
+
+BCC.F.:	BCC	AFALS.
+E.RTI2:	BR	E.RTI3
+
+BCS.F.:	BCS	AFALS.
+	BR	E.RTI3
+
+BEQ.F.:	BEQ	AFALS.
+	BR	E.RTI3
+
+BNE.F.:	BNE	AFALS.
+	BR	E.RTI3
+
+BCS.T.:	BCS	ATRUE.
+	BR	E.RTI3
+
+
+BEQ.T.:	BEQ	ATRUE.
+	BR	E.RTI3
+
+B.NCF.:	BCC	ATRUE.
+	BR	AFALS.
+
+B.CF.:	BCS	ATRUE.
+	BR	AFALS.
+
+B.ZF.:	BEQ	ATRUE.
+	BR	AFALS.
+
+B.NZF.:	BNE	ATRUE.
+	BR	AFALS.
+
+;;-- # 20
+CONS.T:	.CONSP
+	BR	ENSTYP
+
+;; T.SYM  (THE SYMBOL x)
+SYM.T:	.SYMP
+	BR	ENSTYP
+
+STR.T:	.STRP
+	BR	ENSTYP
+
+T.VEC.:	.VECP
+	BR	ENSTYP
+
+T.CHR.:	.CHARP
+	BR	ENSTYP
+
+PRED.:	SEC		; flag to save R1
+	BR	SUBR2.
+
+;; Shift
+SH210.:	MOV	R1, R2.OFF(SP)
+	MOV	R0, R1
+	BR	E.RTI3
+
+;; CONVERT R1, R2 TO INT16
+TI16B.:	TO.I16
+ 	.SWP12
+ 	TO.I16
+ 	BR	SWP12.
+
+
+;; .PUSH0
+PUSH0.:	MOV	R0, R2
+	MOV	R1, R0
+	.CONS
+	BR	SWP01.
+
+
+;;-- 8. words
+;; Macro .CCASE
+;; LIKE A C SWITCH STATEMENT
+;; SEARCHES BYTE VALUE R1 IN ARRAY
+;;!!!TODO
+CCASE.:	MOV	(R4)+, R0		; COUNT
+1$:	CMPB	(R4)+, R1
+	BEQ	E.CASE
+	INC	R4
+	SOB	R0, 1$
+E.4TRP:	MOV	R4, PC.OFF(SP)
+E.TRP1:	BR	E.TRP7
+;;----
+
+SWP01.:	MOV	R1, R0.OFF(SP)
+	MOV	R0, R1
+E.TRP0:	BR	E.TRP7
+
+AFALS.:	CLR	R1
+	BR	B.RET1
+
+.	= A.TRAP + <110 - B.2.4 * 4>
+;; Called by BASIC
+;; R2: line length, R3: $BUF
+T110:	ADD	#16, SP
+	ADD	R2, R3			; R: end of line
+	MOV	R3, R1
+	MOVB	#C.NL, (R1)+		; terminate line by NL
+	JMP	GETLI1
+
+.IF DF C$MDAR
+T.AR.:	.ARP
+	BR	ENSTYP
+.ENDC
+
+
+
+SWP13.:	MOV	R1, R3.OFF(SP)
+	MOV	R3, R1
+	BR	E.RTI3
+
+
+;; .NREV0
+NREV0.:	MOV	R0, R1
+	.SUBR	NREVERSE
+	BR	E.RTI3
+
+
+;; TO.I16
+TOI16.:	PU.FL
+	.BASIC	$DI
+PCLC1.:	BR	PCLC.
+
+;; .BASN MACRO
+BASN.:	MOV	(R4)+, PC.OFF(SP)
+	MOV	R4, (SP)		; Assume R4.OFF == 0
+E.RTI3:	BR	E.RTI1
+
+
+;;-- 6 words
+DF3NI.:	CMP	R3, #V.U
+	BNE	E.TRP1
+	CLR	R3.OFF(SP)
+	BR	E.TRP1
+;;----
+
+POP5.:	TST	R5
+        BEQ	E.RTI1
+        MFPS	R3
+        MOV	R5, R1
+        T.CONS
+        MOV	(R5)+, R1
+        MOV	(R5), R5
+	BR	E.RTK
+
+;; FI16.R
+FI16R.:	MOV	#RET.1, PC.OFF(SP)
+	.BETWE	FIXEND-FIXOFF, 1-FIXOFF	;!!!?
+	BCS	FI16RC
+RFI16:	ADD	#FIXOFF, R1
+E.TRP7:	BR	E.TRAP
+
+;;---------end of 2/4-word Routines
+
+
+
+GPLAC.:
+1$:     T.SYM
+	BEQ.E
+	MOV	#DYNENV-4, R5
+3$:	CMP	(R5), R1
+	BEQ	PLAC9
+	MOV	4(R5), R5
+4$:	BNE	3$
+	MOV	#V.SYVA, R2
+	CALL	PLSPL4
+	BEQ	E.RTI8
+	TST	-(R5)		; R5 -= 2
+	BR	PLAC5
+
+
+TCASE.:	.TYCOD
+	ADD	R0, R4
+E.CASE:	MOVB	(R4), R4
+	ASL	R4
+	ADD	R4, PC.OFF(SP)
+E.RTI8:	BR	E.RTI
+
+
+FI16RC:	PUSH	R1
+	.BASN
+	.WORD	$ID, F.U16B	; TO DOUBLE
+
+
+BIND.:	MOV	#6, R3
+	CALL	INSER.
+	MOV	SP, R5
+	ADD	#ST.OFF + 4, R5
+	MOV	DYNENV, (R5)
+	MOV	(R4)+, -(R5)
+	MOV	(R4)+, -(R5)
+	MOV	R5, DYNENV
+	BR	E.4TRP
+
+
+;;-- 10.words
+;; .PLACE Macro
+;; R1: symbol
+;; RETURN: R3: address of place; ZF=1 if unbound
+PLACE.:	MOV	#LEXENV, R5
+6$:	MOV	(R5), R5
+	BEQ	GPLAC.
+	CMP	@(R5)+, R1
+	BNE	6$
+	MOV	-(R5), R5
+PLAC9:	TST	(R5)+		; R5 += 2
+PLAC5:	MOV	R5, (SP)	; Assume R4.OFF == 0
+E.RTI1:	BR	E.RTI
+
+
+
+;; F.U16
+F.U16.:	CMP	R1, #FIXEND-FIXOFF
+	BCS	RFI16
+	MOV	R1, R2
+	SUB	#100000, R2
+	MOV	#F32768+2, R1
+	PU.FL
+	PUSH	R2
+	.BASN
+	.WORD	$ID, $DADD, F.U16B
+
+
+
+
+;; TO.U16
+TOU16.: MOV	#F32768+2, R2
+	.BASN
+	.WORD	DPUR12, $DSUB, $DI, 1$
+1$:	ADD	#100000, (SP)
+P1.TRP:	POP	R1
+;; THIS CODE IS IN THE MIDDLE OF TRAP HANDLERS TO AVOID LONG JUMPS
+E.TRAP:	TST	R1        		; SET ZF = bool(R1==0)
+E.RTI:	MFPS	R3
+E.RTJ:	MOV	R5.OFF(SP), R5
+E.RTK:	MOV	R3, R5.OFF(SP)
+R.BAS:	POP	R4, R3
+	.CKSTK
+	JMP	$RTI20        		; POP R2, R0; RTI
+
+TYCOD.: CLR	R0
+	PUSH	R1
+	BEQ	Q.NULL
+	CMP	R1, #FIXEND
+	BLO	Q.FIXN
+	CMP	R1, #V.CHB
+	BHIS	Q.CHAR
+	CMP	R1, #A.FSUBR
+	BLO	Q.FUN
+	CMP     R1, #E.FSUBR
+	BLO	Q.SPOP
+	MOV	R1, R2
+	ASR	R2
+	BCS	1$
+	ASR	R2
+	BCC	Q.CONS
+	BR	Q.FLT
+1$:	ASR	R2
+	BCS	Q.STR
+.IF DF K1801
+	MOV	(R1), R1
+.IFF
+	MOV	-1(R1), R1
+.ENDC
+	;to save stack .LISTP
+	BEQ	Q.SYMB
+.IF DF C$MDAR
+	CMP	R1, #V.0	; R1 - negative for ARRAYS
+	BCS     Q.ARR
+.ENDC
+	CMP	R1, #FIXEND
+	BCS	Q.VEC		; R1 - fixnum
+	CMP	R1, #V.LAMB
+	BEQ	Q.LAMB
+	CMP	R1, #V.STM
+	BEQ	Q.STM
+	BR	Q.SYMB		;!!!TODO check R1 is list here
+.IIF DF C$MDAR,		Q.ARR:	INC	R0
+Q.SPOP:	INC	R0
+Q.LAMB:	INC	R0
+Q.FUN:	INC	R0
+Q.VEC:	INC	R0
+Q.STR:	INC	R0
+Q.STM:	INC	R0
+Q.FLT:	INC	R0
+Q.SYMB:	INC	R0
+Q.CONS:	INC	R0
+Q.CHAR:	INC	R0
+Q.FIXN:	INC	R0
+Q.NULL:	MOV	R0, R0.OFF+2(SP)
+	BR	P1.TRP
+
+
+
+;; POFL.R - Pop FLOAT and return
+R.POFL:	MOV	#RET.1, PC.OFF(SP)			; RETURN AFTER THIS OPERATION
+;; PO.FL - POP FLOAT
+PO.FL.:	.ALL.2
+	MOV	SP, R4
+	ADD	#ST.OFF, R4
+	MOV	(R4)+, (R1)+
+	MOV	(R4)+, (R1)+
+	MOV	(R4)+, (R1)+
+	MOV	(R4)+, (R1)
+	CMP	-(R1), -(R1)		; R1: DOUBLE object
+;; REMOVE WORDS FROM STACK UNTIL R4
+REMOV.:	MOV	SP, R0
+	ADD	#ST.OFF, R0
+1$:	MOV	-(R0), -(R4)
+	CMP	R0, SP
+	BNE	1$
+	MOV	R4, SP
+E.TRP6:	BR	E.TRAP
+
+
+POP1.:	MOV	R1, R5
+	.POP5
+	MFPS	R3
+	MOV	R1, R0.OFF(SP)	; works for NIL too
+	MOV	R5, R1
+	BR	E.RTJ		; R3: result flags
+
+
+ALL.2.:	MOV	#2, R5
+	BR	ALL.12
+; .ALL.1
+ALL.1.:	MOV	#1, R5
+ALL.12:	CLR	R0
+ALLOC.: CALL	MALLOC
+	.GC			; No free space, try GC
+	PUSH	#$TRAP7		; Out of memory
+; Allocate Heap object
+; IN: R0: VALUE TO INITIALIZE CELLS, R5 = SIZE (IN 4-BYTE UNITS)
+; On success returns from TRAP with R1 pointing to allocated memory
+; On fail returns to ALLOC.
+MALLOC:	MOV	#FREEL, R1
+1$:	MOV	R1, R3		; R3, R4 = &next
+	MOV	(R1), R1
+	BEQ	RE.LIS
+	CMP	R5, (R1)+
+	BHI	1$
+	BNE	2$
+	MOV	(R1), (R3)	; EXCLUDE CELL FROM FREE LIST
+2$:	MOV	-(R1), (SP)	; Use return address as temp var (SP): size in 4-byte cells
+	SUB	R5, (R1)
+	ASL	(SP)		; (SP): size in words
+	ADD	(SP), R1
+	ADD	(SP)+, R1	; Skip return address; R1: address behind allocated memory
+3$:	MOV	R0, -(R1)	; Initialize cells
+	MOV	R0, -(R1)
+	SOB	R5, 3$
+E.RTI9:	BR	E.RTI		; R1: allocated memory
+
+BASCON:	MFPS	-(SP)			; Continuation of BASIC.
+	MOV	#$BUFOUT + ST.OFF, R3
+	MOV	-(R3), R5
+	MOV	#R5.OFF/2, R2
+4$:	MOV	-(R3), -(SP)
+	SOB	R2, 4$			; Restore registers
+	BR	R.BAS
+
+
+
+;; .BETWE
+;; LOWER <= R1 < UPPER
+BETWE.:	ADD	#4, PC.OFF(SP)
+	CMP	(R4)+, R1
+	BHI	E.RTI9		; CF=0
+	CMP	R1, (R4)
+	BR	E.RTI9
+
+
+;; .LISTA
+LISTA.:	MOV	SP, R4
+	ADD	#ST.OFF, R4
+	MOV	(R4)+, R1
+	BR	LSN2.
+
+;; .LISTN
+LISTN.:	MOV	R0, R1
+	BEQ	E.TRP6
+	MOV	SP, R4
+	ADD	#ST.OFF, R4
+	CLR	R2
+LSN1.:	MOV	(R4)+, R1
+	.CONS
+LSN2.:	MOV	R1, R2
+	SOB	R0, LSN1.
+	BR	REMOV.
+
+;; .BASIC MACRO
+BASIC.:	MOV	(R4)+, 2$
+	MOV	R4, PC.OFF(SP)
+	MOV	#$BUFOUT, R3
+	MOV	#ST.OFF/2, R2
+1$:     MOV	(SP)+, (R3)+
+	SOB	R2, 1$                  ; SAVE REGS
+	.BASN
+2$:	.WORD	0, BASCON

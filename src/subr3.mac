@@ -1,0 +1,160 @@
+;;; Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
+;;;
+;;; SPDX-License-Identifier: MIT
+
+
+;;; Subroutines with 3+ arguments
+
+
+ASUBR3:
+
+;;                                               R3         &rest R5
+;; (PEEK-CHAR &optional peek-type input-stream eof-error-p eof-value) => char
+PEEKCH::
+	.DF1.NIL		; peek-type DEFAULT TO NIL
+	MOV	R1, R0		; R0: peek-type
+	MOV	R2, R5		; R5: input-stream
+	MOV	R3, R2		; R2: eof-error-p
+4$:	MOV	R5, R1		; R1: input-stream
+	.SUBR	R.CHR1		; (READ-CHAR input-stream eof-error-p NIL)
+	BEQ	R.EOF1		; EOF
+	CMP	R1, R0
+	BEQ	7$              ; FOUND peek-type
+	TST	R0
+	BEQ	7$		; peek-type == NIL
+	BLT	4$		; peek-type is character
+;; assume peek-type==T here
+	CMP	R1, #V.C.SP + 1
+	BCS	4$		; whitespace
+7$:	MOV	R5, R2
+	.UNREAD			; (UNREAD-CHAR char input-stream)
+R.B:	RETURN
+
+
+;; (ACONS key datum alist) => new-alist
+ACONS::  .CONS
+	MOV	R3, R2
+	BR	CONS
+
+;; (SUBST new old tree) => new-tree
+SUBST::	.SWP13		; R1: tree, R3: new
+SUBST1:	.EQL
+	BCS	R.M31
+	.CONSP
+	BCC	R.B
+	.POP1
+	.SBST1
+	.SWP01
+	.SBST1
+	MOV	R0, R2
+	BR	CONS
+
+
+;; (PAIRLIS keys data &optional alist) => new-alist
+PAIRLIS::
+	.DF3.NIL
+	MOV	R2, R5
+1$:	.POP1
+	BEQ	R.M31A
+	MOV	R1, R4
+	.POP5
+	.SH210
+	.SUBR	ACONS
+	MOV	R1, R3
+	MOV	R4, R1
+	BR	1$
+
+;; (FBOUNDP name) => fun object
+FBOUNDP::
+	.FUNAMP
+	BCC	3$
+	MOV	1(R1), R1
+	RETURN
+3$:	.POP1
+	MOV	(R1), R1
+	MOV	#V.SETF, R2
+;; (GET symbol indicator &optional default) => value
+GET::	CALL	SYPLS		; (SYMBOL-PLIST symbol)
+;; (GETF plist indicator &optional default) => value
+GETF::	MOV	R1, R5
+	CALL	PLSPL1
+GET2:	BEQ	1$
+	MOV	-(R5), R3	; property value
+1$:	.DF3.NIL
+R.M31A:	BR	R.M31
+
+
+;; (SETF (SYMBOL-VALUE symbol) new-value)
+;; (SET symbol value) => value
+SET::	.GPLAC
+	BEQ	1$		; not bound
+	MOV	R2, (R4)
+	BR	R.M21
+1$:	MOV	R2, R3
+	MOV	#V.SYVA, R2
+;; (SETF (GET symbol indicator) new-value) => new-value
+X.GET::	CALL	PLSPLC
+	BEQ	1$		; indicator not found
+	MOV	R3, -(R5)
+	BR	R.M31A
+1$:	CLR	R0
+	MOV	R3, R1		; value
+	.PUSH0
+	MOV	R2, R1		; indicator
+	.PUSH0			; R0: (indicator value)
+	MOV	R0, (R4)	; Assign (indicator value) to tail
+	BR	R.M31A
+
+
+;; (SETF (ELT seq index) new-element)
+X.ELT::	.STRP
+	BCS	X.CHAR
+	.SVECP
+	BCS	X.SVRE
+	.SWP12
+;; (SETF (NTH n list) new-object) => object
+X.NTH::	.SUBR	NTHCDR
+	BNE	1$
+	TRAP	9.		; Index-out-of-range
+1$:	MOV	R3, (R1)
+	BR	R.M31A
+
+.IF DF C$MDAR
+
+;; (SETF (ROW-MAJOR-AREF array index) new-element) => element
+X.RMAR::
+	CALL	RMAR
+	BR	X.SVR1
+.ENDC	; C$MDAR
+
+;; (SETF (SVREF simple-vector index) new-element)
+X.SVRE::
+	CALL	SVREF
+X.SVR1:	MOV	R3, (R2)
+	BR	R.M31A
+
+;; (SETF (CHAR string index) new-character) => character
+X.CHAR::
+	CALL	CHAR
+	MOV	R3, R1
+	T.CHR
+	MOVB	R1, (R2)
+	RETURN
+
+;; (MAKE-STRING-INPUT-STREAM string &optional start end) => string-stream
+MKSSTM::
+	T.STR
+	.DF2	V.0
+	.DF3.NIL
+	TST	R3
+	BNE	1$
+	BISB	-3(R1), R3	; STRING LEN
+	ADD	#FIXOFF, R3
+1$: 	MOV	R1, R4
+	.ALL.2
+	MOV	#V.STM, (R1)+
+	MOV	R4, (R1)+
+	MOV	R2, (R1)+
+	MOV	R3, (R1)
+	SUB	#5, R1
+	RETURN

@@ -1,0 +1,576 @@
+;;; Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
+;;;
+;;; SPDX-License-Identifier: MIT
+
+;; Special operators (FSUBR)
+
+A.FSUBR:
+
+
+PSETQ1: MOV	R1, R4
+	.POP5
+	BEQ.E
+	.EVAL1
+	CLR	R2
+	.CONS
+	MOV	R1, R2
+	MOV	#V.QUOTE, R1
+	.CONS
+	.PUSH0
+	MOV	R4, R1
+	.PUSH0
+;; (PSETQ {pair}*) => result
+PSETQ::	.POP5
+	BNE	PSETQ1
+	MOV	R0, R5
+	CALL	SETQ
+	RE.NIL
+
+SETQ1:	MOV	R0, (R4)
+;; (SETQ {pair}*) => result
+SETQ::	.POP5
+	BEQ	R.M01A
+	MOV	R1, R4		; R4: variable
+	.POP5
+	.EVAL1
+	MOV	R1, R0		; R0: Evaluated value
+	MOV	R4, R1		; R1: variable
+	.PLACE
+	BNE	SETQ1
+	MOV	#V.SYVA, R2
+	MOV	R0, R3
+	.SUBR	X.GET
+	BR	SETQ
+
+
+;; (AND form*) => result
+AND::	MOV	#V.T, R0	; R0: FLAG.Z   (V.T has Bit.2 set in its address)
+;; (OR form*) => result
+OR::	MOV	R0, R1
+OR1:	.POP5
+	BEQ	9$
+	.EVAL1
+	MFPS	R3
+	XOR	R0, R3
+	MTPS	R3
+	BEQ	OR1
+9$:	RETURN
+
+
+;; (SETF {pair}*) => result*
+SETF::	.POP5
+	BEQ	R.M01A
+	MOV	SP, R3
+ 	.SYMP
+	BCS	3$		; (SETF fun args)
+	.POP1
+	.SWP01			; R1: symbol, R0: value
+	MOV	#V.SETF, R2
+	.SUBR	GET
+	BEQ.E
+	PUSH	#V.FUNCALL, R1
+	.SWP01
+6$:	.POP1
+	BEQ	4$
+	PUSH	R0
+	BR	6$
+3$:	PUSH	#V.SETQ, R1
+4$:	.POP5
+	BEQ.E
+	PUSH	R1
+	SUB	SP, R3
+	ASR	R3
+	MOV	R3, R0
+	.LISTN
+	.EVAL1
+	MOV	R1, R0
+	BR	SETF
+
+
+;; (ROTATEF place*) => nil
+ROTATEF::
+	.POP5
+	BEQ	9$
+	MOV	R1, R0		; R0: Prev symbol
+	.SYVAL
+	MOV	R1, R4		; R4: value of first symbol
+	BR	2$
+1$:	MOV	R1, R3
+	.SYVAL
+	.SH210
+	MOV	R3, R0		; R0: Cur symbol
+	.SET
+2$:	.POP5
+	BNE	1$		; Set last symbol value in R4
+	MOV	R0, R1
+	MOV	R4, R2
+	.SET
+9$:	CLR	R1
+R.ROT:	RETURN
+
+;; (TAGBODY tag-statement*) => NIL
+TAGBODY::
+	MOV	SP, R1
+	MOV	R5, R2
+	.CONS
+	MOV	#LEXENV, R4
+	MOV	(R4), R2
+	.CONS
+	MOV	R1, (R4)		; Add TAGBODY-environment
+	BR	TAGBO1
+TAGBO2:	.CONSP
+	BCC	TAGBO1			; ignore tags
+	.EVAL1
+TAGBO1:	.POP5
+	BNE	TAGBO2
+	MOV	(R4), R5
+	MOV	2(R5), (R4)		; restore previous Environment
+RENIL1:	RE.NIL
+
+;; (COND {clause}*) => result*
+;; clause::= (test-form form*)
+COND::	.POP5
+	BEQ.F			; IF NO MORE, RET NIL
+	.POP1
+	BEQ.E
+	.SWP01
+	.EVAL1
+	BEQ	COND
+	MOV	R0, R5
+	BR	PROGN1
+;; (PROGN form*) => result
+PROGN::
+	CLR	R1
+PROGN1:	.POP5
+	BEQ	R.ROT		; Return last evaluated value
+	.P5EVL
+	BR	PROGN1
+
+
+
+;-------------------------------------------
+FSUBR1:
+
+;; (POP place) => element
+S.POP::	.PLACE
+	BEQ.E
+	MOV	(R4), R1
+	.POP1
+	MOV	R1, (R4)
+R.M01A:	MOV	R0, R1
+	RETURN
+
+;; Make '(BLOCK NIL' environment
+BLENV0:	CLR	R2
+;; Make BLOCK-environment
+;; R2: block name
+;; Destroys: R2, R4
+BLENV:	PUSH	R1
+	MOV	SP, R1
+	CMP	(R1)+, (R1)+	; R1 += 4; contains SP pointing of caller
+	.CONS			; (SP . name) BLOCK-environment entry
+	MOV	LEXENV, R2
+	.CONS
+	MOV	R1, LEXENV	; Add BLOCK-environment
+	POP	R1
+	RETURN
+
+;; (BLOCK name form*) => result
+BLOCK::	MOV	R1, R2
+	CALL	BLENV
+    	CALL	PROGN
+    	MOV	LEXENV, R5
+    	TST	(R5)+
+;; unwind BLOCK
+;; (R5): prev LEXENV
+UNW.BL:	MOV	(R5), LEXENV		; restore LEXENV
+    	RETURN
+
+
+
+;; (FUNCTION name) => function
+FUNCTION::
+.IF NDF K1801
+	.CONSP
+	BCC	1$
+.ENDC
+	CMP	(R1), #V.LAMB
+	BEQ	2$
+1$:     JMP	FDEFINITION
+2$:	.POP1			; skip LAMBDA keyword
+	MOV	R1, R5		; R5: (lambda-list . body)
+	.POP5			; R1: lambda-list, R5: body
+;; (LAMBDA lambda-list &rest body) => function
+LAMBDA::
+	PUSH	R1		; SAVE &REST BODY
+	.ALL.2
+	MOV	#V.LAMB, (R1)+
+	POP	(R1)+		; Lambda list
+	MOV	R5, (R1)+	; body
+	MOV	LEXENV, (R1)
+	SUB	#5, R1
+	RETURN
+
+
+;; (WHEN test-form form*) => result
+WHEN::	DEC	R0
+;; (UNLESS test-form form*) => result
+UNLESS::
+	.EVAL1
+	ADD	R0, R1
+	BHI	RENIL1
+PROGNA:	BR	PROGN
+
+
+;; (LET ({var | (var [init-form])}*) form*) => result
+LET::	MOV	#100000, R0
+;; (LET* ({var | (var [init-form])}*) form*) => result
+LETA::	MOV	LEXENV, R3
+	PUSH	R3, DYNENV	; Save environments
+	MOV	SP, R4
+	ADD	R0, R4		;  R4 < 0: LET;  R4 >= 0: LET*
+	BR	4$
+1$:	PUSH	R3, R1		; save LEXENV, varlist
+	CLR	-(SP)		; value=0
+	MOV	R0, R1
+	.SYMP
+	BCS	3$
+	.POP1     		; (var [init-form]) case
+	MOV	R0, R2		; R2: var
+	.POP1
+	MOV	R0, R1		; R1: init-form
+	.EVAL1
+	MOV	R1, (SP)	; value
+	MOV	R2, R1		; R1: var
+3$:	MOV	#V.SPEC, R2
+	CLR	R3
+	.PRED	GET		; (GET symbol 'special nil)
+	POP	R2, R0, R3	; R0: varlist, R2: value, R3: LEXENV
+	BCC	5$		; lexical var
+	PUSH	R4
+	BIC	#100000, (SP)	; clear 'LET/LET*' bit
+	CMP	(SP)+, SP
+	BEQ	2$		; first DYN frame uses saved DYNENV
+;; previous DYN frame
+	.WORD	010646		; PUSH	SP	;!!!I MACRO-11 marks this instruction is incompatible among PDP-11 models;
+2$:	PUSH	R2, R1
+	TST	R4
+	BMI	7$		; LET case
+	MOV	SP, DYNENV
+	BR	7$
+5$:	.SUBR	ACONS		; (ACONS var val LEXENV)
+	MOV	R1, R3		; R3: new LEXENV
+	TST	R4
+	BMI	7$		; LET case
+	MOV	R3, LEXENV	; LET* case
+7$:	MOV	R0, R1
+4$:	.POP1
+	BNE	1$
+	BIC	#100000, R4	; clear 'LET/LET*' bit
+	CMP	R4, SP
+	BEQ	8$		; No dynamic bindings
+	MOV	SP, DYNENV
+8$:	MOV	R3, LEXENV
+;; assume R1==0 here
+9$:	.EVAL1          	;!!! Don't use .EVAL1 to save stack for recursions
+	.POP5
+	BNE	9$		; Return last evaluated value
+	MOV	R4, SP		; unwind dynamic environment frames
+	POP	DYNENV, LEXENV		;!!!? Restore dynamic & lexical environments
+;; (QUOTE object) => object
+QUOTE::	RETURN
+
+;; (DOTIMES (var count-form [result-form]) statement*) => result
+DOTIMES::
+	CALL	DOPREP
+	MOV	R1, R2
+	MOV	#V.0, R1
+	BR	2$
+1$:	PR.PROGN		; Execute body
+	.SUBR	INCR
+2$:	MOV	R1, (R3)	; Bind var to next value of counter
+	.PRED	LT12
+	BCS	1$
+DOTIM1:	MOV	R4, R1
+	.EVAL1			; Eval result-form
+	MOV	LEXENV, R5
+1$:	CMP	@(R5)+, SP	; (EQ (CAR block-environment-entry) SP)
+	BEQ	UNW.BL
+	MOV	(R5), R5
+	BR	1$
+
+;; (GO tag) =>
+GO::	MOV	#LEXENV, R4
+	BR	2$
+1$:	MOV	(R5), (R4)	; Pop environment
+2$:	MOV	(R4), R5
+	MOV	(R5)+, R3	; R3: environment element
+	BEQ.E
+	CMP	(R3)+, #FIXEND	; Check for TAGBODY-environment, it has small integer as CAR (saved SP register)
+	BHIS	1$
+	MOV	(R3), R2	; R2: TAGBODY's tags/statements
+	BIT	#1, R2
+	BNE	1$		; BLOCK-environment
+	.SUBR	MEMBER
+	BEQ	1$		; try next TAGBODY-environment if the tag is not found
+	MOV	R1, R5		; R5: points to the tag we jumped
+	MOV	-(R3), R0	; R0: target SP
+	MOV	#TAGBO1, R2	; longjmp into TAGBODY
+;; R0: target stack pointer
+;; R2: address to jump
+UNWIND:	MOV	DYNENV, R3
+	BEQ	9$
+	CMP	R3, R0		; compare with target SP
+	BHIS	9$
+	MOV	4(R3), DYNENV
+	BR	UNWIND
+9$:	MOV	R0, SP
+	JMP	(R2)
+
+
+;; (DOLIST (var list-form [result-form]) statement*) => result
+DOLIST::
+	CALL	DOPREP
+1$:	CLR	(R3)		; Bound var to NIL for result-form
+	.POP1			; R0: NEXT LIST ELEMENT
+	BEQ	DOTIM1
+	MOV	R0, (R3)	; BIND VAR TO LIST ELEMENT OR NIL ON THE END
+	PR.PROGN		; EXECUTE BODY
+	BR	1$
+
+
+
+;; (PROG2 first-form second-form form*) => result-2
+PROG2::	.EVAL1
+	.POP5
+	BEQ.E
+;; (PROG1 first-form form*) => result-1
+PROG1::	.EVAL1
+	PUSH	R1
+	CALL	PROGN
+	BR	POP1.R
+
+;; (DEFVAR name &optional initial-value) => name
+DEFVAR::
+	MOV	R1, R3		; R3: name
+	MOV	R1, R2		; R2: name
+	.BOUNDP
+	BCS	DEFVA2		; don't eval for bound variable
+	.POP5
+	BEQ	DEFVA2		; no value
+DEFVA1:	.EVAL1
+	.SWP12			; R1: name R2: evaluated initial-value
+	.SET
+DEFVA2:	MOV	R3, R1		; R1: name
+	MOV	#V.SPEC, R2
+	.PRED	X.GET		; (SETF (GET name 'SPECIAL) name)
+	RETURN
+
+
+;; (TIME form) => result
+TIME::	PUSH	R1		; place in stack for EVAL result
+	MOV	R1, R5
+	MOV	#V.M.1K, R1
+	PU.FL
+	.SYVAL	V.FREQ
+	PU.FL
+	PU.NOW
+	MOV	R5, R1
+	.EVAL1
+	MOV	R1, 30(SP)
+	PU.NOW
+	.BASN						; (floor (* -1000 (/ (- prev-real-time (GET-INTERNAL-REAL-TIME)) INTERNAL-TIME-UNITS-PER-SECOND)))
+	.WORD	$DSUB, DSWAP, $DDIV, $DMUL, $INT, 2$	; to get milliseconds from timer ticks
+2$:	PO.FL
+	CLR	R2
+	.PRINT
+	.P.STR	A.MS
+POP1.R:	POP	R1		; Restore first form result
+	RETURN
+
+;; (RETURN &optional result) =>
+RETU::	.SH210          	; (RETURN-FROM NIL result)
+;	BR	RETUFR		; fallback
+
+;;;----------------
+
+FSUBR2:
+;; (RETURN-FROM name &optional result) =>
+RETUFR::
+	.SWP12                  ; R2: name
+	.DF1.NIL
+	.EVAL1			; R1: evaluated result
+	MOV	#LEXENV, R4
+	BR	2$
+1$:	MOV	(R5), (R4)	; Pop environment
+2$:	MOV	(R4), R5
+	MOV	(R5)+, R3	; R3: environment element
+	BEQ.E
+	CMP	(R3)+, #FIXEND	; Check for TAGBODY-environment, it has small integer as CAR (saved SP register)
+	BHIS	1$		; non-BLOCK-environment
+	CMP	(R3), R2
+	BNE	1$		; next environment entry
+	MOV	-(R3), R0	; R0: target SP
+	MOV	#UNW.BL, R2     ; longjmp into BLOCK
+	BR	UNWIND
+
+
+;; (DO* ({var init step}*) (end-test-form result-form*) statement*) => result
+DOA::	ADD	#V.LETA - V.LET, R0
+;; (DO ({var init step}*) (end-test-form result-form*) statement*) => result
+DO::	ADD	#V.LET, R0
+	MOV	R2, R3			; R3: (end-test-form result-form*)
+	MOV	R5, R2			; R2: (statements)
+	MOV	R1, R5			; R5: ({var init step}*)
+	PUSH	#V.BLOCK
+	CLR	-(SP)			; Stack: BLOCK NIL
+	PUSH	R0, R1, #V.TAGB, #2	; LET/LET* ({var init step}*) TAGBODY #2
+	SUB	#V.LET-V.PSETQ, R0
+
+	PUSH	#V.UNLESS, (R3)+	; Stack: LET/LET*, ({var init step}*) TAGBODY #2 UNLESS test; (R3): (result-form*)
+
+	MOV	#V.PROGN, R1
+	.CONS				; R1: (PROGN statements)
+	PUSH	R1			; Stack: LET/LET*, ({var init step}*) TAGBODY #2 UNLESS test (PROGN statements)
+
+	MOV	R0, R1			; R1: SETQ/PSET
+	CLR	R0
+	.PUSH0				; SETQ/PSET
+	BR	2$
+1$:	.SYMP
+	BCS	2$			; no step for symbol
+	MOV	R1, R2			; R2: (var init [step])
+	MOV	(R2)+, R1		; R1: var
+	MOV	(R2)+, R2		; R2: (init [step])
+	TST	(R2)+			; R2: (step)
+	TST	(R2)
+	BEQ	2$			; no step: (var init)
+	.PUSH0
+	MOV	@(R2)+, R1
+	.PUSH0
+2$:     .POP5
+	BNE	1$
+	.NREV0          		; R1: (SETQ/PSETQ var1 step1...)
+	PUSH	R1			; Stack: LET vars TAGBODY #2 UNLESS test (PROGN ...) (SETQ ...)
+
+	MOV	#2, R0
+	PUSH	#V.GO, R0
+	.LISTN				; R1: (GO #1)
+	PUSH	R1			; Stack: LET vars TAGBODY #2 UNLESS test (PROGN ...) (SETQ ...) (GO #2)
+
+	MOV	#5, R0
+	.LISTN
+	PUSH	R1			; Stack: LET vars TAGBODY #2 (UNLESS test (PROGN ...) (SETQ ...) (GO #2))
+
+	CMPB	-(R0), -(R0)		; R0: 3
+	.LISTN
+	PUSH	R1, (R3)		; Stack: LET vars (TAGBODY #2 (UNLESS test (PROGN ...) (SETQ ...) (GO #2))) (result-forms*)
+
+	INC	R0			; R0: 4
+	.LISTA     			; R1: expanded macro (LET vars (TAGBODY ...) result-forms*)
+
+	PUSH	R1
+	DEC	R0			; R0: 3
+	.LISTN     			; R1: expanded macro (BLOCK NIL (LET vars (TAGBODY ...) result-forms*))
+	BR	JEVAL1
+
+;; (DEFPARAMETER name initial-value) => name
+DEFPARAMETER::
+	MOV	R1, R3		; R3: name
+	.SWP12			; R1: initial-value, R2: name
+	BR	DEFVA1
+
+;; (DEFUN name lambda-list &rest body) => name
+DEFUN::	PUSH	R1    		; SAVE NAME
+	MOV	R5, R0
+	.FUNAMP
+	BCS	1$
+	MOV	@2(R1), R1	; R1: name of (SETF name) form
+1$:	.PUSH0			; R0: (function-block-name . body)
+	MOV	#V.BLOCK, R1
+	.PUSH0
+	MOV	R0, R1
+	CLR	R0
+	.PUSH0
+	MOV	R0, R5		; R5: ((BLOCK function-block-name . body))
+	MOV	R2, R1
+	.SUBR	LAMBDA
+	MOV	R1, R2
+	MOV	(SP), R1
+	.SYMP
+	BCS	2$
+	MOV	@2(R1), R1
+	MOV	R2, R3
+	MOV	#V.SETF, R2
+	.SUBR	X.GET		; (SETF (GET 'SYMBOL 'SETF) LAMBDA)
+	BR	9$
+2$:	.PRED	X.SYFU		; (SETF (SYMBOL-FUNCTION sym) fun)
+9$:	BR	POP1.R
+
+
+;; (PROGV symbols values form*) => result
+PROGV::	MOV	#DYNENV, R3	; R3: &DYNENV
+	PUSH	(R3)		; PUSH DYNENV
+	MOV	SP, R4		; R4: pointer used to unwind
+	.EVAL1
+	.SWP12			; R2: evaluated symbols
+	.EVAL1			; R1: evaluated values
+1$:	.POP1
+	BEQ	8$
+	PUSH	(R3)		; PUSH DYNENV
+	PUSH	R0		; binded value
+	.SWP12
+	.POP1
+	PUSH	R0       	; symbol
+	.SWP12
+	MOV	SP, (R3)	; set DYNENV to SP
+	BR	1$
+7$:	.EVAL1			; PROGN
+8$:	.POP5
+	BNE	7$		; Return last evaluated value
+	MOV	R4, SP		; unwind dynamic environment frames
+	POP	(R3)		; restore DYNENV
+	RETURN
+
+;; (IF test-form then-form &optional else-form) => result*
+IF::	.EVAL1
+	BNE	1$
+	MOV	(R5), R2	; R1: else form
+1$:	MOV	R2, R1
+JEVAL1:	JMP	EVAL1
+
+
+;; (PUSH item place) => new-place-value
+S.PUSH::
+	.EVAL1
+	.SWP12
+	.PLACE
+	BEQ.E
+	MOV	R2, R1
+	MOV	(R4), R2
+	.CONS
+	BR	R.INCF
+
+
+;; (DECF place &optional delta-form) => new-value
+DECF::	TST	(R0)+			; R0: 2 (offset of $DSUB address)
+;; (INCF place &optional delta-form) => new-value
+INCF::  .DF2	V.1
+	.SWP12
+	.EVAL1
+	.SWP12
+	.PLACE
+	BEQ.E
+	MOV	(R4), R1		; R1: place value
+	MOV	$APLMI(R0), BAS2A       ; select $DADD or $DSUB operation
+	.SUBR	BAS2
+R.INCF:	MOV	R1, (R4)
+	RETURN
+
+
+
+
+
+FSUBR3:
+
+E.FSUBR:

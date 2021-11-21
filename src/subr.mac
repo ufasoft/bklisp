@@ -1,0 +1,212 @@
+;#######   Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com #####
+;#                                                                                                                                #
+;#       See LICENSE for licensing information                                                                                    #
+;##################################################################################################################################
+
+;; Subroutines
+
+ASUBR0:
+
+;; (QUIT) => exit into MONITOR operating system
+QUIT::	.EXIT
+
+;; (LIST &rest objects) => list
+LIST::	MOV	R5, R1		; R5: &REST
+RE.LIS:	RETURN
+
+
+
+
+LOGRED:	POP	R1
+LOGR.0:	.POP5
+	BNE	1$
+	MOV	R0, R1
+	FI16.R
+1$:	TO.I16
+	JMP	(R4)
+
+;; (LOGAND &rest integers) => result-integer
+LOGAND::
+	COM	R0
+	JSR	R4, LOGRED
+	COM	R1
+	BIC	R1, R0
+	BR	LOGR.0
+
+;; (LOGIOR &rest integers) => result-integer
+LOGIOR::
+	JSR	R4, LOGRED
+	BIS	R1, R0
+	BR	LOGR.0
+
+;; (LOGXOR &rest integers) => result-integer
+LOGXOR::
+	JSR	R4, LOGRED
+LOGXO1:	XOR	R1, R0
+	BR	LOGR.0
+
+;; (LOGEQV &rest integers) => result-integer
+LOGEQV::
+	COM	R0
+	JSR	R4, LOGRED
+	COM	R0
+	BR	LOGXO1
+
+;; (EXTROOM) => nil
+;; Switches to Extended Memory mode (+12 KB RAM)
+;; The operation cannot be reversed
+EXTROOM::
+.IF DF BK10.01
+	MOV	#C.EXTM, R0
+	MOVB	R0, @#$EXTM	; Set ExtMem byte explicitly to non-(0 or 377 value) to prevent switching off
+	EMT	16		; Switch on ExtMem mode
+.ENDC
+;	MOV	#HIMEME, EHEAP
+;; (ROOM) => free bytes
+ROOM::	.GC
+	MOV	#FREEL-2, R2
+	CLR	R1
+1$:	ADD	(R2)+, R1
+2$:	MOV	(R2), R2
+	BNE	1$
+	ASL	R1		; R2: 0, used as stream; BYTES == CELLS * 4
+	ASL	R1
+	F.U16
+	.PRINT
+	.P.STR	A.ROOM
+	RETURN
+
+VECTO1:	MOV	R1, R5
+;; (VECTOR &rest objects) => vector
+VECTOR::
+	MOV	R5, R1
+	.LENGTH
+	.MKAR
+	MOV	R1, R2
+	INC	R2
+	TST	R5
+1$:	BEQ	RE.LIS
+	MOV	(R5)+, (R2)+	; COPY LIST TO VECTOR
+	MOV	(R5), R5
+	BR	1$
+
+
+
+LISTA1:	PUSH	R1
+	INC	R0
+;; (LIST* &rest objects+) => result
+LISTA::	.POP5
+	BNE	LISTA1
+	.LISTA
+	RETURN
+
+APPEN1:	TST	R5
+	BEQ	1$	; R1: last list
+	.SUBR	CPLIST
+1$:	.PUSH0
+;; (APPEND &rest lists) => result
+APPEND::
+	.POP5
+	BNE	APPEN1
+	.NREV0
+	MOV	R1, R5
+	CLR	R2
+NCONC1:	MOV	R2, R0
+;; (NCONC &rest lists) => concatenated-list
+NCONC::	.POP5
+	BEQ	R.0
+	.SH210
+	BEQ	NCONC1
+	.SUBR	LAST1
+	MOV	R2, 2(R1)
+	BR	NCONC
+
+;; (GET-INTERNAL-REAL-TIME) => internal-time
+GETTIM::
+	MOV	#$TMCNT, R2
+	MOV	(R2)+, R1		; Read CNT
+	TSTB	(R2)			; R2: $TMCSR, test CSR.FL bit (overflow)
+	BPL	1$			; No overflow, R1 contains count
+	MOV	#F32768+2, R1		; Add duration of one timer cycle 65536==2*32768
+	.PUSH0
+	.PUSH0
+	MOV	@#$TMCNT, R1		; Re-read CNT because of Race Condition with two volatile vars: FL and CNT, recheck
+1$:	MOV	#$TMMOD, (R2)		; Reset Timer, R2: $TMCSR
+	NEG	R1
+	F.U16
+	.PUSH0
+	MOV	PRVTIM, R1
+	.PUSH0
+	MOV	R0, R5
+	.SUBR	S.ADD
+	MOV	R1, PRVTIM
+	RETURN
+
+;; (* &rest numbers) => product
+S.MUL::	MOV	#$DMUL, R4
+	INC	R0
+	BR	ADDMUL
+
+;; (+ &rest numbers) => sum
+S.ADD::	MOV	#$DADD, R4
+ADDMUL:	ADD	#V.0, R0
+	MOV	R5, R2
+	BEQ	R.0
+	BR	REDUC2
+
+;; (INKEY) => char-p
+INKEY::
+.IF DF BK10.01
+	TSTB	$TSTKEY
+	BEQ	R.0		; no pressed key
+	.TTYIN	R1
+.IFF
+	.TTINR
+	BCS	R.0		; no pressed key
+.ENDC
+	BR	CODEC3		; (CODE-CHAR R1)
+
+;; (Y-OR-N-P &optional control &rest arguments) => generalized-boolean
+YORNP::	TST	R5
+	BEQ	2$
+	CLR	R1		; R1: NIL (terminal stream)
+	.FRESHL			; (FRESH-LINE NIL)
+	MOV	#V.T, R1
+	.FORMAT			; (APPLY 'FORMAT T control arguments)
+1$:     CLR	R2		; R3: terminal stream
+	.P.CHR	C.SP, 'Y	; " Y/N" prompt
+	.P.CHR	'/, 'N
+2$:	.SUBR	INKEY		; (INKEY)
+	BEQ	2$		; wait for input
+	.CHRUP			; (CHAR-UPCASE char)
+	CMP	R1, #V.C.Y
+	BEQ.T
+	CMP	R1, #V.C.N
+	BEQ.F
+	BR	1$
+
+;; (MACHINE-TYPE) => description
+MTYP::	ADD	#V.MTYP - V.MVER, R0
+;; (MACHINE-VERSION) => description
+MVER::	ADD	#V.MVER - V.LTYP, R0
+;; (LISP-IMPLEMENTATION-TYPE) => description
+LTYP::	ADD	#V.LTYP - V.LVER, R0
+;; (LISP-IMPLEMENTATION-VERSION) => description
+LVER::	ADD	#V.LVER, R0
+R.0:	MOV	R0, R1
+	RETURN
+
+;; (MAKE-STRING-OUTPUT-STREAM) => string-stream
+MKSOS::	.ALL.2
+	MOV	#V.STM, (R1)
+INC1RA:	INC	R1
+	RETURN
+
+
+.INCLUDE	/subr1.mac/
+.INCLUDE	/subr2.mac/
+.INCLUDE	/subr3.mac/
+
+
+;;;---------------------------------------------------------------------------------
+ASUBR4:

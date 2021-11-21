@@ -1,0 +1,725 @@
+;;; Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
+;;;
+;;; SPDX-License-Identifier: MIT
+
+
+;;; Subroutines with 2+ arguments
+
+
+ASUBR2:
+
+LAST1:	MOV	#V.1, R2	; n = 1
+;; (LAST list &optional (n 1)) => tail
+LAST::	MOV	R1, R5		; second-list lagging by n
+	.DF2	V.1
+	.SWP12
+	TO.U16
+	.SWP12			; main list
+1$:	.CONSP
+	BCC	R.M51		; return second-list
+	DEC	R2
+	BPL	2$
+	MOV	2(R5), R5
+2$:	.POP1
+	BR	1$
+
+
+;; (1+ number) => successor
+INCR::	TST	(R0)+			; R0 = 2
+;; (1- number) => predecessor
+DECR::	ADD	#V.0-1, R0
+	MOV	R0, R2
+	MOV	#$DADD, R4
+BAS1:	MOV	R4, BAS2A
+BAS2:	.BASN
+	.WORD	DPUR12
+BAS2A:	.WORD	$DADD
+DREFLT:	.WORD	RBAS.5
+
+
+;; (LOG number &optional base) => logarithm
+LOG::	PU.FL
+	.BASIC	$LOG                       ;!!!TODO OPTIMIZE
+	CMP	R2, R4		; compare with #V.U
+	BEQ	RBAS.5
+	.BASN
+	.WORD	DPUR2, $LOG, $DDIV, RBAS.5
+
+
+
+
+
+;; (SVREF simple-vector index) => element
+SVREF::	T.VEC
+	.SWP12
+.IIF NDF K1801, DEC	R2
+	MOV	(R2)+, R0	; R0: vector length
+	SUB	#FIXOFF, R0
+SVREF1:	TO.U16
+	CMP	R1, R0
+	BHIS	E.RANG
+	ASL	R1
+	ADD	R1, R2
+	MOV	(R2), R1
+	RETURN
+
+.IF DF C$MDAR
+
+
+
+
+;; (ARRAY-DIMENSION array axis-number => dimension
+ARDIM::	.ARDMS			; (ARRAY-DIMENSIONS array)
+.ENDC
+;; (ELT sequence index) => object
+ELT::	.STRP
+	BCS	CHAR
+	.SVECP
+	BCS	SVREF
+	.SWP12
+	.SUBR	NTHCDR
+	BNE	R.CAR
+E.RANG:	TRAP	9.			; index is out of range
+
+.IF DF C$MDAR
+
+;; (ROW-MAJOR-AREF array index) => element
+RMAR::	.VECP
+	BCS	ELT		; (elt rray index)
+	T.AR
+	.SWP12			; R1: index
+	.IIF NDF K1801, DEC	R2
+	MOV	#FIXOFF-1, R0
+	SUB	(R2)+, R0	; R0: (ARRAY-TOTAL-SIZE array)
+	TST	(R2)+
+	BR	SVREF1
+
+.ENDC	; C$MDAR
+
+
+
+;; (CHAR string index) => character
+CHAR::	SUB	#3, R1
+	BISB	(R1)+, R0
+	.SWP12
+	TO.U16
+	CMP	R1, R0
+	BHIS	E.RANG
+	ADD	R1, R2
+	MOV	#V.CHB, R1
+	BISB	(R2), R1
+	RETURN
+
+
+;; (TAILP object list) => bool
+TAILP::	.SWP12
+1$:	.EQL
+	BCS.T
+	.CONSP
+	BCC.F
+	.POP1
+	BR	1$
+
+
+
+
+
+;!!!R	STR:
+;!!!R		MOV	#3, R0
+;!!!R	CMTBIT:
+;!!!R		CALL	HEAPP
+;!!!R		BCC.F
+;!!!R		BIC	#177774, R1
+;!!!R		CMP	R1, R0
+;!!!R		B.ZF
+
+EQLPCH: .SWP12
+	.CHARP
+	BCC.F
+CH.EQU:	MOV	#V.CHB, R1
+	MOV	R1, R2
+	BISB	R3, R1
+	BISB	R4, R2
+CHEQU2:	.CHRUP
+	.SWP12
+	.CHRUP
+EQ.CH:	T.CHR
+	.SWP12
+	T.CHR
+;; (EQ x y) => bool
+EQ::	CMP	R1, R2
+	B.ZF
+
+;; (EQL x y) => bool
+EQL::	.FLTP
+	BCC	EQ
+	.SWP12
+	.FLTP
+2$:	BCC.F
+	BIT	-(R1), (R0)+	; R1 -= 2; R2 -= 2
+	BIT	-(R2), (R0)+	; R0 = 4
+1$:	CMP	(R1)+, (R2)+   	; COMPARE DOUBLES
+	BNE	9$
+	SOB	R0, 1$
+9$:	B.ZF
+
+
+EQUAL1:	MOV	R1, R3
+	MOV	R2, R4
+	MOV	R2, R1
+	.CONSP
+	BCC.F
+	.PRED	EQUAL2		; COMPARE CONSES
+	BCC.F
+	CMP	(R3)+, (R4)+	; R3 += 2; R4 += 2
+EQUAL2:	MOV	(R3), R1
+	MOV	(R4), R2
+;; (EQUAL x y) => bool
+EQUAL::	.EQL
+	BCS.T
+	.CONSP
+	BCS	EQUAL1
+	.STRP
+	BCC.F
+	.SWP12
+	.STRP
+	BCC.F
+	BR	STREQ1
+;; (STRING-EQUAL string1 string2) => bool
+STREQU::
+	ADD	#CH.EQU - CH.EQ, R0
+;; (STRING= string1 string2) => bool
+;; ASSUME R0 == 0
+STREQ::  T.STR
+	.SWP12
+	T.STR
+STREQ1:	ADD	#CH.EQ, R0	; Skip type checks for FIND-SYMBOL
+	MOV	R0, STR.EO + 2
+	BITB	-(R1), -(R2)	; R1 -= 3, R2 -= 3
+	BIT	-(R1), -(R2)
+	CMPB	(R1), (R2)+
+	BNE.F
+	CLR	R0
+	BISB	(R1)+, R0
+	BEQ.T
+STR.E1:	MOVB	(R1)+, R3
+	MOVB	(R2)+, R4
+STR.EO:	.PRED	CH.EQ		; Self-modifying
+	BCC.F
+	SOB	R0, STR.E1
+	RE.T
+
+
+EQLP.C:	MOV	R2, R1
+	.CONSP
+	BCC.F
+	.PRED	EQLP2
+	BCC.F
+	CMP	(R3)+, (R4)+	; R3 += 2; R4 += 2
+EQLP2:	MOV	(R3), R1
+	MOV	(R4), R2
+EQUALP::
+	.PRED	EQUAL
+	BCS.T
+	MOV	R1, R3
+	MOV	R2, R4
+       .TCASE
+1$:    .BYTE   <2$ - 1$> / 2		; NULL
+       .BYTE   <2$ - 1$> / 2		; FIXNUM
+       .BYTE   <EQLPCH - 1$> / 2	; CHARACTER
+       .BYTE   <EQLP.C - 1$> / 2	; CONS
+       .BYTE   <2$ - 1$> / 2		; SYMBOL
+       .BYTE   <2$ - 1$> / 2		; FLOAT
+       .BYTE   <2$ - 1$> / 2		; STREAM
+       .BYTE   <3$ - 1$> / 2		; STRING
+       .BYTE   <4$ - 1$> / 2		; SIMPLE VECTOR
+       .BYTE   <2$ - 1$> / 2		; SYSTEM FUNCTION
+       .BYTE   <2$ - 1$> / 2		; LAMBDA FUNCTION
+       .BYTE   <2$ - 1$> / 2		; SPECIAL OPERATOR
+.IIF DF C$MDAR .BYTE   <5$ - 1$> / 2	; ARRAY
+       .EVEN
+2$:    RE.NIL
+
+.IF  DF C$MDAR
+5$:	.IIF NDF K1801, DEC	R1
+	MOV	(R1), R5
+	NEG	R5
+	ADD	#FIXOFF+1, R5
+	BR	6$
+.ENDC	; C$MDAR
+
+4$:
+.IIF NDF K1801, DEC	R1
+	MOV	(R1), R5
+	SUB	#FIXOFF - 1, R5		; LOOP COUNTER: LEN + 1 TO COMPARE LENGTH FIELD TOO
+6$:
+.IF NDF K1801
+	BITB	-(R3), -(R4)		; --R3; --R4
+.ENDC
+3$:	.PRED	EQLP2
+	BCC.F
+	CMP	(R3)+, (R4)+	; R3 += 2; R4 += 2
+	SOB	R5, 3$
+	RE.T
+
+
+CH.EQ:	CMPB	R3, R4
+	B.ZF
+
+CH.NE:	CMPB	R3, R4
+	B.NZF
+
+
+
+;; (STRING/= string1 string2) => bool
+STRNE::	.STREQ
+	B.NCF
+
+;; (ASH integer count) => shifted-integer
+ASH::	.TI16B
+	TST	R2
+	BEQ	9$
+	BLT	7$
+1$:	ASL	R1
+	SOB	R2, 1$
+	BR	9$
+7$:	NEG	R2
+8$:	ASR	R1
+	SOB	R2, 8$
+9$:	FI16.R
+
+EQ.NUM:	.BASN
+	.WORD	DPUR12, $DCMP, NOT
+
+;; (SUBSETP list-1 list-2) => bool
+;;!!! INEFFICIENT BUT TERSE IMPLEMENTATION, MAKES UNNECESSARY ALLOCATIONS
+SUBSETP::
+	.SUBR	SETDIF		; (NULL (SET-DIFFERENCE list-1 list-2))
+	B.ZF
+
+;; (INTERSECTION list-1 list-2) => result-list
+INTERSECTION::
+	MOV	#103001, INTDI2		; OPCODE: BCC INTDI3
+	BR	INTDIF
+
+;; (UNION list-1 list-2) => result-list
+UNION::	MOV	R2, R0			; IMPLEMENTATION:  (NCONC (SET-DIFFERENCE list-1 list-2) list-2)
+;; (SET-DIFFERENCE list-1 list-2) => result-list
+SETDIF::
+	MOV	#103401, INTDI2		; OPCODE: BCS INTDI3
+;; INTERSECTION/SET-DIFFERENCE
+INTDIF::
+	MOV	R1, R5
+INTDI3:	.POP5
+	BEQ	R.M01
+INTDI1:	.MEMBER
+INTDI2:	BCS	INTDI3
+	.PUSH0			; PUSH R1 INTO R0 LIST
+	BR	INTDI3
+
+
+;; (LOGNAND integer-1 integer-2) => result-integer
+LOGNAND::
+	.TI16B
+	COM	R2
+	BR	LOGOC3
+
+;; (LOGANDC2 integer-1 integer-2) => result-integer
+LOGAC2::
+	.SWP12
+;; (LOGANDC1 integer-1 integer-2) => result-integer
+LOGAC1::
+	PUSH	#LOGNOT
+;; (LOGORC2 integer-1 integer-2) => result-integer
+LOGOC2::
+	.SWP12
+;; (LOGORC1 integer-1 integer-2) => result-integer
+LOGOC1::
+	.TI16B
+LOGOC3: BIC	R2, R1
+	BR	LOGNO1
+
+;; (LOGNOR integer-1 integer-2) => result-integer
+LOGNOR:: .TI16B
+	BIS	R2, R1
+LOGNO1:	COM	R1
+	FI16.R
+
+;; (LOGTEST integer-1 integer-2) => bool
+LOGTEST::
+	.TI16B
+	BIT	R2, R1
+	B.NZF
+
+
+
+;; (EXPT base-number power-number) => result
+EXPT::	.BASN
+	.WORD	DPUR12, DSWAP, $LOG, $DMUL, $EXP, RBAS.5
+
+
+;; (DIGIT-CHAR weight &optional (radix 10)) => char
+DIGICH:: .DF2	V.10
+	.TI16B
+	CMP	R1, R2
+	BHIS.F
+	CMP	R1, #10.
+	BLO	1$
+	ADD	#V.C.A - 10. - V.C.0, R1
+1$:	ADD	#V.C.0, R1
+	RETURN
+
+;; (DIGIT-CHAR-P char &optional (radix 10)) => weight
+DIGCHP::
+	.DF2	V.10
+	.CHRUP		; R1: (CHAR-UPCASE char)
+	ADD	#FIXOFF - V.CHB - '0, R1
+	.TI16B
+	CMP	R1, R0
+	BLO.F				; char < '0
+	CMP	R1, #9.
+	BLOS	1$
+	CMP	R1, #'A - '0
+	BLO.F
+	ADD	#10. + '0 - 'A, R1
+1$:	CMP	R1, R2		; R1: weight as int16
+	BHIS.F			; weight >= radix
+	ADD	#FIXOFF, R1
+	RETURN
+
+
+
+;; (UNREAD-CHAR character &optional input-stream) => nil
+UNR.CH::
+;!!!R	T.CHR
+	.SWP12
+	TO.STM
+	MOV	R1, R4
+	INC	R4
+	MOV	(R4)+, R1
+	.STRP
+	BCS	1$		; string-input-stream
+	MOV	#INCUR, R4
+;!!!R	MOV	(R4), R3
+	CMP	(R4), #$BUF + 1
+	BLO.E
+;!!!R	MOVB	R2, -(R3)
+1$:	DEC	(R4)		; --curPos
+	CLR	R1
+	RETURN
+
+
+
+;; (REDUCE function list) => result
+REDUCE::
+	TO.FUN
+	MOV	R1, R4		; SAVE function in R4
+	MOV	R2, R5
+	.POP5
+	BNE	1$		; NON-EMPTY LIST OF ARGS
+	MOV	R4, R1		; function
+	JMP	FUNCALL		; (FUNCALL function)
+2$:	CLR	R2
+	.CONS
+	.SH210
+	.CONS          		; R1: LIST OF 2 ARGS
+	MOV	R5, R3
+	MOV	R1, R5
+	MOV	R4, R1
+	.FUNCALL		; (FUNCALL a b)
+	MOV	R3, R5
+1$:	MOV	R1, R0		; ACCUMULATE RESULT IN R0
+	.POP5
+	BNE	2$		; MANY ARG
+R.M01:	MOV	R0, R1
+	RETURN
+
+
+.INCLUDE	/print.mac/
+
+
+;; (FILL sequence item) => sequence
+FILL::	MOV	R2, R3		; R3: item
+	MOV	R1, R0
+	.LENGTH
+	.SH210			; R1: sequence, R2: (LENGTH sequence)
+1$:	DEC	R2
+     	CMP	R2, #V.0
+	BLO	R.PLSP
+	.PRED	X.ELT
+	BR	1$
+
+;; Find place in property-list
+;; Input: R1: symbol, R2: property-indicater
+;; Returns: R5: (pointer to place)+2, R4: pointer to current list item; ZF=1, R5=0 if not found
+PLSPLC: T.SYM
+.IF NDF K1801
+	DEC	R1
+.ENDC
+PLSPL4:	MOV	R1, R5
+PLSPL2:	MOV	R5, R4		; R4: &tail
+	MOV	(R4), R5	; R5: Property-list
+;; Assume ZF: R5==0
+PLSPL1:	BEQ	R.PLSP
+	MOV	(R5)+, R0	; R0: property name
+	MOV	(R5), R5
+	TST	(R5)+		; R5: &tail
+	CMP	R0, R2
+	BNE	PLSPL2        	; continue search
+	CLZ
+R.PLSP:	RETURN
+
+;; (REMPROP symbol indicator) => bool
+REMPROP::
+	CALL	PLSPLC
+	BEQ.F
+	MOV	(R5), (R4)	; remove found indicator & value
+	RE.T
+
+
+;; Put word into memory
+;; (POKE address int16) => int16
+POKE::	MOV	R1, R3
+	.TI16B
+	MOV	R2, (R1)
+	BR	R.M31B
+
+
+; Sort (R3), (R4) by Predicate IN R2
+SORT34: MOV	R2, R0
+	MOV	(R3), R1
+	MOV	(R4), R2
+	.PRED	CALL3		; (FUNCALL R0 R1 R2)
+	BCS	1$		; R1 < R2
+	MOV	(R3), R1      	; swap @(R3), (R4)
+	MOV	(R4), (R3)
+	MOV	R1, (R4)
+1$:	RETURN
+
+
+;; (SORT sequence predicate) => sorted-sequence
+SORT::	PUSH	R1
+	.LENGTH
+	CMP	R1, #V.2
+	BLO	9$
+	MOV	R1, R5
+	MOV	(SP), R1
+	.SVECP
+	BCS	5$
+	MOV	R1, R3		; SORT LIST
+	BR	4$
+2$:	MOV	2(R4), R4
+	BEQ	3$
+	.SORT34
+	BR	2$
+3$:	MOV	2(R3), R3
+	BEQ	9$
+4$:	MOV	R3, R4
+	BR	2$
+5$:	MOV	R1, R3		; SORT VECTOR
+	SUB	#FIXOFF + 1, R5
+6$:	TST	(R3)+
+	MOV	R3, R4
+	PUSH	R5
+7$:	TST	(R4)+
+	.SORT34
+	SOB	R5, 7$
+	POP	R5
+	SOB	R5, 6$
+9$:	POP	R1
+	RETURN
+
+;; (RASSOC item alist) => entry
+RASSOC::
+	TST	(R0)+		; R0 = 2 (Offset to CDR)
+;; (ASSOC item alist) => entry
+;; ASSUME R0 == 0
+ASSOC::	MOV	R2, R5		; R5: alist
+	MOV	R1, R2		; R2: item
+1$:	.POP5
+        BEQ.F
+        T.CONS
+        MOV	R1, R3		; R3: entry
+        ADD	R0, R1
+        MOV	(R1), R1	; R1: (CAR/CDR entry)
+        .EQL
+        BCC	1$		; Test failed
+R.M31B:	BR	R.M31
+
+
+
+;; (REM number divisor) => reminder
+REM::	.TI16B
+	CALL	$DAL
+	MOV	R3, R1
+	FI16.R
+
+;; (RANDOM limit &optional random-state) => random-number
+RANDOM::
+	PU.FL
+	PU.FL 			; Positive to get random
+	MOV	R2, R1
+	CMP	R1, R4		; compare with V.U
+	BNE	1$
+	.SYVAL	V.RNDS		; *RANDOM-STATE*
+1$:	MOV	(R1)+, R2
+	TST	-(R2)
+	MOV	R2, A.RDNS
+	MOV	#$III, R3
+	CALL	COPY4
+	MOV	(R1)+, R2
+	TST	-(R2)
+	MOV	R2, B.RDNS
+	.BASN
+	.WORD	DCP23, $RAN, $DMUL, B.III, RBAS.5 		; SCALE
+
+
+;; (BUTLAST list &optional (n 1)) => result-list
+BUTLAST::
+	MOV	R1, R0
+	.LAST
+	.SH210
+;; (LDIFF list object) => result-list
+LDIFF::	.EQL
+	BCS.F
+	.CONSP
+	BCC	R.A
+	.POP1
+	.SUBR	LDIFF
+	.SH210
+	BR	CONS
+
+;; (ADJOIN item list) => new-list
+ADJOIN::
+	.MEMBER
+	BCS	R.M21
+;; (CONS object-1 object-2) => cons
+CONS::	MOV	R1, R3
+	.ALL.1
+	MOV	R3, (R1)
+CONS1:	MOV	R2, 2(R1)
+	RETURN
+
+
+;; (SETF (CDR cons) object) => object
+X.CDR:: PUSH	#R.M21
+;; (RPLACA cons object) => cons
+RPLACD::
+	T.CONS
+	BR	CONS1
+
+;; (SETF (CAR cons) object) => object
+X.CAR::	PUSH	#R.M21
+;; (RPLACD cons object) => cons
+RPLACA::
+	T.CONS
+	MOV	R2, (R1)
+	RETURN
+
+.IF DF C$FULL
+TENTH::	INC	R0
+NINTH::	INC	R0
+EIGHTH::
+	INC	R0
+SEVENTH::
+	INC	R0
+SIXTH::	INC	R0
+FIFTH::	INC	R0
+FOURTH::INC	R0
+.ENDC
+;; (THIRD list) => object
+THIRD::
+	ADD	#V.2, R0
+	.SH210
+;; (NTH n list) => object
+NTH::	PUSH	#R.CAR		; (CAR (NTHCDR n list))
+;; (NTHCDR n list) => tail
+NTHCDR::
+	TO.U16
+	BEQ	R.M21
+	.SWP12
+1$:	.POP1
+	SOB	R2, 1$
+	RETURN
+
+
+;; (MEMBER item list) => tail
+MEMBER::
+	MOV	R2, R5		; R5: list
+	MOV	R1, R2		; R2: item
+1$:	MOV	R5, R3
+	.POP5
+	BEQ	R.M31
+	.EQL
+	BCC	1$
+R.M31:	MOV	R3, R1
+	RETURN
+
+.IF DF BK10.01
+
+GETLIN: CALL	$IVEIL
+GETLI1:	MOV	#$BUF, (PC)+
+INCUR:	.WORD	$BUF
+	MOV	R1, INEND
+GETCH:  MOV	#INCUR, R0
+	CMP	(R0), (PC)+
+INEND:	.WORD	$BUF
+	BHIS	GETLIN
+	MOV	#V.CHB, R1
+	BISB	@(R0)+, R1	; READ CHAR INTO R1
+	INC	-(R0)
+.IFF
+	.TTYIN	R1
+.ENDC
+	RETURN
+
+
+;; (READ-CHAR input-stream T)
+R.CHRT::
+	INC	R0
+;; (READ-CHAR input-stream NIL NIL)
+R.CHR0::
+	MOV	R2, R1
+	MOV	R0, R2
+R.CHR1:	CLR	R5
+;;                                         R2      &rest R5
+;; (READ-CHAR &optional input-stream eof-error-p eof-value) => char
+R.CHAR::
+	TO.STM
+	MOV	R1, R4
+	INC	R4
+	MOV	(R4)+, R1
+	.STRP
+	BCC	GETCH		; STDIN
+	MOV	(R4)+, R3	; R3: cur pos
+	CMP	R3, (R4)	; (R4): upper bound
+	BHIS	R.EOF		; EOF
+	INC	R3
+	MOV	R3, -(R4)	; increment cur pos
+	ADD	R1, R3
+	MOV	#V.CHB, R1
+	BISB	-FIXOFF-3(R3), R1
+	RETURN
+R.EOF:	TST	R2		; eof-error-p
+	BNE.E
+R.EOF1:	MOV	(R5), R1	; R1: eof-value
+	RETURN
+
+;; (SETF (SYMBOL-FUNCTION symbol) new-value)
+X.SYFU::
+	T.SYM
+	MOV	R2, 1(R1)
+R.M21:	MOV	R2, R1
+R.A:	RETURN
+
+
+
+
+;; (SETF (THIRD list) value) => value
+X.THIRD::
+	INC	R0
+X.SECOND::
+	ADD	#V.1, R0
+	MOV	R2, R3		; R3: value
+	.SH210
+	BR	X.NTH

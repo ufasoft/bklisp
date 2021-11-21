@@ -1,0 +1,295 @@
+;#######   Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com #####
+;#                                                                                                                                #
+;#       See LICENSE for licensing information                                                                                    #
+;##################################################################################################################################
+
+;; Print Subroutines
+
+
+P.NIL:	.P.STR	A.NIL
+	RETURN
+
+.IF DF C$MDAR
+P.AR:
+	MOV	R1, R3
+	INC	R3
+	.P.CHR	'#
+	.SUBR	ARRANK		; R1: (ARRAY-RANK array)
+	.WRITE
+	.P.CHR	'A
+	MOV	(R3)+, R5	; R5: (ARRAY-DIMENSIONS array), R3: points to first element
+;; Print sub-array
+P.SBAR:	.POP5
+	BEQ	9$	; leaf
+	.P.CHR	'(
+	MOV	R1, R0
+	SUB	#FIXOFF, R0
+	BEQ	P.RPAP
+	BR	2$
+1$:	.P.CHR	C.SP
+2$:	PUSH	R0, R5
+	CALL	P.SBAR
+	POP	R5, R0
+	SOB	R0, 1$
+	BR	P.RPAP
+9$:	MOV	(R3)+, R1
+	.WRITE
+	RETURN
+
+.ENDC	; C$MDAR
+
+
+P.STM:
+P.FUN:
+P.LAMB:
+P.SPOP:
+P.OBJ:	.P.CHR	'#, '<
+	MOV	R1, R0
+	.SUBR	TYPEOF
+	.PRIN1
+	MOV	#OBLIST-3, R1	; Search symbol by function
+1$:	MOV	3(R1), R1
+	BEQ	7$
+	CMP	1(R1), R0
+	BNE	1$
+	.P.CHR	C.SP
+	.PRIN1
+7$:	CMP	(R0)+, #V.LAMB
+	BNE	9$
+	.P.CHR	C.SP
+	MOV	(R0)+, R1
+	.PRIN1			; print lambda-list
+	MOV	(R0)+, R5
+8$:	.POP5
+	BEQ	9$
+	.P.CHR	C.SP
+	.PRIN1			; print function body
+	BR	8$
+9$:	.P.CHR	'>
+	RETURN
+
+
+P.CONS:	MOV	R1, R5
+	CMP	(R1), #V.QUOTE
+	BNE	P.LIST
+	.POP1
+	.CONSP
+	BCC	P.LIST
+	TST	2(R1)
+	BEQ	P.QUOT
+P.LIST:	.P.CHR	'(
+3$:	.POP5			; Print CAR
+	.WRITE
+	MOV	R5, R1
+	BEQ	P.RPAP
+	.P.CHR	C.SP
+	.CONSP
+	BCS	3$
+	.P.CHR	'., C.SP	; Print dot pair
+	.WRITE
+P.RPAP:	.P.CHR	')
+	RETURN
+
+P.VEC:	.P.CHR	'#, '(
+	MOV	R1, R0
+.IIF NDF K1801, DEC	R0
+	MOV	(R0)+, R5	; LEN
+	SUB	#FIXOFF, R5
+	BEQ	P.RPAP
+	BR	2$
+1$:	.P.CHR	C.SP
+2$:	MOV	(R0)+, R1
+	.WRITE
+	SOB	R5, 1$
+	BR	P.RPAP
+
+
+
+P.QUOT: MOV	(R1), R1		; PRINT: 'object
+	.P.CHR	''
+WRITE1:	.TCASE
+1$:	.BYTE	<P.NIL - 1$> / 2
+	.BYTE	<P.FIX - 1$> / 2
+	.BYTE	<P.CHAR - 1$> / 2
+	.BYTE	<P.CONS - 1$> / 2
+	.BYTE	<P.SYMB - 1$> / 2
+	.BYTE	<P.FLT - 1$> / 2
+	.BYTE	<P.STM - 1$> / 2
+	.BYTE	<P.STR - 1$> / 2
+	.BYTE	<P.VEC - 1$> / 2
+	.BYTE	<P.FUN - 1$> / 2
+	.BYTE	<P.LAMB - 1$> / 2
+	.BYTE	<P.SPOP - 1$> / 2
+.IIF DF C$MDAR, .BYTE	<P.AR - 1$> / 2
+	.EVEN
+
+
+
+P.FIX:	SUB	#FIXOFF, R1
+P.INT: 	PUSH	R2, R1
+	.SYVAL	V.PRAD
+	MOV	R1, R3		; R3: *PRINT-RADIX*
+	.SYVAL	V.PBAS		; *PRINT-BASE*
+	TO.U16
+	.CCASE
+1$:	.WORD	4
+	.BYTE	2., <P.BIN - 1$>/2
+	.BYTE	8., <P.OCT - 1$>/2
+	.BYTE	10., <P.DEC - 1$>/2
+	.BYTE	16., <P.HEX - 1$>/2
+	.E.UNK
+
+P.FLT:	.INTP
+	BCC	1$
+	MOV	#CATCH, R3
+	MOV	SP, (R3)	; Catch TRAP 6 (Overlow)
+	SUB	#ST.OFF, (R3)
+	MOV	R1, R4		; R4: number
+	TO.I16
+	TST	(R3)
+	BEQ	2$		; catched Overflow error
+	CLR	(R3)		; Clear CATCH
+	BR	P.INT
+2$:	MOV	R4, R1		; Restore number in R1
+1$:	PUSH	R2		; Save Stream
+	PU.FL
+	CALL	$DGO
+W.STR1:	POP	R3, R4		; R3: Len, R4: Ptr
+	BR	W.STR8
+
+
+P.CHAR:	MOV	R1, R0
+	.SYVAL	V.PESC
+	BEQ	W.CHA1
+	.P.CHR	'#, '\
+	MOV	R0, R1
+	.SUBR	CHNAME
+	BNE	W.STR0
+W.CHA1:	MOV	R0, R1
+;; (WRITE-CHAR character &optional output-stream) => character
+W.CHAR::
+	T.CHR
+W.CH2:	MOV	#V.CHB, R0
+	BISB	R1, R0
+	MOV	R2, R1
+	TO.STM
+	MOV	R1, R3
+	MOV	1(R3), R1
+	.LISTP
+	BCS	W.CH2A		; STRING OUTPUT STREAM
+	.TTYOUT   		; TO TERMINAL
+	BR	W.CH2B
+
+W.CH2A:	.SH210
+	MOV	R0, R1
+	.CONS
+	MOV	R1, 1(R3)
+W.CH2B:	MOV	R0, R1		;!!!TODO: optimize
+	RETURN
+
+
+P.SYMB: MOV	R1, R3
+	.SYVAL	V.PESC
+	BEQ	5$
+	TST	3(R3)		; check next pointer
+	BNE	5$		; non-null next means the symbol is interned
+	CMP	R3, #V.QUIT
+	BEQ	5$
+	.P.CHR	'#, ':		; Uninterned symbol prefix
+5$:	MOV	R3, R1
+	.SUBR	SYNAM
+W.STR0:	CLR	R0
+	BR	W.STR
+P.STR:	MOV	R1, R0
+	.SYVAL	V.PESC
+	.SWP01        		; R0: *PRINT-ESCAPE*, R1: string
+	CALL	W.STR4
+;; (WRITE-STRING string &optional output-stream) => string
+;; IF R0 THEN ESCAPE \ AND "
+W.STR::	MOV	R1, R5		; SAVE R1
+	MOV	R1, R4
+	SUB	#3, R4
+	CLR	R3
+	BISB	(R4)+, R3
+	BEQ	W.STR3
+;; R4: ADDR, R3: LEN
+W.STR2:	MOVB	(R4)+, R1
+	TST	R0
+	BEQ	5$		; *PRINT-ESCAPE* is NIL
+	.CCASE
+1$:	.WORD	2
+	.BYTE	'\, <3$ - 1$>/2
+	.BYTE	'", <3$ - 1$>/2
+	BR	5$
+3$:	.P.CHR	'\		; ESCAPING
+5$:	.W.CH2
+	SOB	R3, W.STR2
+W.STR3:	MOV	R5, R1
+W.STR4:	TST	R0		; print " if *PRINT-ESCAPE*
+ 	BEQ	9$
+	.P.CHR	'"
+9$: 	RETURN
+
+P.BIN:	ADD	#$BIN - $OCT - 2. + 8., R1
+	ADD	#'b-'o, R0
+P.OCT:	ADD	#$OCT - $HEX - 8. + 16., R1
+	ADD	#'o-'x, R0
+P.HEX:	ADD	#$HEX - $ISTR + 10. - 16., R1
+	ADD	#'x, R0
+	TST	R3
+	BEQ	P.DEC
+	MOVB	R0, 1$-2
+	.P.CHR	'#
+	.P.CHR	'b			;SELF-MODIFIED
+1$:	CLR	R3			; don't print suffix for bases 2, 8 or 16
+P.DEC:	MOV	R3, W.STR9
+	ADD	#$ISTR - 10., R1
+	MOV	#2$, R4
+	JMP	(R1)    		; Don't use .BASIC here because both .BASIC & BIN use $BUFOUT
+2$:	.WORD	3$
+3$:	TST	(PC)+
+W.STR9:	.WORD	0			; print decimal suffix?
+	BEQ	W.STR1
+	POP	R3, R4 			; R3: len, R4: PTR
+	DEC	R3
+	ADD	R3, R4			; R4: points at the end
+	MOVB	#'., (R4)+		; decimal suffix
+	SUB	R3, R4
+W.STR8:	POP	R2		; R2: Stream
+	CMPB	(R4), #C.SP
+	BNE	7$
+	CMPB	(R4)+, -(R3)		; INC R4, DEC R3
+7$:	MOV	R4, R0
+	ADD	R3, R0
+	CMPB	-(R0), #C.SP
+	BNE	8$
+	DEC	R3
+8$:	CLR	R0
+	BR	W.STR2
+
+
+;; (WRITE-LINE string &optional output-stream) => string
+W.LINE::
+	CALL	W.STR
+	.P.CHR	C.NL
+	RETURN
+
+;; (PRINT object &optional output-stream) => object
+PRINT::	.P.CHR	C.NL
+	.PRIN1
+	.P.CHR	C.SP
+	RETURN
+
+;; (PRIN1 object &optional output-stream) => object
+PRIN1::	.BIND	V.PESC, V.T
+	BR	PRINC1
+
+P.STR.:	MOV	PC.OFF+4(SP), R4
+	MOV	(R4)+, R1
+	MOV	R4, PC.OFF+4(SP)
+;; (PRINC object &optional output-stream) => object
+PRINC::	.BIND	V.PESC, 0		; (LET ((*PRINT-ESCAPE* NIL)) ...)
+PRINC1:	.WRITE
+	CMP	(SP)+, (SP)+		; restore Dynamic environment
+	POP	DYNENV
+	RETURN

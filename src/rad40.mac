@@ -1,0 +1,71 @@
+;#######   Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com #####
+;#                                                                                                                                #
+;#       See LICENSE for licensing information                                                                                    #
+;##################################################################################################################################
+
+;;; BkLisp RADIX-40 encoding routines
+
+;; INPUT: R0: 0, R1: RADIX-40 string
+;; OUTPUT: ASCII string in TOKBUF & TOKLEN
+.MACRO	.R2STR
+R2STR:	MOV	(R1)+, R2
+	MOV	#3, R5
+2$:	MOV	R2, R3
+	BIC	#177740, R3
+	ADD	#'A - 1, R3
+	CMP	R3, #'Z
+	BLOS	3$
+	MOVB	R40TAB-32-'A(R3), R3
+3$:	MOVB	R3, TOKBUF(R0)
+	INC	R0
+	MOV	#5, R4
+4$:	ASR	R2
+	SOB	R4, 4$
+	BEQ	9$		; end-of-string
+	SOB	R5, 2$
+	BR	R2STR
+9$: 	MOVB	R0, TOKLEN
+;	RETURN
+R2STR9:
+.ENDM
+
+;; INPUT: R1: STRING object
+;; RETURNS: On success CF=0, RADIX-40 string in $BUFOUT, R3 points behind the last word which is < (32. * 32.).
+;; Saves R1, R2
+STR2R:	PUSH	R1
+	SUB	#3, R1
+	MOVB	(R1)+, R5
+	BLE	8$		; strlen== 0 || strlen>127
+	ADD	R1, R5		; R5: end of string
+	MOV	#$BUFOUT, R3
+	BR	4$
+1$:	MOV	R4, R0
+	ADD	#31 +'A, R0
+2$:	ADD	#1 - 'A, R0
+	TST	(R3)
+	BEQ	6$		; first char in triplet
+	MOV	#5, R4
+	BIT	#1740, (R3)
+	BEQ	5$		; second char in triplet
+	MOV	#10., R4
+5$:	ASL	R0
+	SOB	R4, 5$
+6$:	ADD	R0, (R3)+
+	CMP	R1, R5
+	BEQ	9$		; there are more chars
+	BIT	#76000, -(R3)
+	BEQ	3$		; continue triplet
+	BIS	#100000, (R3)+	; mark as non-last word
+4$:	CLR	(R3)
+3$:	MOVB	(R1)+, R0
+	CMPB	R0, #'Z
+	BHI	8$
+	CMPB	R0, #'A
+	BHIS	2$
+	MOV	#5., R4
+7$:	CMPB	R0, R40TAB-1(R4)
+	BEQ	1$
+	SOB	R4, 7$
+8$:	SEC
+9$:	POP	R1
+	RETURN

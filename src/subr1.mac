@@ -1,0 +1,1655 @@
+;;; Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
+;;;
+;;; SPDX-License-Identifier: MIT
+
+
+;;; Subroutines with 1+ arguments
+
+ASUBR1:
+
+
+
+
+;; (CHARACTER char-designator) => character
+CHARACTER::
+;;!!!O Uncomment for performance
+;	.CHARP
+;	BCS	CODEC2
+	CALL	STRING
+	MOV	-3(R1), R1	; R1: (chars[0]:len)
+	DECB	R1
+	BNE.E			; len != 1
+	BR	CODEC1
+
+;; (CODE-CHAR code) => char-p
+CODECH::
+	TO.U16
+	SWAB	R1
+	BNE.F			; code >= 256
+CODEC1:	SWAB	R1
+CODEC3:	ADD	#V.CHB, R1
+CODEC2:	RETURN
+
+
+
+;; (MAKE-LIST size) => list
+MKLIST::
+	TO.U16
+	BEQ	R.0
+	.SH210		; R1: NIL, R2: size as UINT
+1$:	.PUSH0
+	SOB	R2, 1$
+R.0A:	BR	R.0
+
+;; (/ num &rest subtrahends) => reciprocal
+S.DIV::	MOV	#$DDIV, R4
+	INC	R0				; (/ 1 arg)
+	BR	SUBDIV
+;; (- num &rest subtrahends) => difference
+S.SUB::	MOV	#$DSUB, R4
+SUBDIV:	ADD	#V.0, R0			; (- 0 arg)
+	MOV	R5, R2
+	BNE	1$
+	.SH210
+	JMP	BAS1
+1$:	.CONS
+	MOV	R1, R2
+REDUC2:	MOV	R4, BAS2A
+	MOV	#BAS2, R1
+	JMP	REDUCE
+
+
+
+;; (MAKE-SEQUENCE result-type size) => sequence
+MKSEQ::	MOV	R1, R2		; R2: result-type
+	.POP5			; R1: size
+	CMP	R2, #V.LIST
+	BEQ	MKLIST
+	CMP	R2, #V.STR
+	BEQ	MKSTR
+	CMP	R2, #V.VEC
+	BNE.E
+;; (MAKE-ARRAY dimensions) =>	vector
+MKAR::
+.IF DF C$MDAR
+	MOV	R1, R5		; R5: dimensions
+	.LISTP
+	BCS	5$
+2$:	TO.U16
+	BR	3$
+4$:	TO.U16
+	ADD	#FIXOFF, R1
+	.PUSH0
+5$:	.POP5
+	BNE	4$
+	.NREV0			; R1: dimensions as FIXNUMS
+	MOV	R1, R4		; R4: dimensions
+	MOV	R1, R5		; R5: dimensions
+	.SUBR	S.MUL
+	TO.U16
+	INC	R1
+	PUSH	#1$
+	CLR	R0		; R0: init element
+3$:	CMP	R1, #FIXEND/2
+	BLO	6$
+	ER.DIM
+6$:	MOV	R1, R3
+	ADD	#FIXOFF, R3
+	MOV	R1, R5
+	ASR	R5
+	INC	R5
+	.ALLOC
+	MOV	R3, (R1)
+	BR	INC1RA
+
+1$:	MOV	R4, 1(R1)		; dimensions
+.IIF NDF K1801,		DEC	R1
+	NEG	(R1)
+	ADD	#FIXOFF*2, (R1)
+.IIF NDF K1801,		INC	R1
+	RETURN
+.ENDC
+
+.IF DF C$MDAR
+
+;; (ARRAY-ROW-MAJOR-INDEX array &rest subscripts) => index
+ARMI::	CLR	R4		; result index
+	.ARDMS		; R1: (ARRAY-DIMENSIONS array)
+	BR	1$
+2$:	MOV	R1, R3		; save dimensions
+
+
+;	.SUBR	MULDIM
+	PUSH	R5
+	MOV	R1, R5
+	.SUBR	S.MUL
+	TO.U16
+	POP	R5
+
+	MOV	R1, R2		; R2: (APPLY '* (CDR dimensions))
+	.POP5
+	TO.U16			; R1: subscript
+	BEQ	5$
+4$:	ADD	R2, R4
+	SOB	R1, 4$
+5$:	MOV	R3, R1		; restore dimensions
+1$:	.POP1
+	BNE	2$		; has some dimensions
+	MOV	R4, R1		; R1: index
+	ADD	#FIXOFF, R1
+	RETURN
+.ENDC	; C$MDAR
+
+
+.IF DF C$MDAR
+
+R.AR2:	MOV	R1, R5
+	.LENGTH
+	.PUSH0
+	CLR	R1
+	.POP5
+R.AR1:	SOB	R3, R.AR2
+	MOV	R4, R5		; R5: array as list structure
+	.NREV0			; R1: dimensions
+	MOV	R1, R0		; R0: dimensions
+	.MKAR			; R1: (MAKE-ARRAY dimensions)
+	MOV	R1, R2
+.IIF NDF K1801,	DEC R2
+	CMP	(R2)+, (R2)+	; R2: points to first element
+	.SWP01			; R0: array, R1: dimensions
+	CALL	FILLAR
+	BR	R.0A
+
+.ENDC	; C$MDAR
+
+
+
+
+;; (MAKE-STRING size)  => string
+;; PRESERVES R3
+MKSTR::	TO.U16
+MKSTR1:	CMP	R1, #256.
+	BLO	1$
+	TRAP	15.
+1$:	MOV	R1, R5
+	MOV	#20040, R0	; SPACE:SPACE  INIT VALUE
+	ASR	R5
+	ASR	R5
+	INC	R5		; #CELLS = (SIZE + 4) / 4
+	MOV	R1, R4
+	.ALLOC
+	MOVB	R4, (R1)+	; SAVE LEN HEADER
+.IF DF K1801
+	TST	(R1)+		; R1 += 2
+.IFF
+	ADD	#2, R1
+.ENDC
+	RETURN
+
+
+
+
+
+FMT.AM: MOV	R2, R1
+	.FRESHL
+	BR	FORMA1
+
+
+FMT.C:	.POP5
+	T.CHR
+	BR	FORMA6
+
+FMT.B:	ADD	#V.2 - V.10 - V.C.B + V.C.D, R1
+FMT.D:	ADD	#V.10 - V.8 - V.C.D + V.C.O, R1
+FMT.O:	ADD	#V.8 - V.16 - V.C.O + V.C.X, R1
+FMT.X:	ADD	#V.16 - V.C.X, R1
+	MOV	R1, 2(PC)
+	.BIND	V.PBAS, V.10	; Self-modifying code
+	.BIND	V.PRAD, 0	; (LET ((*PRINT-BASE* base) (*PRINT-RADIX* NIL)) ...
+	.POP5
+	.PRIN1
+	ADD	#10., SP
+	POP	DYNENV
+	BR	FORMA1
+
+;; (FORMAT destination control-string &rest args) => result
+FORMAT::
+	PUSH	R1              ; (SP): destination
+	BNE	1$
+	.SUBR	MKSOS		; R1: (MAKE-STRING-OUTPUT-STREAM)
+; R0: ~ flag
+1$:	MOV	R1, R2		; R2: destination
+	.POP5			; R1: control-string
+	T.STR
+	SUB	#3, R1
+	CLR	R4
+	BISB	(R1)+, R4	; R4: (LENGTH control-string)
+	BEQ	FORMA4
+	MOV	R1, R3		; R3: points to cur char
+FORMA2:	MOV	#V.CHB, R1
+	BISB	(R3)+, R1	; R1: cur char
+	TST	R0
+	BNE	FORMA7		; char after ~
+	INC	R0		; set ~ flag
+	CMPB	R1, #'~
+	BEQ	FORMA3
+	BR	FORMA6
+
+
+FMT.S:	.POP5
+	.PRIN1
+	BR	FORMA1
+
+
+
+.IF DF C$MDAR
+;; #nA(...) syntax reader
+;; INPUT: R3: n+1
+R.AR:	.READ
+	MOV	R1, R4		; R4: array as list structure
+	BR	R.AR1
+.ENDC	; C$MDAR
+
+FMT.A:	.POP5
+	.SUBR	PRINC
+	BR	FORMA1
+
+
+FORMA7:	.CHRUP
+	.CCASE
+6$:	.WORD	10.
+	.BYTE	'~, <FORMA6 - 6$>/2
+	.BYTE	'&, <FMT.AM - 6$>/2
+	.BYTE	'%, <FMT.PC - 6$>/2
+	.BYTE	'A, <FMT.A - 6$>/2
+	.BYTE	'S, <FMT.S - 6$>/2
+	.BYTE	'C, <FMT.C - 6$>/2
+	.BYTE	'B, <FMT.B - 6$>/2
+	.BYTE	'D, <FMT.D - 6$>/2
+	.BYTE	'O, <FMT.O - 6$>/2
+	.BYTE	'X, <FMT.X - 6$>/2
+	.E.SX
+
+
+FMT.PC:	MOV	#V.C.NL, R1
+FORMA6:	.W.CH2			; (WRITE-CHARACTER R1 R2)
+FORMA1:	CLR	R0		; clear ~ flag
+FORMA3:	SOB	R4, FORMA2
+FORMA4: POP	R1
+	BNE.F			; destination is non-NIL
+	MOV	R2, R1
+;; (GET-OUTPUT-STREAM-STRING string-output-stream) => string
+GETOSS::
+	TO.STM
+	INC	R1
+ 	MOV	(R1), R0	; R0: reversed list of chars
+ 	CLR	(R1)		; Reset string output stream
+PO.STR:	MOV	R0, R1
+ 	.LENGTH
+ 	TO.U16
+ 	MOV	R1, R5		; R5: string length
+	BEQ	RE.STR		; EMPTY STRING
+	.SUBR	MKSTR1
+	ADD	R5, R1
+.IIF DF K1801, 	TST	-(R1)	; R1 -= 2: points after last char in the string
+.IIF NDF K1801,	SUB	#2, R1	; R1: points after last char in the string
+2$:	MOVB	(R0), -(R1)	; TRAVERSE SAVED CHARS, FROM LAST TO FIRST
+	MOV	2(R0), R0
+	SOB	R5, 2$
+	ADD	#2 - V.EMPTY, R1
+RE.STR:	ADD	#V.EMPTY, R1
+	RETURN
+
+R.LCO2:	CMPB	R1, #'#
+	BNE	R.LCOM
+	.R.CHR
+	CMPB	R1, #'|
+	BNE	R.LCO2
+R.LCO1:	CALL	(PC)
+;; #| COMMENT |#
+R.LCOM: .ROCHR
+	BEQ	READ.1
+1$:	CMPB	R1, #'|
+	BNE	R.LCO2
+5$:	.R.CHR
+	CMPB	R1, #'#
+	BNE	1$
+	BR	READ.1
+
+
+;; #:symbol-name    Uninterned symbol
+RS.COL: PUSH	#MKSYM1
+;; Returns
+;;   R1: token as string object (TOKLEN+3)
+;;   R3, R5: TOKBUF
+;;   R4: token length
+;;   ZF: 1  if length == 1
+R.TOK:	MOV	#TOKBUF, R4	;  Read into TOKBUF
+	BR	R.TOK1
+R.TOK3:	MOV	#TOKBUF, R4	;  Read into TOKBUF
+R.TOK2:	MOVB	R1, (R4)+
+	CMP	R4, #TOKBUF + MAXTOK
+	BHIS	R.ERR		; token is too long
+;; READ TOKEN INTO address R4
+R.TOK1:	.ROCHR
+	BEQ     5$
+	.CSTP			; is char constituent?
+	BCS	R.TOK2
+	.UNREAD
+5$:	MOV	#TOKBUF, R3
+	MOV	R3, R1
+	MOV	R3, R5
+.IF DF K1801
+	TST	(R1)+		; R1: token as string object
+.IFF
+	ADD	#2, R1
+.ENDC
+	SUB	R3, R4
+	MOVB	R4, -3(R1)
+	CMP	R4, #1
+R.1:	RETURN
+
+R.HEX:	CALL	R.TOK
+	CLR	R5
+1$:	MOV	#V.CHB, R1
+	BISB	(R3)+, R1
+	MOV	#V.16, R2
+	.SUBR	DIGCHP		; (DIGIT-CHAR-P char 16)
+	BEQ.E
+	SUB	#FIXOFF, R1
+	ASL	R5
+	ROL	R5
+	ROL	R5
+	ROL	R5
+	BIS	R1, R5
+	SOB	R4, 1$
+	BR	R.OCT1
+
+
+R.SHARP:CLR	R3
+	.R.CHR
+	.BETWE	V.C.0, V.C.9+1
+	BCC	3$
+	SUB	#V.C.0-1, R1		; #n syntax
+	MOV	R1, R3			; R3: n+1
+	.R.CHR
+3$:	.CHRUP
+	.CCASE
+1$:	.WORD	4$ - . - 2 / 2
+.IIF DF C$MDAR	.BYTE	'A, <R.AR - 1$>/2
+	.BYTE	'|, <R.LCOM - 1$>/2
+	.BYTE	'\, <RS.CH - 1$>/2
+	.BYTE	'(, <R.VEC - 1$>/2
+	.BYTE	'', <R.FUN - 1$>/2
+	.BYTE	':, <RS.COL - 1$>/2
+	.BYTE	'B, <R.BIN - 1$>/2
+	.BYTE	'O, <R.OCT - 1$>/2
+	.BYTE	'X, <R.HEX - 1$>/2
+4$:	.E.SX
+
+
+;; "..."
+;; R5 is String LEN
+R.STR1:	.R.CHR
+R.STR2:	.PUSH0                  ; R0: reversed list of chars
+R.STR:	.R.CHR
+	.CCASE
+3$:	.WORD	2
+	.BYTE	'", <PO.STR - 3$>/2	; End of string
+	.BYTE	'\, <R.STR1 - 3$>/2	; Escape
+	BR	R.STR2
+
+R.BIN:	ADD	#$CBIN - $COCT, R0
+	ADD	#$COCT, R0
+R.OCT:	CALL	R.TOK
+	CALL	(R0)
+R.OCT1:	MOV	R5, R1
+	FI16.R
+
+;; READ "("
+R.ERR:	.E.SX
+
+
+
+RS.CH:  .R.CHR
+	.CSTP			; is char constituent?
+	BCC	9$
+	.UNREAD
+	CALL	R.TOK
+	BEQ	1$		; single char #\x
+	.SUBR	NAMECH		; (NAME-CHAR str)
+	BNE	9$
+1$:	MOV	#V.CHB, R1
+	BISB	(R3), R1
+9$:	RETURN
+
+
+;; Here R5: &rest (eof-error-p eof-value recursive-p)
+READ.8:	.POP5
+	BEQ.E			; eof-error-p is true by deafult
+	MOV	R1, R2		; R3: eof-error-p
+	JMP	R.EOF
+
+;; R2: input-stream
+READ1:	CLR	R5	; R5: nil   (means eof-error-p: true by default, eof-value: nil)
+	BR	READ.1
+;;                               &rest R5
+;; (READ &optional input-stream eof-error-p eof-value recursive-p) => object
+READ::	MOV	R1, R2
+R.SPACE:
+READ.1:	.ROCHR
+	BEQ	READ.8
+;; TRY READ AS MACRO CHAR
+;; ON NOT MACRO CHAR RETURN V.U
+;; R0: 0
+;; R1: CHAR
+;; R2: STREAM
+	.CCASE
+.IF DF C$MACR
+1$:	.WORD	13.
+	.BYTE	'`	, <R.BACK - 1$>/2
+	.BYTE	',	, <R.COMMA - 1$>/2
+.IFF
+1$:	.WORD	11.
+.ENDC	; C$MACR
+	.BYTE	C.SP	, <R.SPACE - 1$>/2
+	.BYTE	'"	, <R.STR - 1$>/2
+	.BYTE	'(	, <R.LIST - 1$>/2
+	.BYTE	')	, <R.ERR - 1$>/2
+	.BYTE	''	, <R.QUOTE - 1$>/2
+	.BYTE	'#	, <R.SHARP - 1$>/2
+	.BYTE	C.SEMI	, <R.SEMI - 1$>/2
+	.BYTE	C.HT	, <R.SPACE - 1$>/2
+	.BYTE	C.NL	, <R.SPACE - 1$>/2
+	.BYTE	C.LF	, <R.SPACE - 1$>/2
+	.BYTE	C.CR	, <R.SPACE - 1$>/2
+
+	CALL	R.TOK3
+	BNE	6$
+	CMPB	(R3), #'.
+	BNE	4$
+	MOV	#V.DOT, R1	; DOT TOKEN
+	RETURN
+4$:	MOVB	(R3), R1
+	.BETWE	'0, '9+1
+	BCC	5$		; 1-Char tokens cannot be recognized as invalid by $PACK
+6$: 	PUSH	R5
+	PUSH	R4		; STACK: SPTR, SLEN
+	CALL	$PACK           ; TRY TO INTERPRET AS NUMBER
+	TST	(SP)+		; POP UNUSED WORD
+	SUB	R5, R3
+	CMP	R3, R4
+	BNE	3$
+	POFL.R			; NUMBER IS PARSED, Allocate and return DOUBLE object
+3$:	ADD	#10, SP
+5$:	MOVB	R4, -(R5)	; TOKLEN = len
+	MOV	#TOKLEN+3, R1	; TOKEN AS STRING OBJECT
+	.SUBR	NSTRUP
+				;; FALLBACK
+;; (INTERN string) => symbol
+INTERN::
+	PUSH	R1
+	CALL	FINSY
+	BCS	1$		; SYMBOL already exists
+	MOV	(SP), R1
+	CALL	MKSYM1
+	MOV	OBLIST, 3(R1)
+	MOV	R1, OBLIST
+1$:	TST	(SP)+		; SP += 2
+RET.8:	RETURN
+
+
+;; SEMICOLON COMMENT
+R.SEMI: MOV	#V.C.NL, R1
+	MOV	#V.U, R3
+	MOV	R3, R4
+	.PEEKC			; (PEEK-CHAR #\NEWLINE stream)
+	BR	READ.1
+
+
+.IF DF C$MACR
+R.BACK:			;!!!TODO BACKQUOTE
+	.E.SX
+
+R.COMMA:		;!!!TODO BACKQUOTE
+	.E.SX
+.ENDC
+
+;; #'function-name
+;; R1: V.C.QO
+R.FUN:	ADD	#V.FUN - V.QUOT, R1	; (FUNCTION function-name)
+;; 'x
+;; R1: V.C.QO
+R.QUOTE:ADD	#V.QUOT - V.C.QO, R1		; (QUOTE x)
+	.PUSH0
+	.READ
+	.PUSH0
+R.NREV:	.NREV0
+	RETURN
+
+R.VEC:	PUSH	#VECTO1
+;; Assumes R0==0
+R.LIST: MOV	#V.CHB + '), R4
+	BR	R.DEL1
+;; (READ-DELIMITED-LIST char &optional input-stream) => list
+R.DELI::
+	MOV	(R5), R2	; R2: input-stream
+;; Implemenation of (READ-DELIMITED-LIST)
+	MOV	R1, R4		; R0: char
+R.DEL1:	PUSH	R0		; (SP): dotted element (initally NIL), R0: list
+	CLR	R5		; HAVE DOT
+	BR	4$
+1$:	.READ
+	CMP	R1, #V.DOT
+	BEQ	2$
+	TST	R5		; DOTTED ELEMENT
+	BEQ	3$
+	MOV	R1, (SP)
+2$:	INC	R5
+	BR	4$
+3$:	.PUSH0
+4$:	MOV	PC, R1		; PC works as V.T for .PEEKC
+	MOV	R1, R3
+	.PEEKC			; (PEEK-CHAR T input-stream T)
+	CMP	R1, R4
+	BNE	1$
+	.R.CHR			; (READ-CHAR input-stream)
+	MOV	R0, R2		; BUILT LIST
+	POP	R0		; R0: dotted element
+	BR	NREV.2		; DOTTED ELEMENT
+
+
+
+.IF DF C$MDAR
+
+;; (ARRAY-RANK array) => rank
+ARRANK::
+	PUSH	#LSTLEN		; (LIST-LENGTH (ARRAY-DIMENSIONS array))
+;; (ARRAY-DIMENSIONS array) => dimensions
+ARDIMS::
+	.VECP
+	BCS	2$
+	T.AR
+	MOV	1(R1), R1
+	RETURN
+2$:	.LISTP
+	BCS.E
+	.LENGTH
+.ENDC	; C$MDAR
+
+LISTIFY::
+	.LISTP
+	BCS	RET.8
+LISTI1:	MOV	R0, R2		; CLR R2
+	BR	RCONS3
+
+;; (COPY-TREE tree) => new-tree
+CPTREE::
+	.CONSP
+	BCC	RET.8
+	.POP1
+	.CPTREE
+	.SH210
+	.CPTREE
+RCONS3:	JMP	CONS
+
+;; (MAKE-RANDOM-STATE &optional state)
+MKRNDS::
+	.DF1.NIL
+	BEQ	1$		; Copy *RANDOM-STATE*
+	CMP	R1, #V.T
+	BNE	2$		; clone state arg
+	PU.NOW			; Generate fresh random state from the current timer value
+	BR	LISTI1
+1$:	.SYVAL	V.RNDS
+2$:	.POP1                   ; clone random-state
+	CALL	FLOAT1
+	.SH210
+	CALL	FLOAT1
+	BR	RCONS3
+
+
+
+;; (LOGNOT integer) => result-integer
+LOGNOT::
+	TO.I16
+	COM	R1
+	FI16.R
+
+P.ERR: 	MOV	#$ERROR, R1
+	MOV	#8., R2
+	EMT	20
+	RETURN
+
+;; (ERROR datum) =>
+ERROR::	.PRED	P.ERR
+	CLR	R2
+	.PRIN1
+	JMP	I.ST1A
+
+;; (FRESH-LINE &optional output-stream) => bool
+FRESHL::
+	TO.STM
+	MOV	R1, R3		; R3: stream
+        MOV	1(R1), R1
+        .LISTP
+        BCC	2$		; STDOUT
+        CMP	(R1), #V.C.NL	; is last char NL ?
+        BR	8$
+2$:	EMT	26		; Get terminal Cursor coordinates
+	TST	R1
+8$:	BEQ	R.R0		; zero pos in terminal line or last char was NL
+	MOV	R3, R1		; R1: stream
+	MOV	R3, R0		; R0: return true value
+;; (TERPRI &optional output-stream) => nil
+TERPRI::
+	MOV	R1, R2
+        .P.CHR	C.NL
+	BR	R.R0
+
+;; (COPY-ALIST alist) => new-alist
+CPALIS::
+	MOV	R1, R5
+1$:	.POP5
+	BEQ	R.NREV
+	.CONSP
+	BCC	2$
+	MOV	2(R1), R2
+	MOV	(R1), R1
+	.CONS
+2$:	.PUSH0
+	BR	1$
+
+;; (REVERSE sequence) => reversed-sequence
+REVERSE::
+	.SUBR	CPSEQ
+	BR	NREVERSE
+
+;; (MAPC function &rest lists+) => list-1
+MAPC::	MOV	(R5), R0	; R0: list-1
+;; (MAPCAR function &rest lists+) => result-list
+MAPCAR::
+	PUSH	R0		; (SP): MAPC predicate
+	MOV	SP, R4		; save SP
+1$:	PUSH	R1		; stack from top:  function, args1 ... argsN
+	.POP5
+	BNE	1$
+	CLR	R2		; R2: init result list
+	MOV	R4, R3		; R3: saved SP
+	TST	-(R3)
+3$:	CLR	R0
+4$:	MOV	-(R3), R5
+	.POP5
+	BEQ	9$		; end of mapcar
+	.PUSH0
+	MOV	R5, (R3)
+	CMP	R3, SP
+	BNE	4$		; some args remain
+	.NREV0
+	MOV	R1, R5
+	MOV	R4, R3
+	MOV	-(R3), R1	; R1: function
+	.FUNCALL
+	TST	(R4)		; is MAPC?
+	BNE	3$
+	.CONS
+	MOV	R1, R2		; R2: result list
+	BR	3$
+9$:	MOV	R4, SP		; restore SP
+	MOV	(SP)+, R1	; R1: list-1 for MAPC
+	BNE	R.IDE		; return list-1
+	CLR	R0
+NREV.2:	MOV	R2, R1
+;; (NREVERSE sequence) => reversed-sequence
+;; ASSUME R0: 0, ZF installed on R1==0
+NREVERSE::
+	BEQ.F			; (NREVERSE NIL) => NIL
+	.CONSP
+	BCC	NREV.V
+NREVE4:	MOV	2(R1), R2	; GET LINK TO NEXT CONS
+	MOV	R0, 2(R1)	; REPLACE WITH LINK TO LAST CONS
+ 	MOV	R1, R0		; PTR TO THIS CONS TO R0
+ 	MOV	R2, R1		; MOVE TO NEXT ELT
+NREVE1:	BNE	NREVE4		; THIS IS CALLED EXTERNALLY
+	BR	R.R0
+
+NREV.V:	.SVECP
+        BCC	NREV.S
+	MOV	R1, R0
+.IIF NDF K1801,	DEC	R1
+	MOV	(R1)+, R2	; R1: points to begin
+	SUB	#FIXOFF, R2	; R2: vector length
+	MOV	R1, R4
+	ADD	R2, R4
+	ADD	R2, R4		; R4 points to end
+	ASR	R2
+	BEQ	R.R0
+1$:	MOV	(R1), R5
+	MOV	-(R4), (R1)+
+	MOV	R5, (R4)
+	SOB	R2, 1$
+R.R0:	MOV	R0, R1		; RETURN THE MODIFIED LIST
+IDENTITY::
+R.IDE:
+	RETURN
+
+;; Reverse string
+NREV.S:	T.STR
+	BISB	-3(R1), R0	; R0: length
+	MOV	R1, R2
+.IF DF K1801
+	TST	-(R2)
+.IFF
+	SUB	#2, R2
+.ENDC
+	MOV	R2, R4		; R2: string buffer
+	ADD	R0, R4		; R4: end
+	ASR	R0
+	BEQ	9$
+1$:	MOVB	(R2), R5
+	MOVB	-(R4), (R2)+
+	MOVB	R5, (R4)
+	SOB	R0, 1$
+9$:	RETURN
+
+
+CH2STR:	MOV	R1, R4
+	.ALL.1			; Allocate 1-Char String
+	INCB	(R1)+		; Length = 1
+	MOVB	R4, (R1)+	; Char
+INC1.R:	INC	R1	 	; Convert to String object
+	RETURN
+
+;; (STRING x) => string
+STRING::
+	.STRP
+	BCS	SYNAM9
+	.CHARP
+	BCS	CH2STR
+;; (SYMBOL-NAME symbol) => name
+SYNAM::	T.SYM
+	BEQ	SYNAM7
+	ADD	#5, R1
+	TST	(R1)
+	BEQ	SYNAM8		; ASCII name
+
+.IF DF C$RAD40
+	.R2STR
+.IFF
+	CALL	R2STR
+.ENDC
+
+	MOV	#TOKBUF+2, R1
+	CLR	R0
+	BR	CPSTR1		; Copy to heap string
+SYNAM7:	MOV	#A.NIL - 5 + 3, R1
+SYNAM8:	ADD	#5, R1
+SYNAM9:	RETURN
+
+
+
+CPLIS1:	MOV	R1, R5
+	MOV	(R5)+, R1
+	.PUSH0
+	MOV	(R5), R1
+;; (COPY-LIST list) => copy
+CPLIST::
+	.CONSP
+	BCS	CPLIS1
+	.SWP01
+	BR	NREVE1
+
+
+
+CDDR::	.POP1
+	BR	CDR
+CDAR::	.POP1
+	MOV	R0, R1
+REST::
+CDR::	.POP1
+	RETURN
+
+SECOND::
+CADR::	.POP1
+	BR	CAR
+CAAR::	.POP1
+	MOV	R0, R1
+FIRST::
+CAR::	.POP1
+R.R0B:	BR	R.R0
+
+;; (GENSYM &optional x) => new-symbol
+GENSYM::
+	.DF1.NIL
+	.PUSH0
+	.INTP
+	BCS	2$		; explicit suffix
+	MOV	#V.GCNT, R1     ; *GENSYM-COUNTER*
+	.GPLAC
+	MOV	(R4), R1
+	MOV	(R0), R3	; R3: x
+	MOV	R1, (R0)	; replace x
+	.SUBR	INCR
+	MOV	R1, (R4)	; (SETQ *GENSYM-COUNTER* (1+ *GENSYM-COUNTER*))
+	MOV	R3, R1		; R1: x
+	.STRP
+	BCS	3$
+2$:	MOV	#V.C.G, R1	; default 'G' prefix
+3$:	.PUSH0
+	MOV	#V.GSYM, R1
+	.PUSH0
+	MOV	R0, R5
+	CLR	R1
+	.FORMAT			; (FORMAT nil "~A~A" prefix counter)
+;; (MAKE-SYMBOL name) => new-symbol
+MKSYM::	T.STR
+MKSYM1:
+	CALL	STR2R
+	BCS	2$			; RASIC-50 ffaild, fallback to ASCII
+	MOV	R3, R5
+	ADD	#11 - $BUFOUT, R5
+	MOV	#$BUFOUT, R4
+	SUB	R4, R3
+	MOV	#6, R2			; R2: offset of name in symbol object
+	BR	5$
+2$:	SUB	#3, R1			; R1: NAME PTR
+	CLR	R5
+	BISB	(R1), R5		; R5: NAME LEN
+	MOV	R5, R3
+	INC	R3			; R3: STRLEN + 1
+	ADD	#14, R5
+	MOV	R1, R4
+	MOV	#10, R2			; R2: offset of name in symbol object
+5$:	ASR	R5
+	ASR	R5			; R5: SYMBOL object length in CELLs
+	CLR	R0			; to clear PLIST, function field and last word
+	.ALLOC
+	ADD	R1, R2
+8$:	MOVB	(R4)+, (R2)+		; COPY NAME
+	SOB	R3, 8$
+	BR	INC1.R			; R1: Symbol
+
+
+;; (NAME-CHAR name) => char-p
+NAMECH::
+	MOV	#A.SPAC+3, R2
+	MOV	#4, R0
+1$:	.PRED	STREQU
+	BCS	NAMEC2
+	ADD	#8., R2
+	SOB	R0, 1$
+R.R0A:	BR	R.R0B			; Return NIL
+NAMEC2:	ASL	R0
+	MOV	#V.CHB, R1
+	BISB	CHNAM1-2(R0), R1
+	RETURN
+
+
+
+;; (COPY-SEQ sequence) => copied-sequence
+CPSEQ::	.LISTP
+	BCS	CPLIST
+	.SVECP
+	BCC	CPSTR
+.IF NDF K1801
+	DEC	R1
+.ENDC
+	MOV	R1, R5		; R5 src buf
+	MOV	(R1)+, R1
+	MOV	R1, R0
+	.MKAR
+	SUB	#FIXOFF-1, R0
+	BEQ	CPSEQ2
+	MOV	R1, R4  	; R4: dest buf
+.IF NDF K1801
+	DEC	R4
+.ENDC
+CPSEQ1:	MOV	(R5)+, (R4)+
+	SOB	R0, CPSEQ1
+CPSEQ2:	RETURN
+
+;; copy string R1
+CPSTR:	T.STR
+CPSTR1:	MOV	R1, R5
+	BISB	-3(R1), R0	; R0: length
+	MOV	R0, R1
+	.SUBR	MKSTR1
+	MOV	R1, R4
+	ASR	R0		; # of words
+	INC	R0
+	CMPB	-(R5), -(R4)
+	CMP	-(R5), -(R4) 	; R4: dst, R5: src
+	BR	CPSEQ1
+
+
+;; (GRAPHIC-CHAR-P char) => bool
+GRACHP::
+	T.CHR
+	ASL	R1		; shift high bit from low byte to ignore it
+	CMPB	R1, #C.SP
+	B.NCF
+
+
+;; (FIND-SYMBOL string) => symbol, state (in CF)
+FINSY::	MOV	#VS.NIL, R2
+	.STREQ		; (STRING= string "NIL")
+	BCS	R.R0A
+;	BCC	1$
+;	CLR	R1		; RETURN NIL
+;	BR	3$
+1$:     MOV	R1, R2
+	CALL	STR2R		; RASIC-50 failed, fallback to ASCII
+	MOV	#OBLIST - 3, R1
+	BCS	5$		; ASCII
+6$:
+	MOV	3(R1), R1
+	BEQ	7$	        ; Not found
+	MOV	R1, R5		; Compare RADIX-50 strings
+	ADD	#5, R5
+	MOV	#$BUFOUT, R4
+.IF DF C$RAD40
+8$:	CMP	(R5)+, (R4)	; ASCII names starts with ZERO word and will be filtered-out
+	BNE	6$		; strings differ
+	TST	(R4)+
+	BMI	8$		; more words
+.IFF
+8$:	CMP	(R5)+, (R4)+	; ASCII names starts with ZERO word and will be filtered-out
+	BNE	6$		; strings differ
+	CMP	R4, R3
+	BNE	8$
+.ENDC
+	BR	3$
+5$:	ADD	#12, R1
+
+2$:	MOV	-7(R1), R1
+	BNE	4$
+7$:	CLC       ; Not found
+	RETURN
+4$:	ADD	#12, R1		; R2: SYMBOL-NAME
+	.STREQ
+	BCC	2$
+	SUB	#12, R1
+3$:	SEC
+9$:	RETURN
+
+;; (ALPHANUMERICP character) => bool
+ALNUMP::
+	.PRED	DIGCHP
+	BCS	ALCHP1
+;; (ALPHA-CHAR-P character) => bool
+ALCHP::	T.CHR
+	BIC	#40, R1				; TO UPPER CASE FOR LAT, TO LOWER CAS FOR RUS
+	.BETWE	V.C.A, V.C.Z+1
+	BCS	ALCHP1
+	.BETWE	V.C300, V.C340
+ALCHP1:	B.CF
+
+
+;; (CHAR-DOWNCASE character) => corresponding-character
+CHRDN::	INC	R0		; BMI opcode 201
+;; (CHAR-UPCASE character) => corresponding-character
+CHRUP::	ADD	#200, R0	; BPL opcode
+	MOVB	R0, CHCAI+1
+	.PRED	ALCHP		; (ALPHA-CHAR-P character)
+	BCC	CHCAI1		; non-ALPHA-CHAR-P
+	TSTB	R1
+CHCAI:	BPL	2$		; SELF-MODIFYING CODE!
+	BIS	#40, R1		; RUS
+	BR	CHCAI1
+2$:	BIC	#40, R1		; LAT
+CHCAI1:	RETURN
+
+
+;; (CHAR-NAME character) => name
+CHNAME::
+	T.CHR
+	.CCASE
+CHNAM2:	.WORD	4
+CHNAM1:	.BYTE	11, <CN.TAB - CHNAM2>/2		; Order does matter. used in NAME-CHAR
+	.BYTE	12, <CN.NL - CHNAM2>/2
+	.BYTE	15, <CN.CR - CHNAM2>/2
+	.BYTE	40, <CN.SP - CHNAM2>/2
+RENIL2:	RE.NIL
+
+CN.CR:	ADD	#A.RETU - V.C.CR - A.SPAC + V.C.SP, R1
+CN.SP:	ADD	#A.SPAC - V.C.SP - A.NEWL + V.C.NL, R1
+CN.NL:	ADD	#A.NEWL - V.C.NL - A.TAB + V.C.HT, R1
+CN.TAB:	ADD	#A.TAB + 3 - V.C.HT, R1
+	RETURN
+
+
+
+
+;; (STRINGP object) => bool
+STRP::	.TYP	U.STR
+
+.IF DF C$MDAR
+;; (ARRAYP object) => bool
+ARP::	.VECP
+	BCS.T
+	.TYP	U.AR
+.ENDC
+
+;; (VECTORP object) => bool
+VECP::	.STRP
+	BCS.T
+;; (SIMPLE-VECTOR-P object) => bool
+SVECP::	.TYP	U.SVEC
+
+
+
+;; (UNINTERN symbol) => bool
+UNINTERN::
+	MOV	#OBLIST, R0
+1$:	MOV	R0, R2		; R2: pointer to next field of SYMBOL
+	MOV	(R2), R0
+	BEQ.F			; End of OBLIST
+.IF DF K1801
+	CMP	(R0)+, (R0)+	; R0 += 4
+.IFF
+	ADD	#3, R0
+.ENDC
+	CMP	R1, (R2)
+	BNE	1$		; Next symbol
+	MOV     (R0), (R2)	; Unlink symbol from OBLIST
+	CLR	(R0)
+RE.T1:	RE.T
+
+
+
+
+;; (SYMBOLP object) => bool
+SYMP::	BEQ	RE.T1
+	.TYP	U.SYM
+
+;; (ENDP list) => bool
+ENDP::	BEQ.T
+	T.CONS				; fallback to return NIL
+;; (ATOM object) => bool
+ATOM::	.CONSP
+	B.NCF
+
+
+;; GET WORD FROM MEMORY
+;; (PEEK address) => int16
+PEEK::	TO.U16
+	MOV	(R1), R1
+	FI16.R
+
+
+;; (CHARACTERP object) => bool
+CHARP::	.TYP	U.CHAR
+
+;; (CHAR-INT character) => integer
+;; (CHAR-CODE character) => code
+CHCODE::
+	T.CHR
+	ADD	#FIXOFF - V.CHB, R1
+	RETURN
+
+
+
+;; (PLUSP real) => bool
+PLUSP::	ADD	#^F1.0 - ^F-1.0, R0
+;; (MINUSP real) => bool
+MINUSP::
+	ADD	#^F-1.0, R0
+;; (ZEROP number) => bool
+ZEROP::	.SUBR	SIGNUM
+	CMP	R0, -(R1)	; compare with low word of SIGNUM result (which can be -1, 0, 1)
+;; (NOT x) => bool
+;; (NULL object) => bool
+NULL::
+NOT::	B.ZF
+
+
+
+;; (EVENP integer) => bool
+EVENP::	DEC	R0
+;; (ODDP integer) => bool
+;;!!! FOR INT16 ONLY
+ODDP::	TO.I16
+	XOR	R0, R1
+	ASR	R1
+R.B.CF:	B.CF
+
+
+;; (STREAMP stream) => bool
+STMP::   .TYP	U.STM
+
+;; (INPUT-STREAM-P stream) => bool
+ISTMP::	.PRED	STMP
+	BCC.F
+	TO.STM
+	PUSH	#NOT		; output-string-stream has list of chars
+	MOV	1(R1), R1
+;; (LISTP object) => bool
+LISTP::	BEQ	RE.T1
+CONSP::	BIT	#3, R1		; Don't use  .TYP U.CONS to avoid recursive calls in .TYCOD
+	BNE	RENIL2
+	PUSH	#R.B.CF
+;; OUT: CF=1 if R1 is heap object
+HEAPP:	CMP	#HEAP - 1, R1
+	BHIS	9$
+	CMP	R1, EHEAP
+9$:	RETURN
+
+
+
+;; (BOUNDP symbol) => bool
+BOUNDP::
+	BEQ	RE.T1
+	.GPLAC
+	B.NZF
+
+
+;; (MAKUNBOUND symbol) => symbol
+MAKUNBOUND::
+	MOV	#V.SYVA, R2
+	.PRED	REMPROP		; (REMPROP symbol 'SYMBOL-VALUE)
+	RETURN
+
+
+;; (FMAKUNBOUND name) => name
+FMAKUNBOUND::
+	T.SYM
+	CLR	1(R1)		; works for NIL too
+	RETURN
+
+;; (SYMBOL-FUNCTION symbol) => contents
+SYFUN::	.PRED	FBOUNDP
+	BCC.E
+	MOV	1(R1), R1
+	RETURN
+
+
+;; (SLEEP seconds) => nil
+SLEEP::	TO.U16
+	BEQ	9$
+1$:	SOB	R0, .			;!!!TODO: CALIBRATE DELAY
+	SOB	R0, .
+	SOB	R1, 1$
+9$:	RETURN
+
+;; (FUNCTIONP object) => bool
+FUNP::	.TYPEP	U.LAMB
+	BCS.T
+SUBRP::	.TYP	U.FUN
+
+;; (SPECIAL-OPERATOR-P symbol) => bool
+SPECOP::
+.IIF NDF K1801,	BEQ.F
+	T.SYM
+	MOV	1(R1), R1
+	.TYP	U.SPOP
+
+
+;; (INTEGERP object) => bool
+INTP::	.PRED	REALP
+	BCC.F
+	PU.FL
+	.BASN
+	.WORD	DDUP, $INT, $DCMP, NOT
+
+
+;; (NUMBERP object) => bool
+NUMP::
+;; (REALP object) => bool
+REALP::	.FIXP
+	BCS.T
+;; (FLOATP object) => bool
+FLOATP::
+	.TYP	U.FLT
+
+
+
+;; (MIN &rest reals+) => min-real
+MIN::	ADD	#3400 - 2000, R0	; BLE opcode 3400
+;; (MAX &rest reals+) => max-real
+MAX::	ADD	#2001, R0		; BGE opcode 2000
+	MOV	R1, R2
+	MOV	R0, (PC)
+3$:	BLE	2$			;SELF-MODIFYING CODE
+	MOV	R1, R2
+2$:	MOV	R2, R1
+	.POP5
+	BEQ	RE.11
+	.BASN
+	.WORD	DPUR12, $DCMP, 3$
+
+
+;; (TYPE-OF object) => typespec
+TYPEOF::
+	.TYCOD
+	INC	R0
+	MOV	#V.SYVA, R1
+1$:	MOV	3(R1), R1
+	SOB	R0, 1$
+RE.11:	RETURN
+
+
+
+
+
+;; COMPARE R1<R2
+;; ASSUME R0==0
+LT12:	.PUSH0
+	MOV	R0, R5
+	CLR	R0
+	MOV	R2, R1
+;; (> &rest numbers+) => bool
+NUMGT::	ADD	#2400 - 3000, R0	; BLT opcode
+;; (< &rest numbers+) => bool
+NUMLT::	ADD	#3000 - 1400, R0	; BGT opcode
+;; (= &rest numbers+) => bool
+NUMEQ::	ADD	#1400 - 2000, R0	; BEQ opcode
+;; (<= &rest numbers+) => bool
+NUMLE::	ADD	#2000 - 3400, R0	; BGE opcode
+;; (>= &rest numbers+) => bool
+NUMGE::	ADD	#4000-<<3$+2-2$>/2>, R0	; BLE opcode 3400
+	MOV	R1, R2
+1$:	MOV	R0, @#3$		; address in word .+2 used in return from $DCMP
+2$:	.POP5
+	BEQ.T
+	.BASN
+	.WORD	DPUR12			; Save R1 for next iteration
+	.WORD	$DCMP, 3$
+3$:	BLE	2$			;!!! SELF-MODIFYING CODE, AFTER_CMP_OPCODE
+	RE.NIL
+
+;; (CHAR-EQUAL &rest characters+) => bool
+CHEQUA::
+	ADD	#CHEQU2 - EQ.CH, R0
+;; (CHAR= &rest characters+) => bool
+CHEQ::	ADD	#EQ.CH, R0
+	MOV	R0, CHEQ2 + 2
+	MOV	R1, R2
+CHEQ1:	.POP5
+	BEQ.T
+CHEQ2:	.PRED	EQ.CH		;!!!Self modifiable code
+	BCC.F
+	BR	CHEQ1
+
+
+;; (CHAR/= &rest characters+) => bool
+CHRNE::	ADD	#EQ.CH - EQ.NUM, R0
+
+;; (/= &rest numbers+) => bool
+NUMNE::	ADD	#EQ.NUM, R0
+
+;; CHECK THAT ALL ELEMENTS OF (R1 . R5) ARE DIFFERENT
+;; R0: PREDICATE OF EQUIVALENCE
+ALLDIF::
+	MOV	R0, 3$ + 2
+	MOV	R1, R2
+1$:	.POP5
+	BEQ.T			; ALL ELEMENTS ARE EQUAL
+	MOV	R1, R3		; SAVE (HEAD . TAIL) FOR NEXT ITERATION
+	MOV	R5, R4
+3$:	.PRED	EQ.NUM		; SELF-MODIFYING CODE
+	BCS.F			; FOUND EQUAL ELEMENTS
+	.POP5
+	BNE	3$
+	MOV	R3, R2
+	MOV	R4, R5
+	BR	1$
+
+
+;; (ISQRT natural) => natural-root
+ISQRT::	.SUBR	SQRT
+	BR	FLOOR
+SIGNUM::
+	ADD	#6, R0
+ABS::	TST	(R0)+
+TRUNCA::
+	TST	(R0)+
+FLOOR::	CMP	(R0)+, (R0)+
+EXP::	TST	(R0)+
+ATAN::	TST	(R0)+
+TAN::	TST	(R0)+
+COS::   TST	(R0)+
+SIN::	TST	(R0)+
+SQRT::	MOV	$AMATH(R0), R0
+	BR	MATH
+ACOS::	ADD	#ACOS1 - ASIN1, R0
+ASIN::	ADD	#ASIN1, R0
+MATH:	PU.FL
+	MOV	#DREFLT, R4
+        JMP	(R0)
+
+
+;; (SINH number) => result
+SINH::  TST	(R0)+			; R0: 2 (offset of $DSUB address)
+;; (COSH number) => result
+COSH::	MOV	$APLMI(R0), 1$
+	PU.FL
+	.BASN
+	.WORD	DDUP, $EXP, DSWAP, DNEG, $EXP
+1$:	.WORD	$DADD, 2$			;Self-modifying code
+2$:     TST	(SP)				; /2 FLT4 on Stack, POP into R1 and Return
+	BEQ	9$
+	SUB	#200, (SP)		;!!!CHECK check for min exponent
+9$:	POFL.R
+
+
+;; (TANH number) => result
+TANH::	MOV	R1, R2
+	.SUBR	COSH
+	.SWP12
+	.SUBR	SINH
+	.BASN
+	.WORD	DPUR12, $DDIV, RBAS.5
+
+
+
+;;;---------------------------------------
+;;; BK-0010.01 Specific code
+
+EIO:	ER.IO
+
+;; (LOAD filename) => bool
+LOAD::	JSR	R5, PSNAME
+
+;	PUSH	#256.		; buffer size
+	TST	-(SP)
+
+	PUSH 	#$BUF		; buffer
+	PUSH	#3		; READ FILE command
+LOAD1:	MOV	SP, R1
+1$:	EMT	36		; File API
+	CMPB	#1, 1(SP)
+	BCS	EIO
+	BEQ	1$		; retry next file
+	CMPB	(SP), #3
+	BNE	8$
+	MOV	#$BUF, R1
+	MOV	R1, INCUR
+	ADD	$TSIZE, R1
+	MOV	R1, INEND       ; assume REPL process the read buffer
+8$:	ADD	#42, SP		; restore Stack
+	RE.T
+
+;; (SAVE filename &optional main) => bool
+SAVE::	MOV	#$AURET, R3
+	PUSH	(R3)
+	MOV	#LOADER, (R3)
+	MOV	(R5), A.MAIN	; main
+	CALL	1$
+        POP	(R3)
+        RETURN
+1$:	JSR	R5, PSNAME
+	PUSH	EHEAP
+	SUB	R3, (SP)
+	PUSH	R3
+	PUSH	#2
+	BR	LOAD1
+
+
+;; (EVAL form) => result
+;; Evaluate form in R1 in null-environment
+EVAL::	MOV	#LEXENV, R4
+	PUSH	(R4)
+	CLR	(R4)
+	.EVAL1
+	POP	(R4)
+	RETURN
+
+.IF DF C$MDAR
+
+;; (ARRAY-TOTAL-SIZE array) => size
+ARTSIZ::
+	.VECP
+	BCS	LENGT1
+	T.AR
+	MOV	#FIXOFF*2-1, R4
+	.IIF NDF K1801, DEC	R1
+	SUB	(R1), R4
+	BR	LSTLE1
+.ENDC
+
+;; (LENGTH sequence) => n
+;; ASSUME R0 == 0
+LENGTH::
+	.LISTP
+	BCC	LENGT1
+;; (LIST-LENGTH list) => length (NIL for circular list)
+LSTLEN::
+	MOV	R1, R2		; R2: SLOW POINTER
+	MOV	#FIXOFF, R4	; COUNTER
+	BR	2$
+1$:	INC	R4
+	MOV	2(R2), R2
+2$:	.POP1
+	BEQ	9$
+	INC	R4
+	CMP	R1, R2
+	BEQ.F			; CIRCULAR LIST
+	.POP1
+	BNE	1$
+9$:
+LSTLE1:	MOV	R4, R1
+	RETURN
+
+
+LENGT1:	.STRP
+	BCC	VECLEN
+STRLEN:	BISB	-3(R1), R0
+	MOV	R0, R1
+	FI16.R
+
+;; (SYMBOL-VALUE symbol) => value
+SYVAL::	BEQ	SYVAL2		; NIL
+	.BOUNDP
+	BCC.E
+ 	.GPLAC
+SYVAL1:	BEQ.E
+	MOV	(R4), R1
+SYVAL2:	RETURN
+
+VECLEN:	T.VEC
+	BR	VECLE1
+
+P5EVL:	ADD	#ST.OFF-2, SP
+;; Evaluate form in R1 in the current environment
+EVAL1:	.CONSP
+	BCC	7$
+;!!!?	PUSH	(R4)		; SAVE ENVIRONMENT
+	MOV	R1, R5
+	.POP5
+	.CONSP
+	BCS	1$
+	.SUBR	FDEFINITION
+	BEQ	1$
+	.TYPEP	U.SPOP
+	MOV	#FSUBRT, R2
+	BCS     APPLY1		; SPECIAL-OPERATOR
+;!???	CALL	SYFUN		; (SYMBOL-FUNCTION sym)
+	BR	5$
+1$:	CMP	(R1), #V.LAMB
+	BNE.E
+	.EVAL1
+5$:	PUSH	R1		; Save Function
+	CLR	-(SP)		; init list for evaluated args
+	BR	2$
+3$:	.P5EVL
+	POP	R2
+	.CONS
+	PUSH	R1
+2$:	.POP5
+	BNE	3$
+	POP	R0
+	.NREV0			; R1: evaluated args
+	MOV	R1, R5
+	MOV	#ASUBRT, R2
+	BR	APPLY$		; (SP): function
+7$:	.TYPEP	U.SYM
+	BCC	SYVAL2		; return
+	.PLACE
+	BR	SYVAL1
+
+;; INTERPRETED FUNCTION
+INTERP:	POP	R3		; R3: lambda-function
+	MOV	5(R3), R4	; R4: Function Environment
+	MOV	1(R3), R1	; Lambda List
+1$:	.POP1			; Bind Lambda List
+	BEQ	9$
+	CMP	R0, #V.REST
+	BEQ	8$		; &REST
+	CMP	R0, #V.OPT
+	BEQ	12$		; &OPTIONAL
+	TST	R5
+	BEQ.E 			; No mandatory arg
+4$:	PUSH	R1
+	MOV	R0, R1
+	CALL	BNARG1
+	POP	R1
+	BR	1$
+
+;; &OPTIONAL section
+16$:	PUSH	R1
+	MOV	R0, R1		; R1: arg spec
+	.CONSP
+	BCC	14$		; &OPTIONAL arg
+	.POP1			; R0: arg-name; R1: (init-form)
+	TST	R5		; &OPTIONAL (arg init-form)
+	BNE	13$		; Don't use init-form
+	MOV	(R1), R1	; R1: init-form
+	.EVAL1			; R1: evaluated init-form
+	.SH210			; R1: arg-name; R2: evaluated init-form
+	BR	15$
+13$:	MOV	R0, R1
+14$:	MOV	(R5)+, R2
+15$:	CALL	BNARG
+	POP	R1
+12$:	.POP1
+	BEQ	9$
+	CMP	R0, #V.REST
+	BNE	16$		; some optional args
+;; &REST section
+8$:	.POP1
+	MOV	R0, R1
+	MOV	R5, R2
+	CALL	BNARG2
+9$:	PUSH	LEXENV
+	MOV	R4, LEXENV
+	MOV	3(R3), R5	; BODY
+	CLR	R1		; Duplicate PROGN code to save 1 word (return to `POP LEXENV`) in the Stack
+10$:	.POP5
+	BEQ	11$		; Return last evaluated value
+	.P5EVL
+	BR	10$
+11$:	POP	LEXENV		;!!!? Restore lexical environment
+RE.FND:	RETURN
+
+;; (STRING-UPCASE string) => cased-string
+STRUP::	TST	(R0)+
+;; (STRING-DOWNCASE string) => cased-string
+STRDN::	.SUBR	CPSTR				; Copy string
+;; (NSTRING-DOWNCASE string) => string
+NSTRDN::
+	TST	-(R0)		; R0 -= 2, Reads 177776, may be BUS ERROR on some models; R0: (CHRDN - CHRUP)
+;; (NSTRING-UPCASE string) => string
+NSTRUP::
+	ADD	#CHRUP, R0
+	MOV	R0, 3$+2
+	T.STR
+	MOV	R1, R5
+.IF DF K1801
+	TST	-(R1)
+.IFF
+	SUB	#2, R1
+.ENDC
+	MOV	R1, R4 		; R4: string buf
+	CLR	R0
+	BISB	-(R1), R0	; LEN
+	BEQ	2$
+1$:	MOV	#V.CHB, R1
+	BISB	(R4), R1
+3$:	.SUBR	CHRDN		; SELF-MODIFYIG PLACE
+	MOVB	R1, (R4)+
+	SOB	R0, 1$
+2$:
+R.M51:	MOV	R5, R1
+	RETURN
+
+
+
+;; (SYMBOL-PLIST symbol) => plist
+SYPLS::	T.SYM
+VECLE1:
+.IIF NDF K1801,	DEC	R1
+R.CAR:	MOV	(R1), R1
+	RETURN
+
+;; (APPLY fun &rest args+) => result
+APPLY::	MOV	R1, R2
+	CALL	LISTA		; LIST*
+	MOV	R1, R5
+	MOV	R2, R1
+;; (FUNCALL fun &rest args) => result
+FUNCALL::
+	TO.FUN
+	MOV	#ASUBRT, R2
+APPLY1:	PUSH	R1
+				;; FALLBACK
+;; IN: (SP): FUNCTION,  R5: ARGS
+APPLY$:	MOV	(SP), R3
+	CMP	R3, #E.FSUBR	; (SP): function
+	BCC	INTERP		; Interpreted Function
+	MOV	#4, R0
+1$:	MOV	#V.U, R1	; Init optional args by V.U (Unbound Value)
+	CMP	R3, (R2)+
+	BLO	2$
+	.POP5
+2$:	PUSH	R1
+ 	SOB	R0, 1$
+	POP	R4, R3, R2, R1	; Pop mandatory and &optional args, R0=0, ZF=(R1==0)
+	RETURN			; Invoke SUBR; Contract: R0: 0, R1..R4: ARGS, R5: &REST
+
+
+.IF DF C$MDAR
+
+;; (SETF (AREF array &rest subscripts) new-element) => element
+X.AREF::
+	MOV	R1, R4		; R4: array
+	MOV	R5, R1
+	.LAST
+	MOV	(R1), R3		; R3: new-element
+	MOV	R5, R1
+	.SUBR	BUTLAST
+	MOV	R1, R5		; R5: subscripts
+	MOV	R4, R1		; R1: array
+	PUSH	#X.SVR1
+;; (AREF array &rest subscripts) => element
+AREF::	MOV	R1, R2		; R2: array
+	.SUBR	ARMI		; R1: (APPLY 'ARRAY-ROW-MAJOR-INDEX array subscripts)
+	.SWP12			; R1: array, R2: index
+	BR	RMAR		; (ROW-MAJOR-AREF array index)
+.ENDC	; C$MDAR
+
+
+;;-- 11. words
+;; (FUNCALL R0 R1 R2)
+CALL3:	PUSH	R1, R2
+	TST	(R0)+			; R0: 2
+	.LISTN
+	MOV	R1, R5
+	MOV	R0.OFF+4(SP), R1
+	BR	FUNCALL
+
+;; (FLOAT number) => float
+FLOAT::	.FLTP
+	BCS	RE.FND
+FLOAT1:	PU.FL
+RBAS.5: POFL.R
+
+;; (FDEFINITION function-name) => definition
+FDEFINITION::
+	.SUBR	FBOUNDP
+	BNE	R.9
+	ER.FUN
+
+;; (WRITE object) => object
+WRITE::	CLR	R2		; R2: *STANDARD-OUTPUT* designator
+	.WRITE
+R.9:	RETURN

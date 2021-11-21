@@ -1,0 +1,3064 @@
+﻿<!DOCTYPE html>
+
+<html lang="ru">
+<head>
+	<title>LISP для БК-0010.01</title>
+	<meta charset="UTF-8">
+  	<meta name="description" content="Ufasoft BkLisp - LISP для БК-0010.01. Справочник.">
+	<meta name="keywords" content="Lisp, Common Lisp, BkLisp, Ufasoft, БК-0010, БК-0010.01">
+	<meta name="author" content="Sergey Pavlov">
+
+    <style>
+    	.clhs {
+    		float: right;
+    	}
+
+    	.index {
+    		column-width: 15em;
+    		column-count: auto;
+    	}
+
+    	.index a {
+    		display: block;
+			font-size: 70%;
+    	}
+
+    	.bibliography {
+			font-size: 70%;
+    	}
+    </style>
+</head>
+
+<body>
+
+<article>
+
+<h1>Ufasoft BkLisp - LISP для БК-0010.01<br>
+Справочник
+</h1>
+<i>Версия 2021</i>
+
+<p>Минимальный интерпретатор языка программирования LISP для микро-компьютера <a href="https://ru.wikipedia.org/wiki/БК_(семейство_компьютеров)">БК-0010.01</a>
+архитектуры <a href="https://ru.wikipedia.org/wiki/PDP-11">PDP-11</a>, на процессоре <a href="https://ru.wikipedia.org/wiki/К1801ВМ1">К1801ВМ1</a>.
+
+<h2>Оглавление</h2>
+<a href="#base-chapter">Базовые объекты</a>
+<br/><a href="#lists-chapter">Списки</a>
+<br/><a href="#sets">Множества</a>
+<br/><a href="#sequences-chapter">Последовательности</a>
+<br/><a href="#array-chapter">Массивы</a>
+<br/><a href="#chars-strings-chapter">Строки и Characters</a>
+<br/><a href="#symbols-chapter">Символы</a>
+<br/><a href="#numbers-chapter">Числа</a>
+<br/><a href="#input">Ввод</a>
+<br/><a href="#output">Вывод</a>
+<br/><a href="#time-chapter">Время</a>
+<br/><a href="#random-chapter">Генератор случайных чисел</a>
+<br/><a href="#functions-chapter">Работа с функциями</a>
+<br/><a href="#control-flow">Управление выполнением</a>
+<br/><a href="#symbol-index">Индекс символов</a>
+
+
+
+<h2>Предыстория</h2>
+<p>В 1984 из многочисленных реализаций LISP создали общий язык <b>Common Lisp</b>, стандартизованный ANSI в 1994 г.</br>
+Этот стандарт опубликован как <a href="http://clhs.lisp.se/">Common Lisp HyperSpec (CLHS)</a>, составитель Кент Питман.
+
+<p>В 1972 г. Ричард Столлман впервые реализовал интерпретатор LISP на PDP-11. Впоследствии он развился в <a href="http://www.softwarepreservation.org/projects/LISP/other#MIT_PDP_11_LISP_">LISP11</a> для различных ОС фирмы DEC.
+
+<p>В 1958 г. Джон Маккарти сформулировал первый вариант языка LISP (от <b>LIS</b>t <b>P</b>rocessing).
+
+<h2>BkLisp</h2>
+
+<p>В дальнейшем данная реализация называется <b>BkLisp</b>.
+
+<p>Так как в отличие от 1970-х есть стандарт, то по возможности имена функций брались из него для совместимости.
+В этом существенное отличие от традиционного LISP11 и <a href="http://www.softwarepreservation.org/projects/LISP/book/LISP%201.5%20Programmers%20Manual.pdf">LISP 1.5.</a>
+
+<p>Эта реализация полностью отличается от <a href="http://ufasoft.com/lisp">Ufasoft Common Lisp</a>, написанного на C++ для современных компьютеров.
+
+<p>Исходный код на языке ассемблера <a href="https://ru.wikipedia.org/wiki/MACRO-11">MACRO-11</a> доступен на <a href="https://github.com/ufasoft/bklisp">github.com/ufasoft/bklisp</a> и на <a href="https://ufasoft.com/bklisp">ufasoft.com/bklisp</a>.
+
+<p><author>Автор: Sergey Pavlov <a href="mailto:dev@ufasoft.com">dev@ufasoft.com</a></author>
+
+<h3>Лицензия</h3>
+<p>Код выпущен под <a href="https://mit-license.org/">лицензией MIT</a>.
+<p>Допускается свободное использование, копирование и модификация при условии ссылки на оригинал.
+
+<h3>Развитие Проекта</h3>
+<p>Наращивать функциональность на оригинальной платформе БК-0010.01 невозможно, не принося в жертву память, а значит сужая множество программ, способных запуститься.
+Остаётся путь портирования на другие платформы.
+<p>Самое очевидное направление: версии для ОС <b>RT-11</b> и <b>БК-0011</b> в частности.
+<p>Из-за схожей системы команд, возможно портировать на процессор <b>m68k</b>.
+
+<p>BkLisp - некоммерческий проект.
+В то же время можно перечислить пожертвования на его развитие:</p>
+<ul style="list-style-type: none;">
+<li>Bitcoin: <a href="bitcoin:1BkLispRHm6TsRvLqgEqFG8qsjFCy42AR5?label=BkLisp">1BkLispRHm6TsRvLqgEqFG8qsjFCy42AR5</a></li>
+<li>Zcash: <a href="zcash:t1bkLispNMjGjcsmuamWB1R7JmkTCWWdBCS?label=BkLisp">t1bkLispNMjGjcsmuamWB1R7JmkTCWWdBCS</a></li>
+</ul>
+
+<h3>Отклонения от Common Lisp</h3>
+<ul>
+    <li>Сравнение букв Кириллицы производится в кодировке <a href="https://ru.wikipedia.org/wiki/БК_(семейство_компьютеров)#Кодировка">КОИ-8-БК</a>, сортировка работает не в алфавитном порядке.</li>
+	<li>Десятичные дроби форматируются подпрограммой из БЕЙСИК, например <b>0.5</b> представляется в виде <b>.5</b> </li>
+	<li>Длина строк ограничена 255 characters.</li>
+	<li>Длина идентификаторов и чисел ограничена 31 characters.</li>
+</ul>
+
+<h3>Специфика BkLisp для БК-0010.01</h3>
+<ul>
+	<li>Используются подпрограммы из ПЗУ Бейсик-Вильнюс. Поэтому для работы на БК-0011 требуется образ ПЗУ от БК-0010.01.</li>
+	<li>Операции с целыми числами предполагают 16-битное представление: диапазон <i>-32768..65535</i>. Отрицательные целые перекрываются с положительными и интерпретируются в зависимости от контекста.
+	<li>Глубина стека <b>256</b> байт. Это позволяет сделать до 14 вложенных вызовов.</li>
+	<li>Сборщик мусора использует часть видеопамяти статусной строки во время работы. Поэтому её содержимое портится.</li>
+	<li>Клавиша ВС повторяет последнюю введённую строку, как в БЕЙСИК.</li>
+	<li>Клавиша СТОП прерывает выполнение и переводит интерпретатор в начальное состояние (цикл REPL). Значения глобальных переменных и функций при этом сохраняются.</li>
+    <li>С помощью вызова <code>(<a href="#extroom">extroom</a>)</code> можно переключиться в режим расширенной памяти (+12 KiB). Вернуться из него нельзя, даже выводя код
+    214<sub>8</sub>.
+    <li>Ещё немного памяти можно высвободить, исключая неиспользуемые символы из пространства имён, например
+	<pre>
+(dolist (sym '(sin cos lisp-implementation-version))
+    (<a href="#unintern">unintern</a> sym))
+	</pre>
+</ul>
+
+<h3>Что НЕ реализовано</h3>
+<p>Функциональность Common Lisp, которой нет в BkLisp:</p>
+<ul>
+	<li>Множественные результаты функций <b>(VALUES a b ...)</b></li>
+	<li><b>&amp;key</b> аргументы у функций</li>
+	<li>Рациональные числа</li>
+	<li>Комплексные числа</li>
+	<li>Целые неограниченной длины</li>
+	<li>Packages</li>
+	<li>CLOS</li>
+	<li>Conditions</li>
+	<li>Pretty Printing</li>
+	<li>Readtable</li>
+	<li>Файлы и Filenames</li>
+	<li>Структуры</li>
+	<li>Хеш-таблицы</li>
+	<li>Макросы</li>
+	<li>LOOP</li>
+	<li>Компилятор</li>
+	<li>Сложное форматирование чисел, римская система счисления</li>
+</ul>
+
+<p>При портировании BkLisp на платформы с большим количеством ОЗУ (ДВК, БК-0011, УКНЦ) часть этой функциональности может быть реализована.
+
+<h2>Справочник</h2>
+
+<p>Справа приведены ссылки на <abbr title="Common Lisp HyperSpec">CLHS</abbr> с более полной документацией.
+В BkLisp реализовано только подмножество функциональности <abbr title="Common Lisp">CL</abbr>, но то что реализовано - совместимо с CL насколько это было возможно при ограничениях платформы.
+
+
+<h3>Терминология</h3>
+<ul>
+	<li><b id="accessor">Аксессор</b> - пара функций для чтения/записи поля. <a class="clhs" href="http://clhs.lisp.se/Body/26_glo_a.htm#accessor">CLHS</a>
+
+	<li><b>boolean</b> - логическое значение: <b>NIL</b> - <i>Ложь</i>, <b>T</b> - <i>Истина</i>.
+	<li><b>generalized-boolean</b> - логическое значение: <b>NIL</b> - <i>Ложь</i>,  все остальные объекты - <i>Истина</i>.
+	<li><b id="proper-list">Правильный список</b> - список, заканчивающийся NIL. <a class="clhs" href="http://clhs.lisp.se/Body/26_glo_p.htm#proper_list">CLHS</a>
+	<li><b id="dotted-list">dotted-список</b> - список, у которого завершающий атом - не nil.   <a class="clhs" href="http://clhs.lisp.se/Body/26_glo_d.htm#dotted_list">CLHS</a>
+	<li><b>простой вектор</b> - вектор, не являющийся строкой, может содержать объекты любого типа.
+	<li><b>sequence</b> - список, простой вектор или строка.
+	<li><b>STDIN</b> - стандартный ввод, клавиатура.
+	<li><b>STDOUT</b> - стандартный вывод, экран.
+	<li><b>whitespace</b> - обобщённые пробелы: #\SPACE, #\TAB, #\NEWLINE, #\RETURN.
+</ul>
+
+<h3>Синтаксис</h3>
+
+<h4>Комментарии</h4>
+<a class="clhs" href="http://clhs.lisp.se/Body/02_dd.htm">CLHS</a>
+<pre>
+(list '(1 2 3))     ; <b>это однострочный комментарий</b>
+
+#| <b>Это
+   Многострочный комментарий</b>
+|#
+
+#|
+    Он также
+
+    #| Может быть вложенным |#
+|#
+</pre>
+<a class="clhs" href="http://clhs.lisp.se/Body/02_dhs.htm">CLHS</a>
+
+
+<h4>Characters</h4>
+<a class="clhs" href="http://clhs.lisp.se/Body/02_dha.htm">CLHS</a>
+
+
+<p>Начинаются с <code><b>#\</b></code>:
+<code>#\D</code>
+<code>#\Щ</code>
+<code>#\9</code>
+<p>Есть несколько именованных character:
+<ul>
+	<li><code>#\tab</code>
+	<li><code>#\space</code>
+	<li><code>#\newline</code>
+	<li><code>#\return</code>
+</ul>
+
+
+<h3>Типы данных</h3>
+
+Тип объекта можно получить вызвав <code>(<a href="#type-of">type-of</a> object)</code>.
+
+<h4>NULL</h4>
+<a class="clhs" href="http://clhs.lisp.se/Body/a_null.htm#null">CLHS</a>
+<p>Единственный объект этого типа: <b>nil</b>
+
+<h4 id="symbol">Символ - SYMBOL</h4>
+<a class="clhs" href="http://clhs.lisp.se/Body/t_symbol.htm#symbol">CLHS</a>
+<p>Символ.
+<p><b>nil</b> также является символом
+
+<h4>CONS</h4>
+<p>Пара значений, основной элемент конструирования сложных объектов.
+
+<h4 id="list-type">Список - LIST</h4>
+<a class="clhs" href="http://clhs.lisp.se/Body/t_list.htm">CLHS</a>
+<p>Объединяющее название для типов CONS и NULL.
+
+<h4 id="character-type">CHARACTER</h4>
+<p>Однобайтовое значение к кодировке КОИ-8-БК.
+<p>В данном документе не используется русский перевод <i>символ</i> для этого понятия из-за неоднозначности в контексте LISP.
+
+<h4 id="string-type">Строка - STRING</h4>
+<p>Строка, массив длиной 0..255 объектов типа <a href="#character-type">CHARACTER</a>.
+
+<h4 id="integer-type">Целое - INTEGER</h4>
+<p>FIXUM либо вещественное число у которого нет дробной части .
+
+<h4 id="fixnum-type">Короткое целое - FIXNUM</h4>
+<p>Целочисленное значение в диапазоне -1500..1500 (или более широком, зависит от версии BkLisp). Не занимает память в Куче.
+<p>Для объектов этого типа функция <a href="#type-of">type-of</a> возвращает тип INTEGER.
+
+<h4 id="float-type">Вещественное - FLOAT</h4>
+<p>Число с плавающей запятой двойной точности (8 байт в Куче). К нему преобразуется и FIXNUM для любых арифметических действий.
+
+<h4 id="array-type">Массив - ARRAY</h4>
+<p>Массив. Строки и векторы являются массивами.
+<p>Массив может быть многомерным.
+<p>Для записи массива испольуется синтаксис:  <code>#<i>ранг</i>A(...)</code>:<br/>
+<code>#2A((A B) (D E F))</code> - массив размерности (2 3).
+
+<h4 id="vector-type">Вектор - VECTOR</h4>
+<h4 id="simple-vector">Простой вектор - SIMPLE-VECTOR</h4>
+<p>Одномерный массив. В BkLisp тип VECTOR совпадает с SIMPLE-VECTOR.
+<p>Длина вектора не может превышать максимальное значение типа <a href="#integer-type">FIXNUM</a>.
+<p>Для записи вектора испольуется синтаксис:  <code>#(...)</code>:<br/>
+<code>#(A B C 9)</code> - вектор размера 4
+
+<h4 id="stream-type">Поток - STREAM</h4>
+<p>Поток ввода или вывода.
+
+<h4 id="function-type">Функция - FUNCTION</h4>
+<p>Пользовательская функция или LAMBDA-выражение.
+
+<h4 id="system-function-type">Встроенная функция - SYSTEM-FUNCTION</h4>
+<p>Встроенная функция.
+
+<h4 id="special-operator">Оператор - SPECIAL-OPERATOR</h4>
+<p>Встроеные примитивы BkLisp,  которые не являются функциями (их аргументы не обязательно вычисляются).
+<p>Так как в BkLisp нет макросов, многие макросы Common Lisp представлены в виде специальных операторов.
+
+<h3 id="base-chapter">Базовые объекты</h3>
+
+<h4 id="nil">Константа NIL</h4>
+<a class="clhs" href="http://clhs.lisp.se/Body/v_nil.htm">CLHS</a>
+<p>Представляет логическое значения <i>ложь</i>, а также <i>пустой список</i>.
+<h5>Примеры</h5>
+<p><code>nil</code> → <code>NIL</code>
+
+<hr/><h4 id="t">Константа T</h4>
+<a class="clhs" href="http://clhs.lisp.se/Body/v_t.htm">CLHS</a>
+<p>Каноническое представление логического значения <i>истина</i>.
+<p>Хотя любой не-<a href="#nil">NIL</a> объект представляет истину, когда нет причин представлять её другим объектом, предпочтительно использовать T.
+<h5>Примеры</h5>
+<p><code>t</code> → <code>T</code>
+
+
+
+<hr/><h3 id="lists-chapter">Списки</h3>
+
+<h4 id="car">Аксессор CAR</h4>
+<p><b>car</b> x &rarr; object<br/>
+<b>(setf (car</b> x) new-object) → new-object
+<a class="clhs" href="http://clhs.lisp.se/Body/f_car_c.htm#car">CLHS</a>
+<p>Если <i>x</i> - cons, <b>car</b> возвращает car этой cons-ячейки. <code>(car nil)</code> возвращает NIL.
+<p><code>(setf (car x) y)</code> устанавливает car-поле cons-ячейки <i>x</i> в значение <i>y</i>.
+
+<hr/><h4 id="cdr">Аксессоры CDR, REST</h4>
+<p><b>cdr</b> x →  object<br/>
+<b>(setf (cdr</b> x) new-object) → new-object
+<a class="clhs" href="http://clhs.lisp.se/Body/f_car_c.htm#cdr">CLHS</a>
+<br/>
+<br/><b id="rest">rest</b> x →  object<br/>
+<b>(setf (rest</b> x) new-object) → new-object
+<a class="clhs" href="http://clhs.lisp.se/Body/f_rest.htm">CLHS</a>
+<p>Если <i>x</i> - cons, <b>cdr</b> возвращает cdr этой cons-ячейки.
+<p>Если <i>x</i> - nil, возвращает nil.
+<p><b>rest</b> и <cdr> синонимы.
+<h5>Примеры</h5>
+<pre>
+(cdr '(1 . 2)) →  2
+</pre>
+
+<hr/><h4 id="caar">Функции CAAR, CDAR, CADR, CDDR</h4>
+<p><b>caar</b> x → object <a class="clhs" href="http://clhs.lisp.se/Body/f_car_c.htm">CLHS</a>
+<br><b id="cdar">cdar</b> x → object
+<br><b id="cadr">cadr</b> x → object
+<br><b id="cddr">cddr</b> x → object
+<h5>Эквивалент</h5>
+<code>(caar x)</code> ≡ <code>(car (car x))</code><br/>
+<code>(cdar x)</code> ≡ <code>(cdr (car x))</code><br/>
+<code>(cadr x)</code> ≡ <code>(car (cdr x))</code><br/>
+<code>(cddr x)</code> ≡ <code>(cdr (cdr x))</code><br/>
+
+<hr/><h4 id="cons">Функция CONS</h4>
+<p><b>cons</b> object-1 object-2 → cons
+<a class="clhs" href="http://clhs.lisp.se/Body/f_cons.htm">CLHS</a>
+<p>Создаёт cons-объект,  <i>car</i> которого <i>object-1</i> и <i>cdr</i> которого <i>object-2</i>.
+
+<hr/><h4 id="acons">Функция ACONS</h4>
+<p><b>acons</b> key datum alist → new alist
+<a class="clhs" href="http://clhs.lisp.se/Body/f_acons.htm#acons">CLHS</a>
+<p>Добавляет <i>cons</i> из <i>key</i> и <i>datum</i> к ассоциатиыному списку <i>alist</i>.
+<h5>Эквивалент</h5>
+<pre>(acons key datum alist) ≡ (cons (cons key datum) alist)</pre>
+
+<hr/><h4 id="adjoin">Функция ADJOIN</h4>
+<p><b>adjoin</b> item list → new-list
+<a class="clhs" href="http://clhs.lisp.se/Body/f_adjoin.htm#adjoin">CLHS</a>
+<p>Если <i>item</i> содержится в <i>list</i> возвращает <i>list</i>, иначе присоединяет <i>item</i> к <i>list</i> с помощью <a href="#cons">cons<a> и возвращает новый список.
+<h5>Эквивалент</h5>
+<pre>(adjoin item list) ≡ (if (member item list) list (cons item list))</pre>
+
+<hr/><h4 id="assoc">Функция ASSOC</h4>
+<p><b>assoc</b> item alist → entry
+<a class="clhs" href="http://clhs.lisp.se/Body/f_assocc.htm#assoc">CLHS</a>
+<p>Возвращает первый <i>cons</i> в ассоциативном списке <i>alist</i>, чей <i>car</i> совпадает с <i>item</i>.
+
+<hr/><h4 id="rassoc">Функция RASSOC</h4>
+<p><b>rassoc</b> item alist → entry
+<a class="clhs" href="http://clhs.lisp.se/Body/f_rassoc.htm#rassoc">CLHS</a>
+<p>Возвращает первый <i>cons</i> в ассоциативном списке <i>alist</i>, чей <i>cdr</i> совпадает с <i>item</i>.
+
+<hr/><h4 id="pairlis">Функция PAIRLIS</h4>
+<p><b>pairlis</b> keys data &optional alist → new alist
+<a class="clhs" href="http://clhs.lisp.se/Body/f_pairli.htm">CLHS</a>
+<p>Возвращает ассоциативный список, с ключами (car) из <i>keys</i> и величинами (cdr) из <i>data</i>. Cписки <i>keys</i> и <i>data</i> должны быть одинаковой длины.<br/>
+Если задан <i>alist</i>, то новые пары добавляются к нему.
+<p>Порядок пар в результате не определён.
+<p>В некоторых языках эта функция называется <a href="https://en.wikipedia.org/wiki/Convolution_(computer_science)">zip</a>.
+<h5>Примеры</h5>
+<pre>
+(psetq keys '(1 2 3)
+       data '("one" "two" "three")
+       alist '((4 . "four")))       →  NIL
+
+(pairlis keys data alist)           →  ((3 . "three") (2 . "two") (1 . "one") (4 . "four"))
+</pre>
+
+<hr/><h4 id="atom">Функция ATOM</h4>
+<p><b>atom</b> object → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_atom.htm">CLHS</a>
+<p>Возвращает <i>истину</i> если <i>object</i> - атом (не cons).
+<p>Противоположна функции <b>consp</b>.
+
+<hr/><h4 id="consp">Функция CONSP</h4>
+<p><b>consp</b> object → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_consp.htm#consp">CLHS</a>
+<p>Возвращает <i>истину</i> если <i>object</i> - cons.
+<p>Противоположна функции <b>atom</b>.
+
+<hr/><h4 id="listp">Функция LISTP</h4>
+<p><b>listp</b> object → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_listp.htm">CLHS</a>
+<p>Возвращает <i>истину</i> если <i>object</i> - список (в том числе пустой).
+<h5>Эквивалент</h5>
+<pre>(listp x) ≡ (or (null x) (consp x))</pre>
+<h5>Примеры</h5>
+<code>(listp (cons 1 2))</code> → <code>T</code>
+
+<hr/><h4 id="copy-alist">Функция COPY-ALIST</h4>
+<p><b>copy-alist</b> alist → new-alist
+<a class="clhs" href="http://clhs.lisp.se/Body/f_cp_ali.htm#copy-alist">CLHS</a>
+<p>Клонирует списковую структуру <i>alist</i>. Элементы, являющиеся cons клонируются, остальные объекты попадают в результат как есть.
+<h5>Примеры</h5>
+<pre>
+(setq *alist* (acons 1 "one" (acons 2 "two" '())))  →  ((1 . "one") (2 . "two"))
+(setq *list-copy* (copy-list *alist*))              →  ((1 . "one") (2 . "two"))
+(setq *alist-copy* (copy-alist *alist*))            →  ((1 . "one") (2 . "two"))
+(rplacd (assoc 2 *alist-copy*) "deux")              →  (2 . "deux")
+*alist-copy*                                        →  ((1 . "one") (2 . "deux"))
+*alist*                                             →  ((1 . "one") (2 . "two"))
+(rplacd (assoc 1 *list-copy*) "uno")                →  (1 . "uno")
+*list-copy*                                         →  ((1 . "uno") (2 . "two"))
+*alist*                                             →  ((1 . "uno") (2 . "two"))
+</pre>
+
+<hr/><h4 id="copy-list">Функция COPY-LIST</h4>
+<p><b>copy-list</b> list → copy
+<a class="clhs" href="http://clhs.lisp.se/Body/f_cp_lis.htm#copy-list">CLHS</a>
+<p>Создаёт копию списка, в том числе <a href="#dotted-list">dotted-списка</a>.
+<h5>Примеры</h5>
+<code>(setq lst '(1 2 . 3))<br>
+(copy-list lst)</code> → <code>(1 2 . 3)</code><br/>
+<code>(eq (copy-list lst) lst)</code> → <code>NIL</code><br/>
+
+<hr/><h4 id="copy-seq">Функция COPY-SEQ</h4>
+<p><b>copy-seq</b> sequence → copied-sequence
+<a class="clhs" href="http://clhs.lisp.se/Body/f_cp_seq.htm#copy-seq">CLHS</a>
+<p>Создаёт shallow-копию последовательности <i>sequence</i>. Копируется только последовательность, не не её элементы.
+
+<hr/><h4 id="copy-tree">Функция COPY-TREE</h4>
+<b>copy-tree</b> tree → new-tree
+<a class="clhs" href="http://clhs.lisp.se/Body/f_cp_tre.htm">CLHS</a>
+<p>Клонирует дерево cons-ячеек.
+<p>Если tree - не cons, оно становится результатом, иначе возвращает новый cons, составленный из результатов применения copy-tree к car и cdr этого cons.
+
+<hr/><h4 id="rplaca">Функция RPLACA</h4>
+<p><b>rplaca</b> cons object → cons
+<a class="clhs" href="http://clhs.lisp.se/Body/f_rplaca.htm#rplaca">CLHS</a>
+<p>Заменяет <i>car</i> ячейки <i>cons</i> на <i>object</i>.
+<h5>Примеры</h5>
+<p><code>(setq a '(a . b ))</code> → <code>(A . B)</code><br/>
+<code>(rplaca a 'c)</code> → <code>(C . B)</code><br/>
+<code>a</code> → <code>(C . B)</code>
+<h5>Побочные эффекты</h5>
+Модифицирует <i>cons</i>.
+
+<hr/><h4 id="rplacd">Функция RPLACD</h4>
+<b>rplacd</b> cons object → cons
+<a class="clhs" href="http://clhs.lisp.se/Body/f_rplaca.htm#rplacd">CLHS</a>
+<p>Заменяет <i>cdr</i> ячейки <i>cons</i> на <i>object</i>.
+<h5>Примеры</h5>
+<code>(rplacd '(1 2 3) 'tail)</code> → <code>(1 . TAIL)</code><br/>
+<h5>Побочные эффекты</h5>
+Модифицирует <i>cons</i>.
+
+<hr/><h4 id="length">Функция LENGTH</h4>
+<p><b>length</b> sequence → n
+<a class="clhs" href="http://clhs.lisp.se/Body/f_length.htm#length">CLHS</a>
+<p>Вычисляет количество элементов в списке, векторе или строке <i>sequence</i>.
+<h5>Примеры</h5>
+<code>(length '(1 2 3))</code> → <code>3</code><br/>
+<code>(length #())</code> → <code>0</code><br/>
+<code>(length "Lisperati")</code> → <code>9</code><br/>
+
+<hr/><h4 id="list">Функция LIST</h4>
+<p><b>list</b> &rest objects → list
+<a class="clhs" href="http://clhs.lisp.se/Body/f_list_.htm#list">CLHS</a>
+<p>Возвращает список объектов <i>objects</i>.
+<h5>Примеры</h5>
+<p><code>(list 1 2 3)</code> → <code>(1 2 3)</code>
+
+<hr/><h4 id="list*">Функция LIST*</h4>
+<p><b>list*</b> &rest objects+ → list
+<a class="clhs" href="http://clhs.lisp.se/Body/f_list_.htm#listST">CLHS</a>
+<p>Похожа на <a href="#list">list</a> за исключением того, что последний аргумент <i>objects</i> становится cdr последней cons-пары результата.
+<h5>Примеры</h5>
+<p><code>(list* 1 2 3)</code> → <code>(1 2 . 3)</code>
+
+<hr/><h4 id="listify">Функция LISTIFY</h4>
+<a class="clhs">нестандартная</a>
+<p><b>listify</b> x → list
+<p>Если <i>x</i> - список, возвращает его, иначе создаёт спис из одного элемента <i>x</i>.
+<h5>Примеры</h5>
+<pre>
+(listify 1)     →  (1)
+(listify '(1))  →  (1)
+</pre>
+
+<hr/><h4 id="length-length">Функция LIST-LENGTH</h4>
+<b>list-length</b> list → length
+<a class="clhs" href="http://clhs.lisp.se/Body/f_length.htm">CLHS</a>
+<p>Для <a href="proper-list">правильного списка</a> возвращает его длину. Для циклического - NIL.
+<h5>Примеры</h5>
+<pre>
+(list-length '(a b c d))  →  4
+(setq cycle '(a b))
+(nconc cycle cycle)
+(list-length cycle)       →  NIL
+</pre>
+
+<hr/><h4 id="make-list">Функция MAKE-LIST</h4>
+<p><b>make-list</b> size → list
+<a class="clhs" href="http://clhs.lisp.se/Body/f_mk_lis.htm">CLHS</a>
+<p>Создаёт список длины <i>size</i> (неотрицательное целое), состоящий из <i>nil</i>.
+<h5>Примеры</h5>
+<pre>
+(make-list 3)  →  (NIL NIL NIL)
+</pre>
+
+
+<hr/><h4 id="first">Аксессоры FIRST, SECOND, THIRD</h4>
+<p><b>first</b> list → object<br/>
+<b id="second">second</b> list → object<br/>
+<b id="third">third</b> list → object<br/>
+<b>(setf (first</b> list) new-object) → new-object<br/>
+<b>(setf (second</b> list) new-object) → new-object<br/>
+<b>(setf (third</b> list) new-object) → new-object<br/>
+<a class="clhs" href="http://clhs.lisp.se/Body/f_firstc.htm">CLHS</a>
+<p>Возвращают/присваивают соответственно первый, второй и третий элементы списка, если считать с единицы.
+<h5>Эквивалент</h5>
+<pre>
+(first list)  ≡ (car list)  ≡ (nth 0 list))
+(second list) ≡ (cadr list) ≡ (nth 1 list))
+(third list)  ≡ (nth 2 list))
+</pre>
+<h5>Примеры</h5>
+<pre>
+(setq lst '(1 2 3))        →  (1 2 3)
+(second lst)               →  2
+(setf (second lst) "two")  →  "two"
+lst                        - (1 "two" 3)
+</pre>
+
+<hr/><h4 id="nth">Аксессор NTH</h4>
+<p><b>nth</b> n list → object<br/>
+<b>(setf (nth</b> n list) new-object) → new-object<br/>
+<a class="clhs" href="http://clhs.lisp.se/Body/f_nth.htm">CLHS</a>
+<p>Возвращает/присваивает <i>n</i>-ый элемент списка <i>list</i>. Если длина списка меньше или равна <i>n</i>, возвращает NIL.
+<h5>Примеры</h5>
+<p><code>(nth 1 '(A B C))</code> → <code>B</code>
+<p><code>(nth 5 '(A B C))</code> → <code>NIL</code>
+<h5>Эквивалент</h5>
+<code>(nth n list)</code> ≡ <code>(car (nthcdr n list))</code>
+
+<hr/><h4 id="nthcdr">Функция NTHCDR</h4>
+<p><b>nthcdr</b> n list → tail
+<a class="clhs" href="http://clhs.lisp.se/Body/f_nthcdr.htm">CLHS</a>
+<p>Возвращает хвост списка <i>list</i>, получаемый после применения <a href="#cdr">cdr</a> <i>n</i> раз.
+<h5>Примеры</h5>
+<p><code>(nthcdr 2 '(a b c)) </code> → <code>(C)</code>
+<p><code>(nthcdr 0 'A)</code> → <code>A</code>
+
+<hr/><h4 id="reverse">Функция REVERSE</h4>
+<p><b>reverse</b> sequence → reversed-sequence
+<a class="clhs" href="http://clhs.lisp.se/Body/f_revers.htm#reverse">CLHS</a>
+<p>Возвращает последовательность того же типа что <i>sequence</i>, содержащую элементы <i>sequence</i> в обратном порядке.
+Не модифицирует свой аргумент.
+
+<hr/><h4 id="nreverse">Функция NREVERSE</h4>
+<p><b>nreverse</b> sequence → reversed-sequence
+<a class="clhs" href="http://clhs.lisp.se/Body/f_revers.htm#nreverse">CLHS</a>
+<p>Обращает порядок элементов в <i>sequence</i> и возвращает её. В отличие от <b><a href="#reverse">reverse</a></b> модифицирует аргумент.
+
+<hr/><h4 id="append">Функция APPEND</h4>
+<p><b>append</b> &rest lists → concatenated-list
+<a class="clhs" href="http://clhs.lisp.se/Body/f_append.htm#append">CLHS</a>
+<p>Возвращает список, являющийся конкатенацией списков <i>lists</i>.
+<p>В отличие от <b>nconc</b> списки не модифицируются, а копируются (кроме последнего).
+
+<hr/><h4 id="last">Функция LAST</h4>
+<p><b>last</b> list &optional (n 1) → tail
+<a class="clhs" href="http://clhs.lisp.se/Body/f_last.htm#last">CLHS</a>
+<p>Возвращает последние <i>n</i> cons-ячеек в списке <i>list</i>. Если <i>list</i> - NIL, возвращает NIL.
+<p>Если <i>n</i> = 0, возвращает атом, завершающий <i>list</i>.
+<p>Если <i>n</i> ≥ количества cons-ячеек в <i>list</i>, возвращает полный <i>list</i>.
+<h5>Примеры</h5>
+<pre>
+(last '(1 2 3))    →  (3)
+(last '(a b c) 4)  →  (A B C)
+</pre>
+
+<hr/><h4 id="butlast">Функция BUTLAST</h4>
+<p><b>butlast</b>list &optional (n 1) → result-list
+<a class="clhs" href="http://clhs.lisp.se/Body/f_butlas.htm">CLHS</a>
+<p>Возвращает копию <i>list</i> за исключением последних <i>n</i> cons-ячеек.
+<p>Если <i>n</i> > количества cons-ячеек в <i>list</i>, возвращает nil.
+<p>Исходный <i>list</i> не модифицируется.
+<h5>Эквивалент</h5>
+<code>(butlast list n)</code> ≡ <code>(ldiff list (last list n))</code>
+<h5>Примеры</h5>
+<pre>
+(butlast '(1 2 3 4 5) 2)  →  '(1 2 3)
+</pre>
+
+<hr/><h4 id="nconc">Функция NCONC</h4>
+<p><b>nconc</b> &rest lists → concatenated-list
+<a class="clhs" href="http://clhs.lisp.se/Body/f_nconc.htm#nconc">CLHS</a>
+<p>Возвращает список, являющийся конкатенацией списков <i>lists</i>.
+<p>Деструктивная операция, все списки кроме последнего модифицируются (cdr последнего cons каждого списка указывает на следующий список).
+
+<hr/><h4 id="endp">Функция ENDP</h4>
+<p><b>endp</b> list → boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_endp.htm#endp">CLHS</a>
+<p>Возвращает <b>T</b> если <i>list</i> пустой список NIL. Возвращает <b>NIL</b>, если <i>list</i> - <i>cons</i>.
+<p>В остальных случаях выбрасывает <a href="#error-13">ОШИБКА 13</a>.
+<p>При переборе списка надёжнее использовать endp, чем <a href="#null">null</a>, чтобы поймать cdr, не являющийся списком (случай <i>dotted-list</i>).
+
+<hr/><h4 id="null">Функция NULL</h4>
+<p><b>null</b> object → boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_null.htm">CLHS</a>
+<p>Возвращает <b>t</b> если <i>object</i> пустой список, иначе возвращает <b>nil</b>.
+<p>Синоним функции <a href="#not"><b>not</b></a>, но применяется со списками.
+
+<hr/><h4 id="not">Функция NOT</h4>
+<p><b>not</b> x → boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_not.htm#not">CLHS</a>
+<p>Возвращает <b>t</b> если <i>x</i> ложь, иначе возвращает <b>nil</b>.
+<p>Синоним функции <a href="#null"><b>null</b></a>, но применяется с логическими выражениями.
+
+<hr/><h4 id="sort">Функция SORT</h4>
+<p><b>sort</b> sequence predicate → sorted-sequence
+<a class="clhs" href="http://clhs.lisp.se/Body/f_sort_.htm">CLHS</a>
+<p>Упорядочивает элементы в <i>sequence</i> в соответсвии с предикатом <i>predicate</i>.
+<p>Предикат должен возвращать true, если первый аргумент предшествует второму (в произвольном смысле).
+<p>Деструктивная операция.
+<h5>Примеры</h5>
+<pre>
+(sort #(2 3 -5 3 4.5 0 1) #'>)  →  #(4.5 3 3 2 1 0 -5)
+</pre>
+
+<hr/><h4 id="ldiff">Функция LDIFF</h4>
+<p><b>ldiff</b> list object → result-list
+<a class="clhs" href="http://clhs.lisp.se/Body/f_ldiffc.htm#ldiff">CLHS</a>
+<p>Если <i>object</i> - хвост <i>list</i>, возвращает список элементов, предшествущих этому хвосту, иначе возвращает копию <i>list</i>.
+
+<hr/><h4 id="subst">Функция SUBST</h4>
+<p><b>substr</b> new old tree → new-tree
+<a class="clhs" href="http://clhs.lisp.se/Body/f_substc.htm">CLHS</a>
+<p>Подменяет в дереве <i>tree</i> листья, совпадающие с <i>old</i> на объект <i>new</i> и возвращает новое дерево.
+<p>Недеструктивная операция.
+<h5>Примеры</h5>
+<pre>
+(let ((tree '(1 (1 2) (1 2 3) (1 2 3 4))))
+  (subst "two" 2 tree))                     →  (1 (1 "two") (1 "two" 3) (1 "two" 3 4))
+</pre>
+
+
+<hr/><h4 id="tailp">Функция TAILP</h4>
+<p><b>tailp</b> object list → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_ldiffc.htm#tailp">CLHS</a>
+<p>Проверяет, является ли <i>object</i> хвостом списка <i>list</i>.
+Иными словами <i>object</i> совпадает (<a href="#eql">eql</a>) с <i>list</i>,  или с CDR одного из его cons-ячеек.
+
+<hr/><h4 id="member">Функция MEMBER</h4>
+<b>member</b> item list → tail
+<a class="clhs" href="http://clhs.lisp.se/Body/f_mem_m.htm#member">CLHS</a>
+<p>Ищет в списке <i>list</i> элемент <i>item</i>.
+Если находит - возвращает хвост списка, начинающийся с этого элемента, иначе возвращает NIL.
+<p>Эту функцию можно отнести к семейству <a href="#sets">Множества</a>, реализует операцию &isin;.
+
+<hr/><h3 id="sets">Множества</h3>
+<p>Множества представляются списками. Элементы сравниваются функцией <b><a href="#eql">eql</a></b>. Пустое множество &empty; представляется <b>nil</b>.
+
+<hr/><h4 id="intersection">Функция INTERSECTION</h4>
+<p><b>intersection</b> list-1 list-2 → result-list
+<a class="clhs" href="http://clhs.lisp.se/Body/f_isec_.htm#intersection">CLHS</a>
+<p>Пересечение множеств ( <b>&cap;</b> ).
+<p>Возвращает список из элементов, принадлежащих каждому из списков <i>list-1</i> и <i>list-2</i>.
+<p>Порядок элементов в результате не определён.
+<h5>Примеры</h5>
+<pre>
+(intersection '(a b c f) '(f a d))  →  F A)
+</pre>
+
+<hr/><h4 id="set-difference">Функция SET-DIFFERENCE</h4>
+<p><b>set-difference</b> list-1 list-2 → result-list
+<a class="clhs" href="http://clhs.lisp.se/Body/f_set_di.htm#set-difference">CLHS</a>
+<p>Разность множеств ( <b>&#x2216;</b> ).
+<p>Возвращает список из элементов <i>list-1</i>, не принадлежащих <i>list-2</i>.
+<p>Порядок элементов в результате не определён.
+<h5>Примеры</h5>
+<code>(set-difference '(a b c f) '(f a d))</code> → <code>(C B)</code>
+
+<hr/><h4 id="subsetp">Функция SUBSETP</h4>
+<p><b>subsetp</b> list-1 list-2 → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_subset.htm#subsetp">CLHS</a>
+<p>Проверка на подмножество ( <b>&sub;</b> ).
+<p>Возвращает true, если каждый элемент <i>list-1</i> входит и в <i>list-2</i>.
+<h5>Примеры</h5>
+<code>(subsetp '(a b c) '(f a d))</code> → <code>NIL</code><br/>
+<code>(subsetp '() '(f a d))</code> → <code>T</code>
+
+<hr/><h4 id="union">Функция UNION</h4>
+<p><b>union</b> list-1 list-2 → result-list
+<a class="clhs" href="http://clhs.lisp.se/Body/f_unionc.htm">CLHS</a>
+<p>Объединение множеств ( <b>&cup;</b> ).
+<p>Возвращает список из элементов, принадлежащих хотя бы одному из списков <i>list-1</i> и <i>list-2</i>.
+<p>Порядок элементов в результате не определён.
+<h5>Примеры</h5>
+<code>(union '(a b c) '(f a d))</code> → <code>(C B F A D)</code>
+
+<hr/><h3 id="sequences-chapter">Последовательности</h3>
+<p> Последовательность - объединяющее название типов: <a href="list-type">список</a>, <a href="vector-type">вектор</a> и <a href="string-type">строка</a>.
+
+<h4 id="elt">Аксессор ELT</h4>
+<p><b>elt</b> sequence index → object<br/>
+<b>(setf (elt</b> sequence index) new-object) → new-value<br/>
+<a class="clhs" href="http://clhs.lisp.se/Body/f_elt.htm">CLHS</a>
+<p>Возвращает/присваивает <i>index</i>-ый элемент последовательности <i>sequence</i>.
+<h5>Примеры</h5>
+<pre>
+(elt #(A B C) 1)  →  B
+(elt "ABC" 1)     →  #\B
+</pre>
+
+<hr/><h4 id="fill">Функция FILL</h4>
+<b>fill</b> sequence item → sequence
+<a class="clhs" href="http://clhs.lisp.se/Body/f_fill.htm">CLHS</a>
+<p>Заполняет <i>sequence</i> объектами <i>item</i>.
+<h5>Примеры</h5>
+<pre>
+(fill "Hello" #\Z)  →  "ZZZZZ"
+(fill #(A B C) 'Z)  →  #(Z Z Z)
+</pre>
+
+<hr/><h4 id="make-sequence">Функция MAKE-SEQUENCE</h4>
+<b>make-sequence</b> result-type size → sequence
+<a class="clhs" href="http://clhs.lisp.se/Body/f_mk_seq.htm">CLHS</a>
+<p>Создаёт последовательность типа <i>result-type</i> размера <i>size</i> (неотрицательное целое).
+<p><i>result-type</i> должен быть одним из символов: <a href="#list-type">list</a>, <a href="#string-type">string</a> или <a href="#vector-type">vector</a>.
+<h5>Примеры</h5>
+<pre>
+(make-sequence 'string 3)  →  "   "
+(make-sequence 'list 0)    →  NIL
+</pre>
+
+<hr/><h3 id="array-chapter">Массивы</h3>
+
+<h4 id="array-dimension">Функция ARRAY-DIMENSION</h4>
+<b>array-dimension</b> array axis-number → dimension
+<a class="clhs" href="http://clhs.lisp.se/Body/f_ar_dim.htm">CLHS</a>
+<p>Возвращает <i>axis-number</i>-ую размерность массива <i>array</i>.
+<h5>Примеры</h5>
+<p><code>(array-dimension #(1 2 3) 0)</code> → <code>3</code>
+<h5>Эквивалент</h5>
+<code>(array-dimension array n)</code> ≡ <code>(nth n (array-dimensions array))</code>
+
+<hr/><h4 id="array-dimensions">Функция ARRAY-DIMENSIONS</h4>
+<b>array-dimensions</b> array → dimensions
+<a class="clhs" href="http://clhs.lisp.se/Body/f_ar_d_1.htm#array-dimensions">CLHS</a>
+<p>Возвращает список размерностей массива <i>array</i>.
+<h5>Примеры</h5>
+<pre>
+(array-dimensions "Hello")  →  (5)
+</pre>
+
+
+<hr/><h4 id="array-rank">Функция ARRAY-RANK</h4>
+<b>array-rank</b> array → rank
+<a class="clhs" href="http://clhs.lisp.se/Body/f_ar_ran.htm">CLHS</a>
+<p>Возвращает ранг (количество размерностей) массива <i>array</i>.
+<h5>Примеры</h5>
+<p><code>(array-rank #(1 2 3))</code> → <code>1</code>
+<h5>Эквивалент</h5>
+<code>(array-rank array)</code> ≡ <code>(length (array-dimensions array))</code>
+
+<hr/><h4 id="array-row-major-index">Функция ARRAY-ROW-MAJOR-INDEX</h4>
+<b>array-row-major-index</b> array &rest subscripts → index
+<a class="clhs" href="http://clhs.lisp.se/Body/f_ar_row.htm">CLHS</a>
+<p>Возвращает позицию элемента <i>array</i> с индексами <i>subscripts</i> односительно начала массива в памяти.
+<h5>Примеры</h5>
+<pre>
+(let ((a (make-array '(2 3 4))))
+  (array-row-major-index a 0 2 1))  →  9 ; 0*3*4 + 2*4 + 1
+</pre>
+
+<hr/><h4 id="array-total-size">Функция ARRAY-TOTAL-SIZE</h4>
+<b>array-total-size</b> array → size
+<a class="clhs" href="http://clhs.lisp.se/Body/f_ar_tot.htm">CLHS</a>
+<p>Возвращает общее количество элементов в массиве.
+<h5>Эквивалент</h5>
+<code>(array-total-size x)</code> ≡ <code>(apply #'* (array-dimensions x))</code>
+<h5>Примеры</h5>
+<pre>
+(array-total-size (make-array '(2 3 5)))  →  30
+</pre>
+
+<hr/><h4 id="arrayp">Функция ARRAYP</h4>
+<p><b>arrayp</b> object → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_arrayp.htm">CLHS</a>
+<p>Возвращает истину если <i>object</i> - массив.
+<p>Векторы и строки - тоже массивы.
+
+<hr/><h4 id="make-array">Функция MAKE-ARRAY</h4>
+<p><b>make-array</b> dimensions → new-array
+<a class="clhs" href="http://clhs.lisp.se/Body/f_mk_ar.htm">CLHS</a>
+<p>Создаёт и возвращает массив с размерностями <i>dimensions</i> (список или число).
+<p>Если <i>dimensions</i> - число, то создаёт (<a href="#simple-vector">простой вектор</a>) этого размера, заполненный значением nil.
+<h5>Примеры</h5>
+<pre>
+(make-array 4)           →  #(NIL NIL NIL NIL)
+(make-array '(2 3))      →  #2A((NIL NIL NIL) (NIL NIL NIL))
+(make-array '(100 100))  →  ОШИБКА 16
+</pre>
+<hr/><h4 id="vectorp">Функция VECTORP</h4>
+<p><b>vectorp</b> object → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_vecp.htm#vectorp">CLHS</a>
+<p>Возвращает истину если <i>object</i> - <a href="#vector-type">вектор</a>.
+<p>Строки являются векторами.
+<h5>Примеры</h5>
+<pre>
+(vectorp #(a b c))  →  T
+(vectorp "abc")     →  T
+(vectorp '(a b c))  →  NIL
+</pre>
+
+<hr/><h4 id="simple-vector-p">Функция SIMPLE-VECTOR-P</h4>
+<p><b>simple-vector-p</b> object → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_smp_ve.htm#simple-vector-p">CLHS</a>
+<p>Возвращает истину если <i>object</i> - <a href="#simple-vector">простой вектор</a>.
+<h5>Примеры</h5>
+<code>(simple-vector-p #(a b c))</code> → <code>T</code>
+
+<h4 id="aref">Аксессор AREF</h4>
+<p><b>aref </b> array &rest subscripts → element<br/>
+<b>(setf (aref</b> &rest subscripts) new-element) → new-element<br/>
+<a class="clhs" href="http://clhs.lisp.se/Body/f_aref.htm">CLHS</a>
+<p>Возвращает/присваевает элемент массива <i>array</i>, определяемый индексами <i>subscripts</i>.
+<h5>Эквивалент</h5>
+<code>(aref array i1 i2 ...)</code> ≡ <code>(<a href="#row-major-aref">row-major-aref</a> array (<a href="#array-row-major-index">array-row-major-index</a> array i1 i2 ...))</code>
+<h5>Примеры</h5>
+<pre>
+(aref #(A B C) 2)                 →  C
+
+(let ((ar (make-array '(2 3))))
+  (list
+    (setf (aref ar 1 2) 'Z)
+    (aref ar 1 2)
+    ar))                          →  (Z Z #2A((NIL NIL NIL) (NIL NIL Z)))
+</pre>
+
+<hr/><h4 id="row-major-aref">Аксессор ROW-MAJOR-AREF</h4>
+<p><b>row-major-aref </b> array index → element<br/>
+<b>(setf (row-major-aref</b> index) new-element) → new-element<br/>
+<a class="clhs" href="https://clhs.lisp.se/Body/f_row_ma.htm">CLHS</a>
+<p>Возвращает/присваивает <i>index</i>-ый элемент массива <i>array</i>, если рассматривать его как одномерный сегмент памяти.
+
+<hr/><h4 id="svref">Аксессор SVREF</h4>
+<p><b>svref </b> simple-vector index → element<br/>
+<b>(setf (svref</b> simple-vector index) new-element) → new-element<br/>
+<a class="clhs" href="http://clhs.lisp.se/Body/f_svref.htm">CLHS</a>
+<p>Возвращает/присваивает <i>index</i>-ый элемент вектора <i>simple-vector</i>.
+<h5>Примеры</h5>
+<pre>
+(svref #(1 2) 0)              →  1
+
+(progn (setq v #(1 2))
+       (setf (svref v 1) 'a)
+       v)                     →  #(1 A)
+</pre>
+
+<hr/><h4 id="vector">Функция VECTOR</h4>
+<b>vector</b> &rest objects → vector
+<a class="clhs" href="http://clhs.lisp.se/Body/f_vector.htm">CLHS</a>
+<p>Создаёт <a href="#vector-type">vector</a>, состоящий из <i>objects</i>.
+<h5>Примеры</h5>
+<pre>
+(vector 1 2 'z nil)  →  #(1 2 Z NIL)
+</pre>
+
+<hr/><h3 id="chars-strings-chapter">Строки и Characters</h3>
+
+<h4 id="alpha-char-p">Функция ALPHA-CHAR-P</h4>
+<p><b>alpha-char-p</b> char → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_alpha_.htm#alpha-char-p">CLHS</a>
+<p>Возвращает <i>истину</i> если <i>char</i> - буква.
+<h5>Примеры</h5>
+<pre>
+(alpha-char-p #\щ)  →  T
+(alpha-char-p #\6)  →  NIL
+</pre>
+
+<hr/><h4 id="alphanumericp">Функция ALPHANUMERICP</h4>
+<p><b>alphanumericp</b> char → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_alphan.htm#alphanumericp">CLHS</a>
+<p>Возвращает <i>Истину</i> если <i>char</i> - буква или цифра.
+<h5>Примеры</h5>
+<pre>
+(alphanumericp #\Г) → T
+(alphanumericp #\6) → T
+</pre>
+
+<hr/><h4 id="char">Аксессор CHAR</h4>
+<b>char</b> string index → character<br/>
+<b>(setf (char</b> string index) new-character) → new-character<br/>
+<a class="clhs" href="http://clhs.lisp.se/Body/f_char_.htm#char">CLHS</a>
+<p>Возвращает/присваивает <i>index</i>-ый элемент строки <i>string</i>.
+<h5>Примеры</h5>
+<p><code>(char "Abc" 1)</code> → <code>#\b</code>
+
+<hr/><h4 id="character">Функция CHARACTER</h4>
+<b>character</b> character-designator → character
+<a class="clhs" href="http://clhs.lisp.se/Body/f_ch.htm">CLHS</a>
+<p>Превращает <i>character-designator</i> в строку:
+<ul>
+	<li>Если <i>character-designator</i> уже character, возвращает его.
+	<li>Если <i>character-designator</i> строка из одного character, возвращает этот character.
+	<li>Если <i>character-designator</i> символ, с именем длиной единичной длины, возвращает первый character имени.
+</ul>
+<h5>Примеры</h5>
+<p><code>(character 'a)</code> → <code>#\A</code>
+
+<hr/><h4 id="characterp">Функция CHARACTERP</h4>
+<p><b>characterp</b> object → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_chp.htm#characterp">CLHS</a>
+<p>Возвращает <i>истину</i> если <i>object</i> - character.
+<h5>Примеры</h5>
+<p><code>(characterp #\A)</code> → <code>T</code>
+<p><code>(characterp "A")</code> → <code>NIL</code>
+
+<hr/><h4>Функции сравнения CHAR=, CHAR/=, CHAR-EQUAL</h4>
+<p><b id="char-eq">char=</b> &rest characters+ → generalized-boolean</br>
+<b id="char-ne">char/=</b> &rest characters+ → generalized-boolean</br>
+<b id="char-equal">char-equal</b> &rest characters+ → generalized-boolean</br>
+<a class="clhs" href="http://clhs.lisp.se/Body/f_chareq.htm">CLHS</a>
+<p><b>char=</b> Возвращает истину, если все <i>characters</i> равны. Эта операция case-sensitive.
+<p><b>char/=</b> Возвращает истину, если все <i>characters</i> попарно разные. Эта операция case-sensitive.
+<p><b>char-equal</b> Возвращает истину, если все <i>characters</i> одинаковы, игнорируя регистр букв. Эта операция case-insensitive.
+<h5>Примеры</h5>
+<pre>
+(char= #\d #\d #\d) 	  →  T
+(char/= #\d #\a #\d)	  →  NIL
+(char-equal #\A #\a #\A)  →  T
+</pre>
+
+
+<hr/><h4 id="char-code">Функция CHAR-CODE</h4>
+<b>char-code</b> char → code
+<a class="clhs" href="http://clhs.lisp.se/Body/f_char_c.htm">CLHS</a>
+<p>Код (неотрицательное целое 0..255) <i>char</i> в кодировке <a>КОИ-8-БК</a>.
+<p>В BkLisp синоним функции <a href="#char-int">char-int</a>.
+<h5>Примеры</h5>
+<p><code>(char-code #\D)</code> → <code>68</code>
+<p><code>(char-code #\ю)</code> → <code>192</code>
+
+<hr/><h4 id="char-int">Функция CHAR-INT</h4>
+<b>char-int</b> char → code
+<a class="clhs" href="http://clhs.lisp.se/Body/f_char_i.htm">CLHS</a>
+<p>Код (неотрицательное целое 0..255) <i>char</i> в кодировке <a>КОИ-8-БК</a>.
+<p>В BkLisp синоним функции <a href="#char-code">char-code</a>.
+
+<hr/><h4 id="code-char">Функция CODE-CHAR</h4>
+<b>code-char</b> code → char-or-nil
+<a class="clhs" href="http://clhs.lisp.se/Body/f_code_c.htm#code-char">CLHS</a>
+<p>Возвращает character с кодом <i>code</i> или NIL, если нет соответсвующего character.
+<h5>Примеры</h5>
+<p><code>(code-char 65)</code> → <code>#\A</code>
+<p><code>(code-char 10)</code> → <code>#\NEWLINE</code>
+
+<hr/><h4 id="char-name">Функция CHAR-NAME</h4>
+<b>char-name</b> character → name
+<a class="clhs" href="http://clhs.lisp.se/Body/f_char_n.htm">CLHS</a>
+<p>Возвращает имя <i>character</i>, если оно существует, иначе NIL.
+<h5>Примеры</h5>
+<p><code>(char-name #\ )</code> → <code>"SPACE"</code>
+<p><code>(char-name (code-char 9))</code> → <code>"TAB"</code>
+<p><code>(char-name (code-char 13))</code> → <code>"RETURN"</code>
+<p><code>(char-name #\Newline)</code> → <code>"NEWLINE"</code>
+<p><code>(char-name #\A)</code> → <code>NIL</code>
+
+<hr/><h4 id="name-char">Функция NAME-CHAR</h4>
+<b>name-char</b> name → char-p
+<a class="clhs" href="http://clhs.lisp.se/Body/f_name_c.htm#name-char">CLHS</a>
+<p>Возвращает character, чьё имя - <i>name</i>, или NIL, если такого не найдено.
+<h5>Примеры</h5>
+<p><code>(name-char "newLINE")</code> → <code>#\NEWLINE</code>
+<p><code>(name-char "A")</code> → <code>NIL</code>
+
+<hr/><h4 id="digit-char">Функция DIGIT-CHAR</h4>
+<p><b>digit-char</b> weight &optional radix → char-or-nil
+<a class="clhs" href="http://clhs.lisp.se/Body/f_digit_.htm">CLHS</a>
+<p>Если <i>weight</i> меньше <i>radix</i> (основание системы счисления, по-умолчанию 10), возвращает character представляющий цифру <i>weight</i> в этой системе счисления.
+В случае если это буква, то в верхнем регистре.
+<p>Иначе возвращает NIL.
+<h5>Примеры</h5>
+<pre>
+(digit-char 15 16)  →  #\F
+(digit-char 7)      →  #\7
+(digit-char 11)     →  nil
+</pre>
+
+<hr/><h4 id="digit-char-p">Функция DIGIT-CHAR-P</h4>
+<p><b>digit-char-p</b> char &optional radix → weight
+<a class="clhs" href="http://clhs.lisp.se/Body/f_digi_1.htm#digit-char-p">CLHS</a>
+<p>Если <i>char</i> является цифрой в системе счисления <i>radix</i> (по-умолчанию 10), возвращает значение (<i>weight</i>) этой цифры.
+<p>Иначе возвращает NIL.
+<h5>Примеры</h5>
+<pre>
+(digit-char-p #\a 11)  →  10
+</pre>
+
+<hr/><h4 id="char-downcase">Функция CHAR-DOWNCASE</h4>
+<p><b>char-downcase</b> character → corresponding-character
+<a class="clhs" href="http://clhs.lisp.se/Body/f_char_u.htm">CLHS</a>
+<p>Переводит <i>character</i> в нижний регистр, если это буква, или возвращает неизменным.
+<h5>Примеры</h5>
+<pre>
+(char-downcase #\Space)  →  #\SPACE
+</pre>
+
+<hr/><h4 id="char-upcase">Функция CHAR-UPCASE</h4>
+<p><b>char-upcase</b> character → corresponding-character
+<a class="clhs" href="http://clhs.lisp.se/Body/f_char_u.htm">CLHS</a>
+<p>Переводит <i>character</i> в верхний регистр, если это буква, или возвращает неизменным.
+<h5>Примеры</h5>
+<pre>
+(char-upcase #\щ)  →  #\Щ
+</pre>
+
+<hr/><h4 id="graphic-char-p">Функция GRAPHIC-CHAR-P</h4>
+<p><b>graphic-char-p</b> char → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_graphi.htm">CLHS</a>
+<p>Возвращает <i>истину</i> если <i>char</i> имеет графическое представление. Пробел <b>#\Space</b> считается графическим, т.к. занимает знакоместо.
+<h5>Примеры</h5>
+<pre>
+(graphic-char-p #\Щ)              →  T
+(graphic-char-p #\Space)          →  T
+(graphic-char-p #\Newline)        →  NIL
+(graphic-char-p (code-char 130))  →  NIL
+</pre>
+
+<hr/><h4 id="make-string">Функция MAKE-STRING</h4>
+<b>make-string</b> size  → string
+<a class="clhs" href="http://clhs.lisp.se/Body/f_mk_stg.htm">CLHS</a>
+<p>Создаёт строку длины <i>size</i> из пробелов:
+<h5>Примеры</h5>
+<pre>
+(make-string 5)  →  "     "
+</pre>
+
+<hr/><h4 id="string">Функция STRING</h4>
+<b>string</b> x → string
+<a class="clhs" href="http://clhs.lisp.se/Body/f_string.htm">CLHS</a>
+<p>Превращает <i>x</i> в строку:
+<ul>
+	<li>Если <i>x</i> уже строка, возвращает её.
+	<li>Если <i>x</i> символ, возвращает его имя.
+	<li>Если <i>x</i> character, создаёт строку единичной длины из <i>x</i>.
+</ul>
+<h5>Примеры</h5>
+<pre>
+(string 'elm)  →  "ELM"
+(string #\c)   →  "c"
+</pre>
+
+<hr/><h4 id="stringp">функция STRINGP</h4>
+<p><b>stringp</b> object → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_stgp.htm#stringp">CLHS</a>
+<p>Возвращает истину если <i>object</i> - <a href="#string-type">строка</a>.
+<h5>Примеры</h5>
+<p><code>(stringp "a")</code> → T
+<p><code>(stringp #\a)</code> → NIL
+
+<hr/><h4 id="string-eq">Функция STRING=</h4>
+<p><b>string=</b> string1 string2 → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_stgeq_.htm#stringEQ">CLHS</a>
+<p>Возвращает истину если <i>string1</i> и <i>string2</i> одинаковые, т.е. состоят из characters, одиннаковых по функции <a href="#char-eq">char=</a>..
+<p>Сравнение case-sensitive.
+<h5>Примеры</h5>
+<p><code>(string= "Abc" "ABC")</code> → <code>NIL</code>
+
+<hr/><h4 id="string-ne">Функция STRING/=</h4>
+<p><b>string/=</b> string1 string2 → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_stgeq_.htm#stringSLEQ">CLHS</a>
+<p>Возвращает истину если <i>string1</i> и <i>string2</i> разные.
+<p>Сравнение case-sensitive.
+<h5>Примеры</h5>
+<p><code>(string/= "Abc" "ABC")</code> → <code>T</code>
+
+<hr/><h4 id="string-equal">Функция STRING-EQUAL</h4>
+<p><b>string-equal</b> string1 string2 → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_stgeq_.htm#string-equal">CLHS</a>
+<p>Возвращает истину если <i>string1</i> и <i>string2</i> одинаковые, т.е. состоят из characters, одиннаковых по функции <a href="#char-equal">char-equal</a>.
+<p>Сравнение case-insensitive.
+<h5>Примеры</h5>
+<p><code>(string-equal "Abc" "ABC")</code> → <code>T</code>
+
+<hr/><h4 id="string-upcase">Функция STRING-UPCASE</h4>
+<b>string-upcase</b> string → cased-string
+<a class="clhs" href="http://clhs.lisp.se/Body/f_stg_up.htm#string-upcase">CLHS</a>
+<p>Создаёт строку в верхнем регистре из <i>string</i>.
+<h5>Примеры</h5>
+<p><code>(string-upcase "Здравствуй МИР!")</code> → <code>"ЗДРАВСТВУЙ МИР!"</code>
+
+<hr/><h4 id="string-downcase">Функция STRING-DOWNCASE</h4>
+<b>string-downcase</b> string → cased-string
+<a class="clhs" href="http://clhs.lisp.se/Body/f_stg_up.htm#string-downcase">CLHS</a>
+<p>Создаёт строку в нижнем регистре из <i>string</i>.
+<h5>Примеры</h5>
+<p><code>(string-downcase "Hello World!")</code> → <code>"hello world!"</code>
+
+<hr/><h4 id="nstring-upcase">Функция NSTRING-UPCASE</h4>
+<b>nstring-upcase</b> string → string
+<a class="clhs" href="http://clhs.lisp.se/Body/f_stg_up.htm#nstring-upcase">CLHS</a>
+<p>Приводит <i>string</i> к верхнему регистру. Модифицирующая операция.
+
+<hr/><h4 id="nstring-downcase">Функция NSTRING-DOWNCASE</h4>
+<b>nstring-downcase</b> string → string
+<a class="clhs" href="http://clhs.lisp.se/Body/f_stg_up.htm#nstring-downcase">CLHS</a>
+<p>Приводит <i>string</i> к нижнему регистру. Модифицирующая операция.
+<h5>Примеры</h5>
+<p><code>(setq str (copy-seq "0123ABCD890a"))</code> → <code>"0123ABCD890a"</code>
+<p><code>(nstring-downcase str)</code> → <code>"0123abcd890a"</code>
+<p><code>str</code> → <code>"0123abcd890a"</code>
+
+<hr/><h3 id="symbols-chapter">Символы</h3>
+<p>Символы могут "интернированными" или свободными. Интернированные принадлежат глобальному списку <b id="oblist">oblist</b>.
+<p>Свободные символы могут быть созданы функциями <a href="#make-symbol">make-symbol</a> или <a href="#unintern">unintern</a> и удалены при сборке мусора если на них не осталось ссылок.
+<p>Lisp reader видит только интернированные символы.
+
+<hr/><h4 id="boundp">Функция BOUNDP</h4>
+<b>boundp</b> symbol → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_boundp.htm">CLHS</a>
+<p>Возвращает истину, если к <i>symbol</i> привязано значение в глобальном окружении.
+<p>boundp игнорирует лексически-связанные переменные.
+<h5>Примеры</h5>
+<pre>
+(boundp 'pi)                   →  T
+(boundp 'abc)                  →  NIL
+(setq abc 1)                   →  1
+(boundp 'abc)                  →  T
+(let ((lex 1)) (boundp 'lex))  →  NIL
+</pre>
+
+<hr/><h4 id="boundp">Функция MAKUNBOUND</h4>
+<b>makunbound</b> symbol → symbol
+<a class="clhs" href="http://clhs.lisp.se/Body/f_makunb.htm#makunbound">CLHS</a>
+<p>Отвязывает от <i>symbol</i> значение, если таковое было привязано.
+<h5>Примеры</h5>
+<pre>
+(setq a 1)       →  1
+(boundp 'a)      →  T
+(makunbound 'a)  →  A
+(boundp 'a)      →  NIL
+</pre>
+
+<hr/><h4 id="defparameter">Оператор DEFPARAMETER</h4>
+<b>defparameter</b> name initial-value → name
+<a class="clhs" href="http://clhs.lisp.se/Body/m_defpar.htm">CLHS</a>
+<p>Создаёт глобальную переменную с именем <i>name</i>, если такой еще не было.
+<p>В отличие от <a href="#defvar">defvar</a> всегда вычисляет <i>initial-value</i> и присваивает результат переменной <i>name</i>.
+<h5>Примеры</h5>
+<pre>
+(defparameter p (+ 2 3)) →  P
+p                        →  5
+(defparameter p 10)      →  P
+p                        →  10
+</pre>
+
+<hr/><h4 id="defvar">Оператор DEFVAR</h4>
+<b>defvar</b> name &optional initial-value → name
+<a class="clhs" href="http://clhs.lisp.se/Body/m_defpar.htm">CLHS</a>
+<p>Создаёт глобальную переменную с именем <i>name</i>, если такой еще не было</p>.
+<p>Если переменная <i>name</i> не имеет привязанного значения в глобальном окруженнии, вычисляет <i>initial-value</i> и присваивает результат переменной <i>name</i>.
+<p>Если <i>initial-value</i> отсутсвует, оставляет значение <i>name</i> как есть, но переводит переменную в глобальные.
+<h5>Примеры</h5>
+<pre>
+(defvar a (+ 2 3))  →  A
+a                   →  5
+(defvar a 10)       →  A
+a                   →  5
+</pre>
+
+
+<hr/><h4 id="fboundp">Функция FBOUNDP</h4>
+<b>fboundp</b> name → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_fbound.htm#fboundp">CLHS</a>
+<p>Возвращает истину, если к <i>sname ymbol</i> привязана функция или оператор.
+<h5>Примеры</h5>
+<pre>
+(fboundp 'car)  →  #&lt;SYSTEM-FUNCTION CAR&gt;
+</pre>
+
+<hr/><h4 id="fmakunbound">Функция FMAKUNBOUND</h4>
+<b>fmakunbound</b> name  → symbol
+<a class="clhs" href="http://clhs.lisp.se/Body/f_fmakun.htm">CLHS</a>
+<p>Отвязывает от <i>name </i> функцию или оператор, если таковые были привязаны.
+<h5>Примеры</h5>
+<pre>
+(fboundp 'asin)      →  #&lt;SYSTEM-FUNCTION ASIN&gt;
+(fmakunbound 'asin)  →  ASIN
+(fboundp 'asin)      →  NIL
+</pre>
+
+<hr/><h4 id="find-symbol">Функция FIND-SYMBOL</h4>
+<b>find-symbol</b> string → symbol
+<a class="clhs" href="http://clhs.lisp.se/Body/f_find_s.htm#find-symbol">CLHS</a>
+<p>Возвращает <a href="#intern">интернированный</a> символ с именем <i>string</i>. Если такой не найден - возвращает NIL.
+<p> Эта операция case-sensitive.
+<h5>Примеры</h5>
+<pre>
+(find-symbol "list")  →  NIL
+(find-symbol "LIST")  →  LIST
+</pre>
+
+<hr/><h4 id="gensym">Функция GENSYM</h4>
+<b>gensym</b> &optional x → new-symbol
+<a class="clhs" href="http://clhs.lisp.se/Body/f_gensym.htm">CLHS</a>
+<p>Создаёт и возвращает неинтернированный символ с именем, состоящим из перфикса и суффикса.
+<p>Если <i>x</i> - строка, она становится префиксом, а суффексом становится значение целого из переменной <a href="#*gensym-counter*">*gensym-counter*</a>. После чего переменная
+инкрементируется.
+<p>Если <i>x</i> - целое, оно становится суффиксом имени, а префикс <b>"G"</b>.
+<p>Если <i>x</i> не задано, то префикс <b>"G"</b>, а суффикс берется из <a href="#*gensym-counter*">*gensym-counter*</a>.
+<h5>Примеры</h5>
+<pre>
+(progn
+ (setq *gensym-counter* 10)
+ (gensym "PRE"))            →  #:PRE10
+*gensym-counter*            →  11
+(gensym 50)                 →  #:G50
+(gensym)                    →  #:G11
+</pre>
+
+<hr/><a class="clhs" href="http://clhs.lisp.se/Body/v_gensym.htm">CLHS</a>
+<h4 id="*gensym-counter*">Переменная *GENSYM-COUNTER*</h4>
+<p>Неотрицательное целое, используемое для именования очередного символа функцией <a href="#gensym">gensym</a>.
+<h5>Примеры</h5>
+<pre>
+(progn
+ (setq *gensym-counter* 10)
+ (gensym))                   →  #:G10
+</pre>
+
+<hr/><h4 id="intern">Функция INTERN</h4>
+<b>intern</b> string → symbol
+<a class="clhs" href="http://clhs.lisp.se/Body/f_intern.htm#intern">CLHS</a>
+<p>Создаёт интернированный символ с именем <i>string</i> если такого ещё нет в глобальном списке символов <a href="#oblist">oblist</a>.
+<p> Возвращает найденный или созданный символ.
+<p> Эта операция case-sensitive.
+<h5>Примеры</h5>
+<pre>
+(eq 'list (intern "LIST"))          →  T
+(intern "list")                     →  list
+(eq (intern "abc") (intern "ABC"))  →  NIL
+</pre>
+
+<hr/><h4 id="unintern">Функция UNINTERN</h4>
+<p><b>unintern</b> symbol → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_uninte.htm">CLHS</a>
+<p>Противоположность функции <a href="#intern">intern</a>. Удаляет <i>symbol</i> из глобального списка <a href="#oblist">oblist</a>. Он становится недоступным для Reader-а.
+<p> Возвращает истину если <i>symbol</i> был в <a href="#oblist">oblist</a>.
+<h5>Примеры</h5>
+<pre>
+(unintern 'machine-type)      →  T
+(find-symbol "MACHINE-TYPE")  →  NIL
+</pre>
+
+<hr/><h4 id="make-symbol">Функция MAKE-SYMBOL</h4>
+<b>make-symbol</b> name → symbol
+<a class="clhs" href="http://clhs.lisp.se/Body/f_mk_sym.htm">CLHS</a>
+<p>Создаёт и возвращает новый неинтернированный символ с именем <i>name</i> (строка). В отличие от операций чтения символов, имя не преобразуется к верхнему регистру.
+<h5>Примеры</h5>
+<pre>
+(make-symbol "AbC")  →  #:AbC
+</pre>
+
+
+<hr/><h4 id="symbol-name">Функция SYMBOL-NAME</h4>
+<b>symbol-name</b> symbol → name
+<a class="clhs" href="http://clhs.lisp.se/Body/f_symb_2.htm">CLHS</a>
+<p>Возвращает имя символа.
+
+<hr/><h4 id="symbolp">Функция SYMBOLP</h4>
+<p><b>symbolp</b> object → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_symbol.htm#symbolp">CLHS</a>
+<p>Возвращает истину если <i>object</i> - <a href="#symbol">символ</a>.
+<h5>Примеры</h5>
+<p><code>(symbolp 'a)</code> → T
+<p><code>(symbolp "a")</code> → NIL
+
+<hr/><h4 id="symbol-function">Аксессор SYMBOL-FUNCTION</h4>
+<b>symbol-function</b> symbol → contents
+<b>(setf (symbol-function</b> symbol) new-value) → new-value<br/>
+<a class="clhs" href="http://clhs.lisp.se/Body/f_symb_1.htm">CLHS</a>
+<p>Возвращает/присваивает функциональный объект привязанные к <i>symbol</i>.
+<p>Если <i>symbol</i> привязан (<a href="#fbound">fbound</a>) к функции, возвращает эту функцию.
+<p>Если <i>symbol</i> привязан к специальному оператору или макро, возвращает объект соответствующего типа.
+<h5>Примеры</h5>
+<p><code>(symbol-function 'sin)</code> → <code>#&lt;SYSTEM-FUNCTION SIN></code>
+<p><code>(setf (symbol-function 'twice) #'(lambda (x) (list x x)))</code>
+
+<hr/><h4 id="symbol-plist">Функция SYMBOL-PLIST</h4>
+<b>symbol-plist</b> symbol → plist
+<a class="clhs" href="http://clhs.lisp.se/Body/f_symb_4.htm">CLHS</a>
+<p>Список свойств символа.
+
+<hr/><h4 id="symbol-value">Аксессор SYMBOL-VALUE</h4>
+<b>symbol-function</b> symbol → value<br/>
+<b>(setf (symbol-value</b> symbol) new-value) → new-value<br/>
+<a class="clhs" href="http://clhs.lisp.se/Body/f_symb_5.htm">CLHS</a>
+<p>Возвращает/присваивает глобальное значение символа <i>symbol</i>.
+<p>Игнорирует лексические переменные.
+<h5>Примеры</h5>
+<pre>
+(setf (symbol-value 'a) 1)       →  1
+(let ((a 2)) a)	                 →  2
+(let ((a 2)) (symbol-value 'a))  →  1
+</pre>
+
+<hr/><h4 id="push">Оператор PUSH</h4>
+<p><b>push</b> item place → new-place-value
+<a class="clhs" href="http://clhs.lisp.se/Body/m_push.htm">CLHS</a>
+<p>Добавляет <i>item</i> в список хранимый в <i>place</i>, сохраняет результат в <i>place</i> и возвращает его.
+<h5>Эквивалент</h5>
+<code>(push item place)</code> ≈ <code>(setf place (cons item place))</code>
+<p>Но отличается порядком вычисления аргументов
+<h5>Примеры</h5>
+<pre>
+(setq lst '(1))  →  (1)
+(push 'a lst)    →  (A 1)
+lst              →  (A 1)
+</pre>
+
+<hr/><h4 id="pop">Оператор POP</h4>
+<p><b>pop</b> place → element
+<a class="clhs" href="http://clhs.lisp.se/Body/m_pop.htm">CLHS</a>
+<p>Операция, обратная <a href="#push">push</a>.
+<p>Извлекает car из списка в <i>place</i> и возвращает его, сохраняя cdr этого списка обратно в <i>place</i>.
+<h5>Эквивалент</h5>
+<code>(pop item place)</code> ≈ <code>(prog1 (car place) (setf place (cdr place)))</code>
+<h5>Примеры</h5>
+<pre>
+(pop (setq stack '(a b c))  →  A
+stack                       →  (B C)
+</pre>
+
+<hr/><h4 id="rotatef">Оператор ROTATEF</h4>
+<p><b>rotatef</b> symbol* → nil
+<a class="clhs" href="http://clhs.lisp.se/Body/m_rotate.htm">CLHS</a>
+<p>Циклический сдвиг (ротация) значений переменных <i>symbols</i>.
+<p>Первой переменной присваивается значение второй, второй переменной - значение третьей и т.д.. Последней переменной присваивается значение первой.
+<h5>Примеры</h5>
+<pre>
+(progn
+  (setq a 1 b 2 c 3)
+  (rotatef a b c)
+  (list a b c))       →  (2 3 1)
+</pre>
+
+<hr/><h4 id="set">Функция SET</h4>
+<b>set</b> symbol value → value
+<a class="clhs" href="http://clhs.lisp.se/Body/f_set.htm#set">CLHS</a>
+<p>Присваивает глобальное значение символа <i>symbol</i>.
+<h5>Эквивалент</h5>
+<code>(set symbol value)</code> ≡ <code>(setf (symbol-value symbol) value)</code>
+<h5>Примеры</h5>
+<code>(set 'a 1)</code> → 1
+
+<hr/><h4 id="setf">Оператор SETF</h4>
+<p><b>setf</b> {pair}* → result
+<a class="clhs" href="http://clhs.lisp.se/Body/s_setq.htm">CLHS</a>
+<p>pair::= var form
+<p>Присваивание переменной <i>var</i> значения вычисленной формы <i>form</i>.
+<p><i>place</i> может быть символом или <a href="#accessor">Аксессором</a>.
+<h5>Примеры</h5>
+<pre>
+(setq x (cons 'a 'b) y (list 1 2 3))  →  (1 2 3)
+(setf (car x) 'x (nth 1 y) (car x))   →  X
+x                                     →  (X . B)
+y                                     →  (1 X 3)
+</pre>
+
+<hr/><h4 id="setq">Оператор SETQ</h4>
+<p><b>setq</b> {pair}* → result
+<a class="clhs" href="http://clhs.lisp.se/Body/m_setf_.htm">CLHS</a>
+<p>pair::= place form
+<p>Модифицирует величину, хранящуюся в месте <i>place</i> на значение вычисляемой формы <i>form</i>. Возвращает значение <i>form</i> из последней пары.
+<h5>Примеры</h5>
+<p><code>(setq a 1 b 2 c 3)</code> → 3
+<p><code>b</code> → 2
+
+<hr/><h4 id="psetq">Оператор PSETQ</h4>
+<b>psetq</b> {pair}* → nil
+<a class="clhs" href="http://clhs.lisp.se/Body/m_psetq.htm#psetq">CLHS</a>
+<p>pair::= var form
+<p>Присваивание переменной <i>var</i> значения вычисленной формы <i>form</i>.
+<p>Похоже на <a href="#setq">setq</a>, но присваивания выполняются параллельнл.
+<h5>Примеры</h5>
+<pre>
+(psetq a 1 b 2)            →  nil
+(psetq a (1+ b) b (1+ a))  →  nil
+(list a b)		           →  (3 2)
+</pre>
+
+<h4 id="get">Аксессор GET</h4>
+<p><b>get</b> symbol indicator &optional default → value<br/>
+<b>(setf (get</b> symbol indicator) new-value) → new-value<br/>
+<a class="clhs" href="http://clhs.lisp.se/Body/f_get.htm">CLHS</a>
+<p><i>get</i> находит свойство <i>indicator</i> в свойствах символа <i>symbol</i> и возвращает его значение. Если свойство не найдено,  возвращает <i>default</i> (по умолчанию NIL).
+<p><i>setf get</i> устанавливает свойство <i>indicator</i> в свойствах символа <i>symbol</i> в значение <i>new-value</i> (по умолчанию NIL).
+<h5>Примеры</h5>
+<pre>
+(setf (get 'a 'prop) 1)  →  1
+(get 'a 'prop)           →  1
+</pre>
+
+<hr/><h4 id="getf">Функция GETF</h4>
+<p><b>getf</b> plist indicator &optional default → value
+<a class="clhs" href="http://clhs.lisp.se/Body/f_getf.htm">CLHS</a>
+<p>Находит свойство <i>indicator</i> в <i>plist</i> и возвращает его значение. Если свойство не найдено,  возвращает <i>default</i> (по умолчанию NIL).
+<h5>Примеры</h5>
+<p><code>(getf '(a 1 b 2 c 3) 'd 5)</code> → 5
+
+<hr/><h4 id="remprop">Функция REMPROP</h4>
+<p><b>remprop</b> symbol indicator → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_rempro.htm">CLHS</a>
+<p>Удаляет из списка свойств <i>symbol</i> свойство с ключём <i>indicator</i>. Возвращает true если такое свойство было в списке.
+<h5>Примеры</h5>
+<pre>
+(setf (get 'a 'prop) 1)
+(remprop 'a 'prop)       → T
+</pre>
+
+<h4 id="symbol-plist">Функция SYMBOL-PLIST</h4>
+<b>symbol-plist</b> symbol → plist
+<a class="clhs" href="http://clhs.lisp.se/Body/f_symb_4.htm">CLHS</a>
+<p>Список свойств символа.
+
+<hr/>
+<h3 id="numbers-chapter">Числа</h3>
+
+<h4 id="add">Функция +</h4>
+<b>+</b> &rest numbers → sum
+<a class="clhs" href="http://clhs.lisp.se/Body/f_pl.htm">CLHS</a>
+<p>Возвращает сумму слагаемых <i>numbers</i>.
+<p>Если слагаемых нет, возвращает <b>0</b>.
+<h5>Примеры</h5>
+<pre>
+(+)          →  0
+(+ 1)        →  1
+(+ 1 2 3 4)  →  10
+</pre>
+
+<hr/><h4 id="subtract">Функция -</h4>
+<b>-</b> number → negation<br/>
+<b>-</b> minuend &rest subtrahends+ → difference
+<a class="clhs" href="http://clhs.lisp.se/Body/f__.htm">CLHS</a>
+<p>С одним аргументом <i>number</i> возвращает противоположное число <i>-number</i>.
+<p>С несколькими аргументами вычитает все вычитаемые <i>subtrahends</i> из уменьшаемого <i>minuend</i> и возвращает результат.
+<h5>Примеры</h5>
+<pre>
+(- 55.55)       →  -55.55
+(- 0)           →  0
+(- 10 1 2 3 4)  →  0
+</pre>
+
+<hr/><h4 id="multiply">Функция *</h4>
+<b>*</b> &rest numbers → product
+<a class="clhs" href="http://clhs.lisp.se/Body/f_st.htm">CLHS</a>
+<p>Возвращает произведение множителей <i>numbers</i>.
+<p>Если множителей нет, возвращает <b>1</b>.
+<h5>Примеры</h5>
+<pre>
+(*)           →  1
+(* 3)         →  3
+(* 1 0 2)     →  0
+(* 1 -2 3 4)  →  -24
+</pre>
+
+<hr/><h4 id="divide">Функция /</h4>
+<b>/</b> number → reciprocal</br>
+<b>/</b> numerator &rest denominators+ → quotient
+<a class="clhs" href="http://clhs.lisp.se/Body/f_sl.htm">CLHS</a>
+<p>С одним аргументом <i>number</i> возвращает обратное число <i>1/number</i>.
+<p>С несколькими аргументами делит делимое <i>numerator</i> на все делители <i>denominators</i> и возвращает результат.
+<p>При делении на 0 возникает <a href="#error-11">ОШИБКА 11</a>.
+<h5>Примеры</h5>
+<pre>
+(/ 0.5)         →  2
+(/ 20 5)        →  4
+(/ 60 -2 3 5.0) →  -2
+(/ 1 0 3)       →  ОШИБКА 11
+</pre>
+
+<hr/><h4 id="1+">Функция 1+</h4>
+<b>1+</b> number → successor
+<a class="clhs" href="http://clhs.lisp.se/Body/f_1pl_1_.htm#1PL">CLHS</a>
+<p>Возвращает число, на единицу большее аргумента.
+<h5>Эквивалент</h5>
+<code>(1+ number)</code> ≡ <code>(+ number 1)</code>
+<h5>Примеры</h5>
+<p><code>(1+ 23) </code> → 24
+
+<hr/><h4 id="1-">Функция 1-</h4>
+<b>1-</b> number → predecessor
+<a class="clhs" href="http://clhs.lisp.se/Body/f_1pl_1_.htm#1-">CLHS</a>
+<p>Возвращает число, на единицу меньшее аргумента.
+<h5>Эквивалент</h5>
+<code>(1- number)</code> ≡ <code>(- number 1)</code>
+
+<hr/><h4 id="incf">Оператор INCF</h4>
+<b>incf</b> place &optional (delta-form 1) → new-value
+<a class="clhs" href="http://clhs.lisp.se/Body/m_incf_.htm">CLHS</a>
+<p>Прибавляет к переменной <i>place</i> значение вычесленной формы <i>delta-form</i> (по-умолчанию 1), записывает результат обратно в переменную и возвращает его.
+<h5>Примеры</h5>
+<pre>
+(progn (setq n 0)
+       (incf n))       → 1
+(list (incf n 4.6) n)  → (5.6 5.6)
+</pre>
+
+<hr/><h4 id="decf">Оператор DECF</h4>
+<b>decf</b> place &optional (delta-form 1) → new-value
+<a class="clhs" href="http://clhs.lisp.se/Body/m_incf_.htm">CLHS</a>
+<p>Вычитает из переменной <i>place</i> значение вычесленной формы <i>delta-form</i> (по-умолчанию 1), записывает результат обратно в переменную и возвращает его.
+<h5>Примеры</h5>
+<pre>
+(progn (setq n -2)
+       (list (decf n -5) (decf n))  →  (3 2)
+</pre>
+
+<hr/><h4 id="num-compare">Функции сравнения чисел =, /=, &lt;, &gt;, &lt;=, &gt;=</h4>
+<p><b id="num-eq">=</b> &rest numbers+ → generalized-boolean</br>
+<b id="num-ne">/=</b> &rest numbers+ → generalized-boolean</br>
+<b id="num-lt">&lt;</b> &rest numbers+ → generalized-boolean</br>
+<b id="num-le">&lt;=</b> &rest numbers+ → generalized-boolean</br>
+<b id="num-gt">&gt;</b> &rest numbers+ → generalized-boolean</br>
+<b id="num-ge">&gt;=</b> &rest numbers+ → generalized-boolean</br>
+<a class="clhs" href="http://clhs.lisp.se/Body/f_eq_sle.htm">CLHS</a>
+<p><b>=</b> Возвращает истину, если все <i>numbers</i> равны.
+<p><b>/=</b> Возвращает истину, если все <i>numbers</i> попарно разные.
+<p><b>&lt;</b> Возвращает истину, если <i>numbers</i> монотонно возрастают.
+<p><b>&lt;=</b> Возвращает истину, если <i>numbers</i> монотонно неубывают.
+<p><b>&gt;</b> Возвращает истину, если <i>numbers</i> монотонно убывают.
+<p><b>&gt;=</b> Возвращает истину, если <i>numbers</i> монотонно невозрастают.
+<h5>Примеры</h5>
+<pre>
+(= 3 3)         →  T
+(/= 3 4 3)      →  NIL
+(/= 3 4 5)      →  T
+(< -4 3 6)      →  T
+(> 4 3 3 2 0)   →  NIL
+(>= 4 3 3 2 0)  →  T
+</pre>
+
+<hr/><h4 id="abs">Функция ABS</h4>
+<p><b>abs</b> number → |<i>number</i>|
+<a class="clhs" href="http://clhs.lisp.se/Body/f_abs.htm#abs">CLHS</a>
+<p>Возвращает модуль (абсолютную величину).
+
+<h4 id="ash">Функция ASH</h4>
+<p><b>ash</b> integer count → shifted-integer
+<a class="clhs" href="http://clhs.lisp.se/Body/f_ash.htm">CLHS</a>
+<p>Выполняет арифметический сдвиг <i>integer</i> в двоичной системе на <i>count</i> позиций. Если <i>count</i> положительно - влево, иначе вправо.
+<h5>Примеры</h5>
+<pre>
+(ash 3 4)   →  48
+(ash 5 -1)  →  2
+</pre>
+
+<hr/><h4 id="exp">Функция EXP</h4>
+<p><b>exp</b> number → e<sup><i>number</i></sup>
+<a class="clhs" href="http://clhs.lisp.se/Body/f_exp_e.htm">CLHS</a>
+<p>Вычисляет экспоненту.
+<h5>Примеры</h5>
+<pre>
+(exp 0)        →  1
+(exp (log 5))  →  4.9999999999999806
+</pre>
+
+<hr/><h4 id="expt">Функция EXPT</h4>
+<p><b>expt</b> base-number power-number → <i>base-number</i><sup><i>power-number</i></sup>
+<a class="clhs" href="http://clhs.lisp.se/Body/f_exp_e.htm">CLHS</a>
+<p>Возводит <i>base-number</i> в степень <i>power-number</i>. Вычисления производятся через логарифм даже для целых показателей, поэтому не точны.
+<h5>Эквивалент</h5>
+<code>(expt x y)</code> ≡ <code>(exp (* (log x) y))</code>
+<h5>Примеры</h5>
+<pre>
+(expt 4 0.5)  →  1.9999999999999984
+</pre>
+
+<hr/><h4 id="log">Функция LOG</h4>
+<p><b>log</b> number &optional (base e) → log<sub><i>base</i></sub> <i>number</i>
+<a class="clhs" href="http://clhs.lisp.se/Body/f_log.htm#log">CLHS</a>
+<p>Вычисляет логарифм <i>number</i>, по основанию <i>base</i>. Если <i>base</i> не задано, вычисляется натуральный логарифм (по основанию <a href="https://ru.wikipedia.org/wiki/E_(число)">e</a>).
+<p>Обратная функция к <a href="#exp">exp</a>.
+<h5>Эквивалент</h5>
+<code>(log base number)</code> ≡ <code>(/ (log number) (log base))</code><br/>
+<h5>Примеры</h5>
+<pre>
+(log 1)       →  0
+(log 100 10)  →  2
+</pre>
+
+<hr/><h4 id="float">Функция FLOAT</h4>
+<p><b>float</b> number → float
+<a class="clhs" href="http://clhs.lisp.se/Body/f_float.htm">CLHS</a>
+<p>Преобразует действительное число <i>number</i> в тип <a href="#float-type">float</a>.
+<h5>Примеры</h5>
+<p><code>(type-of (float (length #(1))))</code> → FLOAT
+
+<hr/><h4 id="floatp">Функция FLOATP</h4>
+<p><b>floatp</b> object → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_floatp.htm">CLHS</a>
+<p>Возвращает истину если <i>object</i> - число с плавающей запятой.
+<p>В BkLisp числа за исключением редких случаев (например результат функции <a href="#length">length</a>) представляются как FLOAT.
+<h5>Примеры</h5>
+<pre>
+(floatp 1.5)                →  T
+(floatp "1")                →  NIL
+(floatp (length #(1 2 3)))  →  NIL
+</pre>
+
+<hr/><h4 id="integerp">Функция INTEGERP</h4>
+<p><b>integerp</b> object → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_inte_1.htm">CLHS</a>
+<p>Возвращает истину если <i>object</i> - целое число.
+<p> В BkLisp семантика integerp отличается от Common Lisp. Так как нет типа для представления длинных целых, целым кроме FIXNUM считается FLOAT с нулевой дробной частью.
+<h5>Примеры</h5>
+<p><code>(integerp (+ 0.5 0.5))</code> → <code>T		; несовместимость с CL</code>
+
+<hr/><h4 id="numberp">Функция NUMBERP</h4>
+<p><b>numberp</b> object → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_nump.htm">CLHS</a>
+<p>Возвращает истину если <i>object</i> - число. В BkLisp - синоним функции <a href="#realp">realp</a>.
+<h5>Примеры</h5>
+<p><code>(numberp 3.14)</code> → T
+
+<hr/><h4 id="realp">Функция REALP</h4>
+<p><b>realp</b> object → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_realp.htm#realp">CLHS</a>
+<p>Возвращает истину если <i>object</i> - действительное число. В BkLisp все числа действительные.
+<h5>Примеры</h5>
+<p><code>(realp (length #(1 2 3)))</code> → T
+
+<hr/><h4 id="pi">Константа PI</h4>
+<p><b>pi</b> → 3.1415926535897932
+<a class="clhs" href="http://clhs.lisp.se/Body/v_pi.htm#pi">CLHS</a>
+<p>Приближение числа <b>π</b>.
+
+<hr/><h4>Тригонометрические функции SIN, COS, TAN, ASIN, ACOS, ATAN</h4>
+<p><b id="sin">sin</b> radians  → sin <i>radians</i>  	(синус)		<a class="clhs" href="http://clhs.lisp.se/Body/f_sin_c.htm#sin">CLHS</a>
+<p><b id="cos">cos</b> radians  → cos <i>radians</i>  	(косинус)	<a class="clhs" href="http://clhs.lisp.se/Body/f_sin_c.htm#cos">CLHS</a>
+<p><b id="tan">tan</b> radians  → tg <i>radians</i>  	(тангенс)	<a class="clhs" href="http://clhs.lisp.se/Body/f_sin_c.htm#tan">CLHS</a>
+<p><b id="asin">asin</b> number → arcsin <i>number</i>  (арксинус в радианах)	<a class="clhs" href="http://clhs.lisp.se/Body/f_asin_.htm#asin">CLHS</a>
+<p><b id="acos">acos</b> number → arccos <i>number</i>  (арккосинус в радианах) <a class="clhs" href="http://clhs.lisp.se/Body/f_asin_.htm#acos">CLHS</a>
+<p><b id="atan">atan</b> number → arctg <i>number</i>  	(артангенс в радианах)	<a class="clhs" href="http://clhs.lisp.se/Body/f_asin_.htm#atan">CLHS</a>
+
+<hr/><h4>Гиперболические функции SINH, COSH, TANH</h4>
+<p><b id="sinh">sinh</b> number → sh <i>number</i> (гиперболический синус)		<a class="clhs" href="http://clhs.lisp.se/Body/f_sinh_.htm#sinh">CLHS</a>
+<p><b id="cosh">cosh</b> number → ch <i>number</i> (гиперболический косинус)	<a class="clhs" href="http://clhs.lisp.se/Body/f_sinh_.htm#cosh">CLHS</a>
+<p><b id="tanh">tanh</b> number → th <i>number</i> (гиперболический тангенс)	<a class="clhs" href="http://clhs.lisp.se/Body/f_sinh_.htm#tanh">CLHS</a>
+<h5>Примеры</h5>
+<pre>
+(sinh 0.5)  →  .52109530549374555
+</pre>
+
+
+<hr/><h4 id="sqrt">Функция SQRT</h4>
+<b>sqrt</b> number → <span>&radic;</span><span style="border-top: 1px solid black">number</span>
+<a class="clhs" href="http://clhs.lisp.se/Body/f_sqrt_.htm#sqrt">CLHS</a>
+<p>Вычисляет квадратный корень.
+<p>Если аргумент отрицательный, прерывается по <a href="#error-5">ОШИБКА 5</a>.
+<h5>Примеры</h5>
+<pre>
+(sqrt 12)  →  3.4641016151377546
+</pre>
+
+<hr/><h4 id="sqrt">Функция ISQRT</h4>
+<b>isqrt</b> natural → &lfloor;<span>&radic;</span><span style="border-top: 1px solid black">number</span>&rfloor;
+<a class="clhs" href="http://clhs.lisp.se/Body/f_sqrt_.htm#isqrt">CLHS</a>
+<p>Вычисляет целую часть квадратного корня.
+<h5>Эквивалент</h5>
+<code>(isqrt x)</code> ≡ <code>(floor (sqrt x))</code>
+<h5>Примеры</h5>
+<pre>
+(isqrt 12)  →  3
+</pre>
+
+<hr/><h4 id="floor">Функция FLOOR</h4>
+<b>floor</b> number → &lfloor;number&rfloor;
+<a class="clhs" href="http://clhs.lisp.se/Body/f_floorc.htm#floor">CLHS</a>
+<p>Вычисляет целую часть <i>number</i> в направлении -∞.
+<h5>Примеры</h5>
+<p><code>(truncate 5.9)</code> → <code>5</code>
+<p><code>(truncate -5.9)</code> → <code>6</code>
+
+<hr/><h4 id="truncate">Функция TRUNCATE</h4>
+<p><b>truncate</b> number → integer
+<a class="clhs" href="http://clhs.lisp.se/Body/f_floorc.htm#truncate">CLHS</a>
+<p>Вычисляет целую часть <i>number</i> в направлении нуля.
+<h5>Примеры</h5>
+<p><code>(truncate -5.9)</code> → <code>-5</code>
+
+<hr/><h4 id="rem">Функция REM</h4>
+<p><b>rem</b> number divisor → remainder
+<a class="clhs" href="http://clhs.lisp.se/Body/f_mod_r.htm">CLHS</a></p>
+<p>Вычисляет остаток от деления целых <i>number</i> и <i>divisor</i>.
+<h5>Примеры</h5>
+<p><code>(rem 13 4)</code> → <code>1</code>
+<p><code>(rem -13 4)</code> → <code>-1</code>
+
+<hr/><h4 id="evenp">Функция EVENP</h4>
+<p><b>evenp</b> integer → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_evenpc.htm#evenp">CLHS</a>
+<p>Возвращает <i>true</i> если <i>integer</i> чётное.
+
+<hr/><h4 id="oddp">Функция ODDP</h4>
+<p><b>oddp</b> integer → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_evenpc.htm#oddp">CLHS</a>
+<p>Возвращает <i>true</i> если <i>integer</i> нечётное.
+
+<hr/><h4 id="min">Функция MIN</h4>
+<p><b>min</b> &rest reals+ → min-real
+<a class="clhs" href="http://clhs.lisp.se/Body/f_max_m.htm#min">CLHS</a>
+<p>Возвращает наименьшее из чисел <i>reals</i>.
+<h5>Примеры</h5>
+<p><code>(min 1 -3.3 2)</code> → <code>-3.3</code>
+
+<hr/><h4 id="max">Функция MAX</h4>
+<p><b>max</b> &rest reals+ → max-real
+<a class="clhs" href="http://clhs.lisp.se/Body/f_max_m.htm#max">CLHS</a>
+<p>Возвращает наибольшее из чисел <i>reals</i>.
+<h5>Примеры</h5>
+<p><code>(max 1 -9.1 2)</code> → <code>2</code>
+
+<hr/><h4 id="minusp">Функция MINUSP</h4>
+<p><b>minusp</b> number → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_minusp.htm#minusp">CLHS</a>
+<p>Возвращает <i>true</i> если <i>number</i> отрицательно (меньше нуля).
+
+<hr/><h4 id="plusp">Функция PLUSP</h4>
+<p><b>plusp</b> number → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_minusp.htm#plusp">CLHS</a>
+<p>Возвращает <i>true</i> если <i>number</i> положительно (больше нуля).
+
+<hr/><h4 id="signum">Функция SIGNUM</h4>
+<p><b>signum</b> number → sgn <i>number</i>
+<a class="clhs" href="http://clhs.lisp.se/Body/f_signum.htm">CLHS</a>
+<p>Математическая функция <a href="https://ru.wikipedia.org/wiki/Sgn">sgn</a>.
+<p>В зависимости от знака <i>number</i>, возвращает одно из чисел: -1, 0, 1.
+<h5>Эквивалент</h5>
+<code>(signum x)</code> ≡ <code>(if (zerop x) x (/ x (abs x)))</code>
+<h5>Примеры</h5>
+<pre>
+(signum -3.4)  →  -1
+(signum 0)     →  0
+</pre>
+
+<hr/><h4 id="zerop">Функция ZEROP</h4>
+<p><b>zerop</b> number → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_zerop.htm">CLHS</a>
+<p>Возвращает <i>true</i> если <i>number</i> равно нулю.
+
+<hr/><h4>Логические функции LOGAND, LOGANDC1, LOGANDC2, LOGEQV, LOGIOR, LOGNAND, LOGNOR, LOGNOT, LOGORC1, LOGORC2, LOGXOR</h4>
+<p>Эти функции выполняют логические операции побитово над 16-битными словами.		<a class="clhs" href="http://clhs.lisp.se/Body/f_logand.htm">CLHS</a>
+<p><b id="lognot">lognot</b> x → ~x
+<br/>Логическое <b>НЕ</b>
+<p><b id="logand">logand</b> &rest integers → integer
+<br/>Логическое <b>И</b>, без аргументов возвращает -1 (в бинарнмо представлении все единицы).
+<p><b id="logior">logior</b> &rest integers → integer
+<br/>Логическое <b>ИЛИ</b>, без аргументов возвращает 0.
+<p><b id="logxor">logxor</b> &rest integers → integer
+<br/>Логическое <b>Исключающее ИЛИ (XOR)</b>, без аргументов возвращает 0.
+<p><b id="logeqv">logeqv</b> &rest integers → integer
+<br/>Логическое <b>XNOR</b>, без аргументов возвращает -1.
+<p><b id="lognand">lognand</b> x y x → ~(x &amp; y)
+<br/>Логическое <b>И-НЕ (NAND)</b>.
+<p><b id="lognor">lognor</b> x y → ~(x | y)
+<br/>Логическое <b>ИЛИ-НЕ (NOR)</b>.
+<p><b id="logandc1">logandc1</b> mask x → ~mask &amp; x
+<p><b id="logandc2">logandc2</b> x mask → x &amp; ~mask
+<br/>Очистка битов по маске
+<p><b id="logorc1">logorc1</b> mask x → ~mask | x
+<p><b id="logorc2">logorc2</b> x mask → x | ~mask
+
+<hr/><h3 id="comparisons">Сравнения</h3>
+
+<h4 id="eq">Функция EQ</h4>
+<p><b>eq</b> x y → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_eq.htm#eq">CLHS</a>
+<p>Возвращает <i>true</i> если <i>x</i> и <i>y</i> - один и тот же объект.
+
+<hr/><h4 id="eql">Функция EQL</h4>
+<p><b>eql</b> x y → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_eql.htm">CLHS</a>
+<p>Возвращает <i>true</i> если выполняется хотя бы одно из условий:
+<ul>
+	<li><code>(eq x y)</code> → <i>true</i>
+	<li><i>x</i> и <i>y</i> числа с одинаковым значением
+	<li><i>x</i> и <i>y</i> character-ы с одинаковым значением
+</ul>
+<h5>Примеры</h5>
+<code>(eql 'a 'b)</code> → false<br>
+<code>(eql 3.0 3.0)</code> → true
+
+<hr/><h4 id="equal">Функция EQUAL</h4>
+<p><b>equal</b> x y → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_equal.htm">CLHS</a>
+<p>Возвращает <i>true</i> если выполняется хотя бы одно из условий:
+<ul>
+	<li><code>(eql x y)</code> → <i>true</i>
+	<li><i>x</i> и <i>y</i> cons-ячейки у которых <code>(and (equal (car x) (car y)) (equal (cdr x) (cdr y)))</code>  (рекурсивно сравниваются car и cdr части).
+	<li><i>x</i> и <i>y</i> одинаковые строки если сравнивать функцией <a href="#string-eq">string=</a>.
+</ul>
+<h5>Примеры</h5>
+<code>(equal (cons 'a 'b) (cons 'a 'b))</code> → T<br>
+
+<hr/><h4 id="equalp">Функция EQUALP</h4>
+<p><b>equalp</b> x y → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_equalp.htm">CLHS</a>
+<p>Возвращает <i>true</i> если выполняется хотя бы одно из условий:
+<ul>
+	<li><code>(equal x y)</code> → <i>true</i>
+	<li><i>x</i> и <i>y</i> characters и <code>(<a href="#char-equal">char-equal</a> x y)</code> (равны без учета регистра).
+</ul>
+<h5>Примеры</h5>
+<code>(equalp #\A #\a)</code> → T<br>
+
+<hr/><h3>Булева логика</h3>
+
+<h4 id="and">Оператор AND</h4>
+<p><b>and</b> form* → result
+<a class="clhs" href="http://clhs.lisp.se/Body/m_and.htm">CLHS</a>
+<p>Вычисляет по очереди формы из <i>form*</i>, пока не дойдёт до значения <i>ложь</i>(NIL), тогда возвращает NIL.
+<p>Если все формы вернули <i>истину</i>, оператор возвращает значение последней формы. Если вызван без аргументов, возвращает <b>T</b>.
+<p>Является "ленивым", так как не вычисляет формы, следующие после первой ложной.
+<h5>Примеры</h5>
+<p><code>(and 'A (+ 2 4))</code> → <code>6</code>
+
+<hr/><h4 id="or">Оператор OR</h4>
+<p><b>or</b> form* → result
+<a class="clhs" href="http://clhs.lisp.se/Body/m_or.htm">CLHS</a>
+<p>Вычисляет по очереди формы из <i>form*</i>, пока не дойдёт до значения <i>истина</i>(NIL), тогда возвращает значение этой формы.
+<p>Если все формы вернули <i>ложь</i> или вызван без аргументов, возвращает <b>NIL</b>.
+<p>Является "ленивым", так как не вычисляет формы, следующие после первой истинной.
+<h5>Примеры</h5>
+<p><code>(or nil (+ 2 2) nil 5)</code> → <code>4</code>
+
+<hr/>
+<h3>Типы</h3>
+
+<h4 id="type-of">Функция TYPE-OF</h4>
+<p><b>type-of</b> object → typespec
+<a class="clhs" href="http://clhs.lisp.se/Body/f_tp_of.htm#type-of">CLHS</a>
+<p>Возвращает спецификацию типа объекта. В BkLisp это один из символов: <br/>
+NULL, SYMBOL, FLOAT, INTEGER, VECTOR, CONS, STRING, CHARACTER, SYSTEM-FUNCTION, FUNCTION, SPECIAL-OPERATOR, STREAM, ARRAY.
+<h5>Примеры</h5>
+<pre>
+(type-of "123")  →  STRING
+(type-of 12.3)   →  FLOAT
+</pre>
+
+
+<hr/>
+<h3 id="input">Ввод</h3>
+
+<a class="clhs" href="http://clhs.lisp.se/Body/v_debug_.htm">CLHS</a>
+<h4 id="*standard-input*">Переменная *STANDARD-INPUT*</h4>
+<p>Содержит поток ввода по умолчанию. Начальное значение - ввод из командной строки.
+
+<hr/><h4 id="inkey">Функция INKEY</h4>
+<p><b>inkey</b> → char-p
+<a class="clhs">Нестандартная</a>
+<p>Возвращает character, соответствующий нажатой клавише, либо NIL, если нажатий не было.
+<p>Не блокирует выполнение ожиданием.
+<h5>Примеры</h5>
+<pre>
+(inkey)  →  #\Y
+(inkey)  →  NIL
+</pre>
+
+<hr/><h4 id="load">Функция LOAD</h4>
+<p><b>load</b> filename → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_load.htm">CLHS</a>
+<p>Читает и выполняет текстовый файл с именем <i>filename</i>  с кодом на LISP.
+<p>Ограничение на размер файла: 256 байт, т.к. для чтения используется буфер ввода строки с клавиатуры.
+<p>В отличие от стандарта CL, в BkLisp эта функция завершается до выполнения форм из файла, поэтому имеет смысл только при интерактивной работе в REPL.
+<h5>Примеры</h5>
+<pre>
+; файл fact.lisp
+(defun factorial (a) (if (zerop a) 1 (* a (factorial (1- a)))))
+
+(load "fact.lisp")    →  FACT
+(fact 9)              →  362880
+</pre>
+
+<hr/><h4 id="make-string-input-stream">Функция MAKE-STRING-INPUT-STREAM</h4>
+<p><b>make-string-input-stream</b> string &optional start end → string-stream
+<a class="clhs" href="http://clhs.lisp.se/Body/f_mk_s_1.htm">CLHS</a>
+<p>Создаёт поток ввода из под-строки <i>string</i>, заданной ограничителями <i>start, end</i> (по умолчанию вся строка).
+<h5>Примеры</h5>
+<pre>
+(read (make-string-input-stream "123"))  →  123
+</pre>
+
+<hr/><h4 id="read">Функция READ</h4>
+<p><b>read</b>  &optional input-stream eof-error-p eof-value recursive-p → object
+<a class="clhs" href="http://clhs.lisp.se/Body/f_rd_rd.htm#read">CLHS</a>
+<p>Парсит печатное представление объекта из <i>input-stream</i> и создаёт такой объект.
+По-умолчанию <i>input-stream</i> - клавиатурный ввод.
+
+<hr/><h4 id="peek-char">Функция PEEK-CHAR</h4>
+<p><b>peek-char</b> &optional (peek-type nil) input-stream (eof-error-p T) (eof-value nil) → char
+<a class="clhs" href="http://clhs.lisp.se/Body/f_peek_c.htm#peek-char">CLHS</a>
+<p>Возвращает очередной character из потока <i>input-stream</i>, не читая его при этом, т.е. после вызова очередны character в потоке остаётся тот-же.
+<ul>
+  <li>если <i>peek-type</i> - <b>nil</b>, ничего не пропускает.
+  <li>если <i>peek-type</i> - <b>t</b>, пропускает все <a href="#whitespace">whitespace</a>.
+  <li>если <i>peek-type</i> - character, пропускает characters потоке, пока не совпадают с <i>peek-type</i>.
+</ul>
+<h5>Примеры</h5>
+<pre>
+(setq stm (make-string-input-stream "  123"))
+(peek-char nil stm)		                      → #\SPACE
+(peek-char t stm)		                      → #\1
+(peek-char #\3 stm)		                      → #\3
+</pre>
+
+<hr/><h4 id="read-char">Функция READ-CHAR</h4>
+<p><b>read-char</b> &optional input-stream (eof-error-p T) (eof-value nil) → char
+<a class="clhs" href="http://clhs.lisp.se/Body/f_rd_cha.htm#read-char">CLHS</a>
+<p>Читает очередной character из потока <i>input-stream</i>.
+<p>В ситуации конца потока (EOF): если <i>eof-error-p</i> - ложь, возвращает <i>eof-value</i>, иначе порождает ошибку.
+<h5>Примеры</h5>
+<code>(read-char (make-string-input-stream "123"))</code> → <code>#\1</code>
+
+<hr/><h4 id="unread-char">Функция UNREAD-CHAR</h4>
+<b>unread-char</b> char &optional input-stream → nil
+<a class="clhs" href="http://clhs.lisp.se/Body/f_unrd_c.htm#unread-char">CLHS</a>
+<p>Помещает <i>char</i> обратно в поток <i>input-stream</i>, чтобы он снова оказался следующим character, при чтении.
+<p>Может быть вызвана только один раз после успешного вызова <a href="#read-char">read-char</a> со значением <i>char</i>, прочитанным read-char.
+<h5>Примеры</h5>
+<pre>
+(setq stm (make-string-input-stream "123"))
+(unread-char (read-char stm) stm)
+(read-char stm)                             → #\1
+</pre>
+
+<hr/><h4 id="read-delimited-list">Функция READ-DELIMITED-LIST</h4>
+<b>read-delimited-list</b> char &optional input-stream → list
+<a class="clhs" href="http://clhs.lisp.se/Body/f_rd_del.htm#read-delimited-list">CLHS</a>
+<p>Читает объекты из <i>input-stream</i> пока не встретит после объекта character <i>char</i>. Возвращает список прочитанных объектов.
+<h5>Примеры</h5>
+<pre>
+(read-delimited-list #\] (make-string-input-stream "1 2 3 ]"))  →  (1 2 3)
+</pre>
+
+<hr/><h4 id="input-stream-p">Функция INPUT-STREAM-P</h4>
+<b>input-stream-p</b> object → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_in_stm.htm">CLHS</a>
+<p>Возвращает истину если <i>object</i> - поток ввода.
+<h5>Примеры</h5>
+<pre>
+(input-stream-p (make-string-input-stream "123"))  →  T
+</pre>
+
+<hr/><h4 id="streamp">Функция STREAMP</h4>
+<b>streamp</b> object → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_stmp.htm">CLHS</a>
+<p>Возвращает истину если <i>object</i> типа <a href="#stream-type">поток</a>.
+<h5>Примеры</h5>
+<pre>
+(streamp *standard-input*)  →  T
+</pre>
+
+<hr/><h4 id="y-or-n-p">Функция Y-OR-N-P</h4>
+<p><b>y-or-n-p</b> &optional control &rest arguments → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_y_or_n.htm">CLHS</a>
+<p>При наличии аругмента <i>control</i>, выводит вопрос, сформированный функцией <a href=#format>format</a> из аргументов <i>control</i> и <i>arguments</i>.
+<p>После чего ожидает ответа в виде нажатия клавиш <b>Y</b> или <b>N</b>.
+<p>Возвращает <i>true</i> если была нажата Y, и NIL если нажата N.
+<h5>Примеры</h5>
+<pre>
+(y-or-n-p "Ты перестала пить коньяк по утрам?")  →  Ты перестала пить коньяк по утрам?
+                                                 →  Y/N
+</pre>
+
+<hr/>
+<h3 id="output">Вывод</h3>
+
+<a class="clhs" href="http://clhs.lisp.se/Body/v_pr_bas.htm">CLHS</a>
+<h4 id="*print-base*">Переменная *PRINT-BASE*</h4>
+<p>Система счисления, используемая для печати целых чисел. Может принимать значения: <b>2</b>, <b>8</b>, <b>10</b>, <b>16</b>. Начальное значение <b>10</b>.
+<h5>Примеры</h5>
+<pre>
+*print-base*            →  10
+(let ((*print-base* 8))
+  (print 32766))        →  77776  ; вывод PRINT
+                        →  32766  ; результат LET
+</pre>
+
+<hr/><a class="clhs" href="http://clhs.lisp.se/Body/v_pr_esc.htm">CLHS</a>
+<h4 id="*print-escape*">Переменная *PRINT-ESCAPE*</h4>
+<p>При значении nil не печатаются Escape-characters и кавычки у строк. Начальное значение <b>t</b>.
+<p>Для вывода, предназначенного для человека обычно <code>*print-escape*</code> присваивают <i>nil</i>. Для машино-читаемого вывода - <i>t</i>.
+<h5>Примеры</h5>
+<pre>
+(let ((*print-escape* nil)) (write "AB"))  →  AB    ; вывод WRITE
+                                           →  "AB"  ; результат LET
+</pre>
+
+<hr/><a class="clhs" href="http://clhs.lisp.se/Body/v_pr_bas.htm">CLHS</a>
+<h4 id="*print-radix*">Переменная *PRINT-RADIX*</h4>
+<p>Если истина, при печати целых выводится спецификатор системы счисления.
+<p> Для систем счисления <b>2</b>, <b>8</b> и <b>16</b> это соответственно префикс <b>#b</b>, <b>#o</b> и <b>#x</b>. Для системы счисления <b>10</b> - суффикс <b>.</b> (десятичная
+точка).
+<p>Начальное значение <b>nil</b>.
+<h5>Примеры</h5>
+<pre>
+(let ((*print-radix* t))
+  (format nil "~S" 14))   →  "14."
+
+(let ((*print-radix* t)
+      (*print-base* 2))
+  (format nil "~S" 14))   →  "#b1110"
+</pre>
+
+<hr/><a class="clhs" href="http://clhs.lisp.se/Body/v_debug_.htm">CLHS</a>
+<h4 id="*standard-output*">Переменная *STANDARD-OUTPUT*</h4>
+<p>Содержит поток вывода по умолчанию. Начальное значение - вывод на экран.
+
+<hr/><h4 id="format">Функция FORMAT</h4>
+<p><b>format</b> destination control-string &rest args → result
+<a class="clhs" href="http://clhs.lisp.se/Body/f_format.htm">CLHS</a>
+<p>Форматирует вывод в соответствии с управляющей строкой <i>control-string</i>, используя аргументы <i>args</i>.
+<p><i>destination</i> может быть:
+<ul>
+  <li><b>nil</b> - тогда результат format - строка, содержащая вывод. </li>
+  <li><b>t</b> - вывод производится в <a href="#*standard-output*">*standard-output*</a> и возвращается nil. </li>
+  <li>типа <a href="#stream-type"> STREAM</a> - вывод производится поток и возвращается nil. </li>
+</ul>
+<p>Последовательно печатаются characters из <i>control-string</i>, но если встречается управляющий character <b>~</b> (тильда), выбиратся специальный обработчик, в зависимости от следующего
+за тильдой character:
+<ul>
+  <li><b>~~</b> - печатает тильду ~. </li>
+  <li><b>~%</b> - печатает перевод строки. </li>
+  <li><b>~&</b> - печатает перевод строки, если уже не в начале строки (вызов <a href="#fresh-line">fresh-line</a>) . </li>
+  <li><b>~A</b> - печатает очередной аргумент из <i>args</i>, используя <a href="#princ">princ</a> (с установкой <a href="#*print-escape*">*print-escape*</a> в nil). </li>
+  <li><b>~S</b> - печатает очередной аргумент из <i>args</i>, используя <a href="#prin1">prin1</a> (с установкой <a href="#*print-escape*">*print-escape*</a> в T). </li>
+  <li><b>~C</b> - печатает очередной аргумент из <i>args</i>, который долже быть типа <a href="#character-type">CHARACTER</a></li>
+  <li><b>~B</b> - печатает очередной аргумент - целое число из <i>args</i> в двоичной системе. </li>
+  <li><b>~D</b> - печатает очередной аргумент - целое число из <i>args</i> в десятичной системе. </li>
+  <li><b>~O</b> - печатает очередной аргумент - целое число из <i>args</i> в восьмеричной системе. </li>
+  <li><b>~X</b> - печатает очередной аргумент - целое число из <i>args</i> в шестнадцатиричной системе. </li>
+</ul>
+<h5>Примеры</h5>
+<pre>
+(format t "Hello, World!~%")    →  Hello, World!
+                                →  NIL
+
+(format nil "Bin: ~b" 123)      →  "Bin: 1111011"
+
+(format nil "A ~A B" "CC")      →  "A CC B"
+(format nil "A ~S B" "CC")      →  "A \"CC\" B"
+
+(length (format nil "A~&~&B"))  →  3
+(length (format nil "A~%~%B"))  →  4
+</pre>
+
+<hr/><h4 id="prin1">Функция PRIN1</h4>
+<p><b>prin1</b> object &optional output-stream → object
+<a class="clhs" href="http://clhs.lisp.se/Body/f_wr_pr.htm#prin1">CLHS</a>
+<p>Выводит объект в виде, пригодном для чтения функцией <a href="#read">read</a>. На время работы присваивает <a href="#*print-escape*">*print-escape*</a> значение <i>истина</i>.
+<h5>Эквивалент</h5>
+<pre>
+(prin1 object stream)  ≡  (let ((*standard-output* stream)
+                                (*print-escape* t))
+                            (write object))
+</pre>
+<h5>Примеры</h5>
+<pre>
+(prin1 #\A)  →  #\A  ; вывод PRIN1
+             →  #\A  ; возвращаемое значение
+</pre>
+
+<hr/><h4 id="princ">Функция PRINC</h4>
+<p><b>princ</b> object &optional output-stream → object
+<a class="clhs" href="http://clhs.lisp.se/Body/f_wr_pr.htm#princ">CLHS</a>
+<p>Выводит объект в виде, по-возможности приспособленным для чтения человеком. На время работы присваивает <a href="#*print-escape*">*print-escape*</a> значение <i>nil</i>.
+<h5>Эквивалент</h5>
+<pre>
+(princ object stream)  ≡  (let ((*standard-output* stream)
+                                (*print-escape* nil))
+                            (write object))
+</pre>
+<h5>Примеры</h5>
+<pre>
+(princ #\A)  →  A    ; вывод PRINC
+             →  #\A  ; возвращаемое значение
+</pre>
+
+<hr/><h4 id="print">Функция PRINT</h4>
+<p><b>print</b> object &optional output-stream → object
+<a class="clhs" href="http://clhs.lisp.se/Body/f_wr_pr.htm#print">CLHS</a>
+<p>Похожа на <a href="#prin1">prin1</a>, но предваряет печать новой строкой и завершает пробелом.
+<h5>Эквивалент</h5>
+<pre>
+(print object stream)  ≡  (prog2 (terpri stream)
+                                 (prin1 object stream)
+                                 (write-char #\space stream))
+</pre>
+<h5>Примеры</h5>
+<pre>
+(prog1 (print 'a) (prin1 2))  →       ; новая строка
+                              →  A 2  ; вывод PRINT, пробел, вывод PRIN1
+                              →  A    ; возвращаемое значение
+</pre>
+
+<hr/><h4 id="fresh-line">Функция FRESH-LINE</h4>
+<p><b>fresh-line</b> &optional output-stream → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_terpri.htm#fresh-line">CLHS</a>
+<p>Если есть уверенность, что поток <i>output-stream</i> (по-умолчанию <a href="#*standard-output*">*standard-output*</a>) уже находится в состоянии начала новой строки, то не делает ничего и возвращает nil.
+<p>Иначе печатает перевод строки аналогично <a href="#terpri">terpri</a> и возвращает истину.
+<h5>Примеры</h5>
+<pre>
+(progn (princ "A")
+       (fresh-line)
+       (fresh-line)
+       (princ "B")
+       (fresh-line)) →  A
+                     →  B
+                     →  #&lt;STREAM&gt; ; возвращаемое значение <i>истина</i>
+</pre>
+
+<hr/><h4 id="terpri">Функция TERPRI</h4>
+<p><b>terpri</b> &optional output-stream → nil
+<a class="clhs" href="http://clhs.lisp.se/Body/f_terpri.htm#terpri">CLHS</a>
+<p>Выводит character NL (перевод строки) в <i>output-stream</i> (по-умолчанию *standard-output*)
+
+<hr/><h4 id="write">Функция WRITE</h4>
+<p><b>write</b> object → object
+<a class="clhs" href="http://clhs.lisp.se/Body/f_wr_pr.htm">CLHS</a>
+<p>Выводит печатное представление <i>object</i> в поток <a href="#*standard-output*">*standard-output*</a> в соответсвии с переменными <a href="#*print-base*">*print-base*</a> и
+<a href="#*print-escape*">*print-escape*</a>. Возвращает <i>object</i>.
+<p>Это базовая фунция печати объектов, вызываемая из <a href="#print">print</a>, <a href="#prin1">prin1</a>, <a href="#princ">princ</a>.
+<h5>Примеры</h5>
+<pre>
+(let ((*print-escape* nil))
+  (write "ABC"))             →  ABC
+                             →  "ABC" ; возвращаемое значение
+</pre>
+
+<hr/><h4 id="write-char">Функция WRITE-CHAR</h4>
+<p><b>write-char</b> character  &optional output-stream → character
+<a class="clhs" href="http://www.lispworks.com/documentation/HyperSpec/Body/f_wr_cha.htm">CLHS</a>
+<p>Выводит <i>character</i> в <i>output-stream</i> (по-умолчанию <a href="#*standard-output*">*standard-output*</a>) и возвращает его.
+<p>Эта функция базовая, к ней обращаются почти все остальные функции вывода.
+<h5>Примеры</h5>
+<pre>
+(write-char #\ю)  →  ю
+                  →  #\ю ; возвращаемое значение
+</pre>
+
+<hr/><h4 id="write-line">Функция WRITE-LINE</h4>
+<p><b>write-line</b> string &optional output-stream → string
+<a class="clhs" href="http://clhs.lisp.se/Body/f_wr_stg.htm">CLHS</a>
+<p>Выводит строку <i>string</i> в <i>output-stream</i> (по-умолчанию <a href="#*standard-output*">*standard-output*</a>) аналогично <a href="#write-string">write-string</a>, переводит строку (<a
+href="#terpri">terpri</a>), и возвращает <i>string</i>.
+<h5>Примеры</h5>
+<pre>
+(progn (write-line "AB")
+       (write-line "CD")) →  AB
+                          →  CD
+                          →  "CD" ; возвращаемое значение
+</pre>
+
+<hr/><h4 id="write-string">Функция WRITE-STRING</h4>
+<p><b>write-string</b> string &optional output-stream → string
+<a class="clhs" href="http://clhs.lisp.se/Body/f_wr_stg.htm">CLHS</a>
+<p>Выводит строку <i>string</i> в <i>output-stream</i> (по-умолчанию <a href="#*standard-output*">*standard-output*</a>) и возвращает её.
+<h5>Примеры</h5>
+<pre>
+(progn (write-string "AA")
+       (write-string "BB"))  →  AABB
+                             →  "BB" ; возвращаемое значение
+</pre>
+
+<hr/><h4 id="get-output-stream-string">Функция GET-OUTPUT-STREAM-STRING</h4>
+<p><b>get-output-stream-string</b> string-output-stream → string
+<a class="clhs" href="http://clhs.lisp.se/Body/f_get_ou.htm">CLHS</a>
+<p>Возвращает строку, содержащую вывод в поток <i>string-output-stream</i>, созданный функцией <a href="#make-string-output-stream">make-string-output-stream</a>.
+
+<hr/><h4 id="make-string-output-stream">Функция MAKE-STRING-OUTPUT-STREAM</h4>
+<p><b>make-string-output-stream</b> → string-stream
+<a class="clhs" href="http://clhs.lisp.se/Body/f_mk_s_2.htm">CLHS</a>
+<p>Создаёт поток вывода, направляемый в строку.
+<p>По завершении вывода строку можно получить функцией <a href="#get-output-stream-string">get-output-stream-string</a>.
+<h5>Примеры</h5>
+<pre>
+(let ((stm (make-string-output-stream)))
+  (write-string "number " stm)
+  (prin1 123 stm)
+  (get-output-stream-string stm))         →  "number 123"
+</pre>
+
+
+
+<hr/><h3 id="time-chapter">Время</h3>
+<p>Для работы со временем используется аппаратный таймер, на некоторых экземплярах БК-0010.01 он неисправен.
+
+<hr/><h4 id="get-internal-real-time">Функция GET-INTERNAL-REAL-TIME</h4>
+<b>get-internal-real-time</b>  →  internal-time
+<a class="clhs" href="http://clhs.lisp.se/Body/f_get_in.htm#get-internal-real-time">CLHS</a>
+<p>Возвращает текущее время как целое число внутренних единиц времени, прошедших с момента старта BkLisp.
+<p>Для пересчета в секунды следует разделить на <a href="#internal-time-units-per-second">internal-time-units-per-second</a>.
+<p>Разница между двумя вызовами этой функции позволяет замерить промежуток реального времени (<a href="https://en.wikipedia.org/wiki/Elapsed_real_time">elapsed wall-clock time</a>).
+<h5>Примеры</h5>
+<pre>
+(get-internal-real-time)  →  123
+(get-internal-real-time)  →  255
+</pre>
+
+<hr/><h4 id="internal-time-units-per-second">Переменная INTERNAL-TIME-UNITS-PER-SECOND</h4>
+<b>internal-time-units-per-second</b> → 366
+<a class="clhs" href="http://clhs.lisp.se/Body/v_intern.htm#internal-time-units-per-second">CLHS</a>
+<p>Частота тиков таймера. Значение по-умолчанию рассчитано на частоту процессора 3 MHz: <code>3_000_000 / 128 / 64</code>.
+<p>Если ваш процессор работает на другой частоте,  для правильной работы <code>(<a href="#time">time</a> <i>form</i>)</code> надо поменять эту переменную:
+<pre>
+;; CL-несовместимость, в CL internal-time-units-per-second - константа
+(setq internal-time-units-per-second (/ 6000000 128 64))
+</pre>
+
+<hr/><h4 id="sleep">Функция SLEEP</h4>
+<b>sleep</b> seconds → nil
+<a class="clhs" href="http://clhs.lisp.se/Body/f_sleep.htm#sleep">CLHS</a>
+<p>Приостанавливает выполнение программы на <i>seconds</i> секунд (которое должно быть положительным целым).
+
+<hr/><h4 id="time">Оператор TIME</h4>
+<b>time</b> form →  result
+<a class="clhs" href="http://clhs.lisp.se/Body/m_time.htm">CLHS</a>
+<p>Замеряет и печатает время выполнения формы <i>form</i>.
+
+<hr/><h3 id="random-chapter">Генератор случайных чисел</h3>
+<strong>&#9888;</strong> Так как в БК-0010.01 отсутствует надёжный источник случайности, генерируемые числа псевдо-случайны. Их нельзя использовать для криптографических целей.
+
+<hr/>
+<h4 id="*random-state*">Переменная *RANDOM-STATE*</h4>
+<a class="clhs" href="http://clhs.lisp.se/Body/v_rnd_st.htm#STrandom-stateST">CLHS</a>
+<p>Текущее состояние <abbr title="Генератор случайных чисел">ГСЧ</abbr>, используемое если функция <a href="#random">random</a> вызвана без явного указания аргумента <i>random-state</i>.
+
+<hr/><h4 id="make-random-state">Функция MAKE-RANDOM-STATE</h4>
+<b>make-random-state</b> &optional (state nil) → random-state
+<a class="clhs" href="http://clhs.lisp.se/Body/f_mk_rnd.htm#make-random-state">CLHS</a>
+<p>Создаёт новый объект состояния ГСЧ (в BkLisp представляется типом (CONS FLOAT FLOAT)). Его последующая модификация функцией <a href="#random">random</a> не влияет на оригинал <i>state</i>.
+<ul>
+  <li>Если <i>state</i> - nil, создаёт копию <a href="#*random-state*">random-state</a>.
+  <li>Если <i>state</i> - t, создаёт random-state со случайным значением (используется таймер).
+  <li>Если <i>state</i> - random-state, создаёт копию <i>state</i>.
+</ul>
+<h5>Примеры</h5>
+<pre>
+(setq rs (make-random-state nil))			; clone *random-state*
+(random 100)     →  34.854692961087769
+(random 100)     →  50.090201930138307
+(random 100 rs)  →  34.854692961087769
+</pre>
+
+<hr/><h4 id="random">Функция RANDOM</h4>
+<b>random</b> limit &optional (random-state *random-state*) → random-number
+<a class="clhs" href="http://clhs.lisp.se/Body/f_random.htm#random">CLHS</a>
+<p>Возвращает псевдослучайное число в диапазоне [0, <i>limit</i>).
+<p>Его значение определяется состоянием <i>random-state</i> (по-умолчанию переменная <a href="#*random-state*">random-state</a>),  которое модифицируется.
+<h5>Примеры</h5>
+<pre>
+(setq rs (make-random-state nil))			; клонируем *random-state*
+(random 100)     →  34.854692961087769
+(random 100)     →  50.090201930138307
+(random 100 rs)  →  34.854692961087769      ; повторно получаем то же число, т.к. используем клон *random-state* из первого шага
+</pre>
+
+<hr/><h3>Системное окружение</h3>
+
+<hr/><h4 id="lisp-implementation-type">Функция LISP-IMPLEMENTATION-TYPE</h4>
+<p><b>lisp-implementation-type</b> → "Ufasoft BkLisp"
+<a class="clhs" href="http://clhs.lisp.se/Body/f_lisp_i.htm">CLHS</a></p>
+
+<hr/><h4 id="lisp-implementation-version">Функция LISP-IMPLEMENTATION-VERSION</h4>
+<p><b>lisp-implementation-version</b> → "2021"
+<a class="clhs" href="http://clhs.lisp.se/Body/f_lisp_i.htm">CLHS</a></p>
+
+<hr/><h4 id="machine-type">Функция MACHINE-TYPE</h4>
+<p><b>machine-type</b> &rarr; "PDP-11"
+<a class="clhs" href="http://clhs.lisp.se/Body/f_mach_t.htm">CLHS</a></p>
+
+<hr/><h4 id="machine-version">Функция MACHINE-VERSION</h4>
+<p><b>machine-version</b> → "БК-0010.01"
+<a class="clhs" href="http://clhs.lisp.se/Body/f_mach_v.htm">CLHS</a></p>
+
+<h4 id="quit">Функция QUIT</h4>
+<a class="clhs">нестандартная</a>
+<b>quit</b> → MONITOR prompt
+<p>Выход из BkLisp в командную строку операционной системы <b>МОНИТОР БК-0010.01</b>
+
+<hr/><h4 id="room">Функция ROOM</h4>
+<b>room</b> → unknown
+<a class="clhs" href="http://clhs.lisp.se/Body/f_room.htm">CLHS</a>
+<p>Собирает мусор и выводит количество свободной памяти.
+<p>Память может быть фрагментирована, не гарантируется аллокация строк и массивов, даже если суммарное количество свободной бамяти больше запрашиваемого размера.
+
+<hr/><h4 id="extroom">Функция EXTROOM</h4>
+<a class="clhs">нестандартная</a>
+<b>extroom</b> → unknown
+<p>Переключает в режим расширенной памяти если уже не в нём и вызывает <a href="#room">room</a>.
+
+<hr/><h4 id="save">Функция SAVE</h4>
+<p><b>save</b> filename &optional main-function → generalized-boolean
+<a class="clhs">нестандартная</a>
+<p>Сохраняет образ памяти BkLisp в файл с именем <i>filename</i>.
+<p>Этот образ можно закрузить из монитора БК командой <b>M</b> <i>filename</i> и продолжить работу. Функции и глобальные переменные будут иметь те же значения,  что при
+сохранении.
+<p>Если задан аргумент <i>main-function</i> типа символ, то при загрузке автоматически выполняется функция с этим именем.
+<h5>Примеры</h5>
+<pre>
+(defun hello ()
+  (princ "Здравствуй, Мир!")
+  (tagbody
+    1
+    (if (inkey) (quit))      ; ожидание нажатия любой клавиши
+    (go 1)))               →  HELLO
+
+(save "hello")             →  T
+(quit)
+
+? M
+ИМЯ? hello                 →  Здравствуй, Мир!
+</pre>
+
+
+<hr/><h3>Интерактивный цикл Чтение-Вычисление-Печать <abbr title="Read-Eval-Print-Loop">REPL</abbr></h3>
+
+<h4 id="+++">Переменные +, ++, +++</h4>
+<a class="clhs" href="http://clhs.lisp.se/Body/v_pl_plp.htm">CLHS</a>
+<p><b>+</b> хранит форму, которую REPL вычислял последней.
+<p><b>++</b> хранит форму, которую REPL вычислял предпоследней (предыдущее значение <b>+</b>)
+<p><b>+++</b> хранит предыдущее значение <b>++</b>.
+<h5>Примеры</h5>
+<pre>
+(+ 0 1)          →  1
+(- 4 2)          →  2
+(/ 9 3)          →  3
+(list + ++ +++)  →  ((/ 9 3) (- 4 2) (+ 0 1))
+</pre>
+
+<hr/><h4 id="***">Переменные *, **, ***</h4>
+<a class="clhs" href="http://clhs.lisp.se/Body/v__stst_.htm">CLHS</a>
+<p><b>*</b> хранит значение последнего результата, напечатанного REPL.
+<p><b>**</b> хранит предыдущее значение <b>*</b>, т.е. предпоследнего результата REPL.
+<p><b>***</b> хранит предыдущее значение <b>**</b>.
+<h5>Примеры</h5>
+<pre>
+(+ 4 5)  →  9
+(+ 1 2)  →  3
+*        →  3
+***      →  9
+</pre>
+
+<hr/><h4 id="peek">Функция PEEK</h4>
+<a class="clhs">нестандартная</a>
+<b>peek</b> address → int16
+<p>Читает 16-битное целое по адресу <i>address</i>.
+
+<hr/><h4 id="poke">Функция POKE</h4>
+<a class="clhs">нестандартная</a>
+<b>poke</b> address int16 → int16
+<p>Записывает 16-битное целое <i>int16</i> по адресу <i>address</i> и возвращает его.
+
+<h3 id="functions-chapter">Работа с функциями</h3>
+
+<hr/><h4 id="defun">Оператор DEFUN</h4>
+<p><b>defun</b> function-name lambda-list form* → function-name
+<a class="clhs" href="http://clhs.lisp.se/Body/m_defun.htm">CLHS</a>
+<p>Определяет функцию с именем <i>function-namel</i>, аргументами <i>lambda-list</i> и телом <i>form*</i>.
+<p><a href="#lambda-list">Список аргументов</a> имеет ту же структуру, что в операторе <a href="#lambda">lambda</a>.
+<p>Defun может использоваться и для переопределения уже существующийх функций.
+<p>Функция может рекурсивно вызывать себя.
+<p>Тело функции заключается в неявный <a href="#block">block</a> с именем символа из <i>function-name</i> в качестве метки (если имя <i>(setf foo)</i> то метка блока <i>foo</i>).
+<h5>Примеры</h5>
+<pre>
+(defun factorial (x)
+  (if (zerop x)
+    1
+    (* x (factorial (1- x)))))  →  FACTORIAL
+
+(factorial 13)                  →  6227020800
+</pre>
+
+<hr/><h4 id="lambda">Оператор LAMBDA</h4>
+<p><b>lambda</b> lambda-list form* → function-name
+<a class="clhs" href="http://clhs.lisp.se/Body/m_lambda.htm">CLHS</a>
+<p>Определяет анонимную функцию (или <a href="https://ru.wikipedia.org/wiki/Замыкание_(программирование)">замыкание</a>) с аргументами <i>lambda-list</i> и телом <i>form*</i>.
+<h5 id="lambda-list">Список аргументов lambda-list</h5>
+<p>Представляет собой список аргументов вида <code>(var* [&optional {var | (var init-form)}*] [&rest var])</code>.
+<p>Переменные после <b id="&optional">&optional</b> необязательные. Если при вызове отсутствует аргумент, переменная привязывается к значению вычисляемой <i>init-form</i>.
+<p>Переменная после <b id="&rest">&rest</b> привязывается к списку аргументов, оставшихся после обработки обязательных и необязательных.
+<h5>Примеры</h5>
+<pre>
+(defun adder (n)
+  (lambda (x) (+ x n)))  →  ADDER
+(setq add (adder 5))     →  #&lt;FUNCTION>   ; (adder 5) вернул функцию одного аргумента, прибавляющую к нему 5
+(funcall add 7)          →  12
+
+(defun bar (a &optional b (c (+ 2 2)) &rest d)
+  (list a b c d))                               →  BAR
+(bar 1)                                         →  (1 NIL 4 NIL)
+(bar 1 2 3 4 5 6)                               →  (1 2 3 (4 5 6))
+</pre>
+
+<hr/><h4 id="apply">Функция APPLY</h4>
+<p><b>apply</b> function &rest args+ → result
+<a class="clhs" href="http://clhs.lisp.se/Body/f_apply.htm#apply">CLHS</a>
+<p>Применяет <i>function</i> к <i>args</i>.
+<p>Последний аргумент из <i>args</i> сам должен быть списком (отличие от функции <a href="#funcall">funcall</a>, это позволяет вызывать функции с переменным числом аргументов.
+
+<hr/><h4 id="fdefinition">Функция FDEFINITION</h4>
+<p><b>fdefinition</b> function-name → definition
+<a class="clhs" href="http://clhs.lisp.se/Body/f_fdefin.htm">CLHS</a>
+<p>Возвращает определение функции или оператора по имени <i>function-name</i>.
+<p>Выбрасывает <a href="#error-18">ОШИБКА 18</a> если функция не определена.
+<h5>Примеры</h5>
+<pre>
+(fdefinition 'tan)         →  #<SYSTEM-FUNCTION TAN>
+(fdefinition '(setf car))  →  #<SYSTEM-FUNCTION>
+(fdefinition 'if)          →  #<SPECIAL-OPERATOR IF>
+</pre>
+
+<hr/><h4 id="funcall">Функция FUNCALL</h4>
+<p><b>funcall</b> function &rest args → result
+<a class="clhs" href="http://clhs.lisp.se/Body/f_funcal.htm#funcall">CLHS</a>
+<p>Применяет <i>function</i> к <i>args</i>.
+<p>В отличие от функции <a href="#apply">apply</a>, на вход <i>function</i> поступает столько же аргументов сколько элементов в <i>args</i>.
+
+<hr/><h4 id="function">Оператор FUNCTION</h4>
+<p><b>function</b> function name → function
+<a class="clhs" href="http://clhs.lisp.se/Body/s_fn.htm">CLHS</a>
+<p>Возвращает объект-фцнкцию привязанную к имени <i>name</i>.
+<p>Можно использовать сокращённый синтаксис: <code><b>#'</b>name</code>.
+<h5>Примеры</h5>
+<pre>
+(function 'exp)  →  #&lt;SYSTEM-FUNCTION EXP>
+#'sin            →  #&lt;SYSTEM-FUNCTION SIN>
+</pre>
+
+<hr/><h4 id="functionp">Функция FUNCTIONP</h4>
+<p><b>functionp</b> object → generalized-boolead
+<a class="clhs" href="http://clhs.lisp.se/Body/f_fnp.htm">CLHS</a>
+<p>Возвращает истину если <i>object</i> имеет тип функции: <a href="#function-type">FUNCTION</a> или <a href="#system-function-type">SYSTEM-FUNCTION</a>.
+<h5>Примеры</h5>
+<pre>
+(functionp #'sin)          →  T
+(functionp 'sin)           →  NIL
+(functionp (lambda (a) a)) →  T
+</pre>
+
+<hr/><h4 id="identity">Функция IDENTITY</h4>
+<p><b>identity</b> object → object
+<a class="clhs" href="http://clhs.lisp.se/Body/f_identi.htm">CLHS</a>
+<p>Возвращает аргумент <i>object</i>.
+<p>Предназначена для использования с функциями высшего порядка(принимающими аргумент-функцию).
+
+<hr/><h4 id="eval">Функция EVAL</h4>
+<p><b>eval</b> form → result
+<a class="clhs" href="http://clhs.lisp.se/Body/f_eval.htm">CLHS</a>
+<p>Вычисляет <i>form</i> в пустом лексическом окружении.
+
+<hr/><h4 id="quote">Оператор QUOTE</h4>
+<p><b>quote</b> quote object → object
+<a class="clhs" href="http://clhs.lisp.se/Body/s_quote.htm">CLHS</a>
+<p>Возвращает <i>object</i>.
+<p>Позволяет передавать константные само-вычисляемые объекты (списки и символы) как аргументы функции, предотвращая их вычисление.
+<p>Можно использовать сокращённый синтаксис: <code><b>'</b>object</code>.
+<h5>Примеры</h5>
+<pre>
+(quote (+ 1 2))  →  (+ 1 2)
+'a               →  A
+(list '(+ 1 2))  →  ((+ 1 2))
+</pre>
+
+<hr/><h4 id="mapc">Функция MAPC</h4>
+<p><b>mapc</b> function &rest lists+ → list-1
+<a class="clhs" href="http://clhs.lisp.se/Body/f_mapc_.htm">CLHS</a>
+<p>Похожа на <a href="#mapcar">mapcar</a>, но не накапливает результаты, а возвращает первый список из <i>lists</i>.
+<h5>Примеры</h5>
+<pre>
+(let (dummy)
+  (list
+    (mapc #'(lambda (&rest x) (setq dummy (append dummy x)))
+      '(1 2 3 4)
+      '(a b c d e)
+      '(x y z))
+    dummy))                                                   →  ((1 2 3 4) (1 A X 2 B Y 3 C Z))
+</pre>
+
+<hr/><h4 id="mapcar">Функция MAPCAR</h4>
+<p><b>mapcar</b> function &rest lists+ → result-list
+<a class="clhs" href="http://clhs.lisp.se/Body/f_mapc_.htm">CLHS</a>
+<p>Применяет функцию <i>function</i> сначала к первым елементам каждоко из списков <i>lists</i>, затем ко вторым и т.д.
+<p>Итерация прекращается при достижении конца самого короткого из <i>lists</i>.
+<p>Возвращает список результатов применения <i>function</i>.
+<h5>Примеры</h5>
+<pre>
+(mapcar #'cons '(a b c) '(1 2 3 4))  →  ((A . 1) (B . 2) (C . 3))
+</pre>
+
+<hr/><h4 id="reduce">Функция REDUCE</h4>
+<p><b>reduce</b> function list → result
+<a class="clhs" href="http://clhs.lisp.se/Body/f_reduce.htm">CLHS</a>
+<p>Применяет бинарную функцию <i>function</i> слева направо к элементам <i>list</i>.
+<p>Если <i>list</i> пустой, возвращает результат вызова <i>function</i> без аргументов.
+<p>В отличие от CL, где reduce можно применять к любой последовательности, BkLisp поддерживает только списки.
+<h5>Примеры</h5>
+<pre>
+(reduce #'* '(1 2 3 4 5))   →  120
+(reduce #'list '(1 2 3 4))  →  (((1 2) 3) 4)
+</pre>
+
+<hr/><h4 id="special-operator-p">Функция SPECIAL-OPERATOR-P</h4>
+<p><b>special-operator-p</b> symbol → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_specia.htm">CLHS</a>
+<p>Возвращает истину если <i>symbol</i> - <a href="#special-operator">специальный оператор</a>.
+<h5>Примеры</h5>
+<p><code>(special-operator-p 'if)</code> → <code>T</code>
+<p><code>(special-operator-p 'car)</code> → <code>NIL</code>
+
+
+
+<hr/><h3 id="control-flow">Управление выполнением</h3>
+
+<h4 id="block">Оператор BLOCK</h4>
+<b>block</b> name form* → result
+<a class="clhs" href="http://clhs.lisp.se/Body/s_block.htm">CLHS</a>
+<p>Выполняет <i>form*</i> внутри блока с лексически-видимой меткой <i>name</i> (символ).
+<p>Позволяет выйти из блока с помощью операторов <a href="#return">return</a> или <a href="#return-from">return-from</a>.
+<h5>Примеры</h5>
+<pre>
+(block early (return-from early 1) 2)  →  1
+</pre>
+
+<hr/><h4 id="return">Оператор RETURN</h4>
+<b>return</b> &optional (result nil) → result
+<a class="clhs" href="http://clhs.lisp.se/Body/m_return.htm">CLHS</a>
+<p>Возвращает вычисленный <i>result</i> из лексически-видимого блока с меткой NIL.
+<h5>Эквивалент</h5>
+<code>(return form) ≡ (<a href="#return-from">return-from</a> nil form)</code>
+<h5>Примеры</h5>
+<pre>
+(block nil (block alpha (return 1) 2))  →  1
+</pre>
+
+<hr/><h4 id="return-from">Оператор RETURN-FROM</h4>
+<b>return-from</b> name &optional (result nil) → result
+<a class="clhs" href="http://clhs.lisp.se/Body/s_ret_fr.htm">CLHS</a>
+<p>Возвращает вычисленный <i>result</i> из лексически-видимого блока с меткой <i>name</i> (не вычисляется).
+<h5>Примеры</h5>
+<pre>
+(block alpha (return-from alpha) 1)  →  NIL
+</pre>
+
+<hr/><h4 id="error">Функция ERROR</h4>
+<b>error</b> datum →
+<a class="clhs" href="http://clhs.lisp.se/Body/f_error.htm">CLHS</a>
+<p>Печатает ОШИБКА <i>datum</i> и прерывает выполнение программы с выходом в REPL.
+<h5>Примеры</h5>
+<pre>
+(if nil "OK" (error "Условие нарушено"))  → ОШИБКА "Условие нарушено"
+</pre>
+
+<hr/><h4 id="go">Оператор GO</h4>
+<b>go</b> tag →
+<a class="clhs" href="http://clhs.lisp.se/Body/s_go.htm">CLHS</a>
+<p>Передаёт управление в точку <i>tag</i> оператора <a href="#tagbody">tagbody</a>.
+
+<hr/><h4 id="tagbody">Оператор TAGBODY</h4>
+<b>tagbody</b> {tag | statement}* → nil
+<a class="clhs" href="http://clhs.lisp.se/Body/s_tagbod.htm#tagbody">CLHS</a>
+<p>Выполняет формы <i>statement</i> в лексическом окружении, которое позволяет передать управлние на метку <i>tag</i> оператором <a href="#go">go</a>.
+
+<hr/><h4 id="cond">Оператор COND</h4>
+<p><b>cond</b> {clause}* → result<br/>
+clause ::= (test-form form*)
+<a class="clhs" href="http://clhs.lisp.se/Body/m_cond.htm">CLHS</a>
+<p>Выбирает какие группы <i>forms</i> выполнить в зависимости от условий <i>test-form</i>.
+<p>Формы <i>test-form</i> выполняются по-порядку до первой вернувшей истину. После этого выполняются <i>forms</i>, соответствующие этой <i>test-form</i> и результат последней возвращается. Если их нет - возвращает
+результат самой <i>test-form</i>.
+<p>Вычисления прекращаются после первой истины. При её отсутствии возвращает NIL.
+<h5>Примеры</h5>
+<pre>
+(cond ((< 1 2) 'a) ((> 3 4) 'b) (t 'c)))  → A
+(cond ((< 2 1) 'a) (nil 'b) (t 'c)))      → C
+</pre>
+
+<hr/><h4 id="if">Оператор IF</h4>
+<p><b>if</b> test-form then-form [else-form] → result
+<a class="clhs" href="http://clhs.lisp.se/Body/s_if.htm">CLHS</a>
+<p><i>Else-form</i> - форма. По-умолчанию <b>nil</b>
+<p>Сначала вычисляется <i>test-form</i>. Если результат - истина, то выбирается <i>then-form</i>, иначе <i>else-form</i>. Выбранная форма вычисляется.
+<p>При отсутствии <i>else-form</i> она считается NIL.
+<h5>Эквивалент</h5>
+<code>(if test-form then-form else-form) ≡ (<a href="#cond">cond</a> (test-form then-form) (t else-form))</code>
+<h5>Примеры</h5>
+<pre>
+(if t 1)     → 1
+(if nil 1 2) → C
+</pre>
+
+<hr/><h4 id="when">Оператор WHEN</h4>
+<p><b>when</b> test-form form*  → result
+<a class="clhs" href="http://clhs.lisp.se/Body/m_when_.htm">CLHS</a>
+<p>Если <i>test-form</i> вычисляется в истину формы <i>forms</i> вычисляются по порядку слева-направо и значение последней формы возвращается.
+<p>Иначе <i>forms</i> не вычисляются и возвращается NIL.
+<h5>Эквивалент</h5>
+<code>(when test {form}+) ≡ (<a href="#if">if</a> test (progn {form}+))</code>
+<h5>Примеры</h5>
+<pre>
+(when t (prin1 1) (prin1 2) (prin1 3))    → 123  ; побочный эффект
+                                            3    ; результат
+
+(when nil (prin1 1) (prin1 2) (prin1 3))  → NIL
+</pre>
+
+<hr/><h4 id="unless">Оператор UNLESS</h4>
+<p><b>unless</b> test-form form*  → result
+<a class="clhs" href="http://clhs.lisp.se/Body/m_when_.htm">CLHS</a>
+<p>Противоположность оператору <a href="#when">when</a>.
+<p>Если <i>test-form</i> вычисляется в ложь формы <i>forms</i> вычисляются по порядку слева-направо и значение последней формы возвращается.
+<p>Иначе <i>forms</i> не вычисляются и возвращается NIL.
+<h5>Эквивалент</h5>
+<code>(unless test {form}+) ≡ (when (not test) {form}+)</code>
+<h5>Примеры</h5>
+<pre>
+(unless nil (prin1 1) (prin1 2) (prin1 3))  →  123   ; побочный эффект
+                                               3       ; результат
+
+(unless t (prin1 1) (prin1 2) (prin1 3))    →  NIL
+</pre>
+
+<hr/><h4>Операторы DO, DO*</h4>
+<p><b id="do">do</b> ({var | (var [init-form [step-form]])}*) (end-test-form result-form*) statement* → result<br/>
+<b id="do*">do*</b> ({var | (var [init-form [step-form]])}*) (end-test-form result-form*) statement* → result<br/>
+<a class="clhs" href="http://clhs.lisp.se/Body/m_do_do.htm">CLHS</a></p>
+<p>Выполняет итерации <i>statements</i> пока не выполнится условие окончaния цикла <i>end-test-form</i>, после чего выполняются <i>result-form*</i> и результат последней возвращается.
+<p>Перед итерациями связываются переменные <i>var</i>. Они инициализируются значениями <i>init-form</i> или nil. После каждой итерации обновляются значениями форм <i>step-form</i>, если они есть.
+<p>DO инициализирует и обновляет переменные паралельно, аналогично <a href="#let">let</a> и <a href="#psetq">psetq</a>.
+<p>DO* инициализирует и обновляет переменные последовательно, аналогично <a href="#let*">let*</a> и <a href="#setq">setq</a>.
+<p>DO, DO* выполняются в неявном блоке с меткой NIL. Можно вернуть результат из любоко места оператором <a href="#return">return</a>.
+<h5>Примеры</h5>
+<pre>
+(do ((temp-one 1 (1+ temp-one))
+     (temp-two 0 (1+ temp-one)))
+  ((= 3 temp-two) temp-one))      →  3
+
+(do* ((temp-one 1 (1+ temp-one))
+      (temp-two 0 (1+ temp-one)))
+  ((= 3 temp-two) temp-one))      →  2
+</pre>
+
+<hr/><h4 id="dolist">Оператор DOLIST</h4>
+<p><b>dolist</b> (var list-form [result-form]) {statements} → result
+<a class="clhs" href="http://clhs.lisp.se/Body/m_dolist.htm">CLHS</a></p>
+<p>Выполняет итерации <i>statements</i> для каждого элемента списка <i>list-form</i>. Переменная <i>var</i> при этом привязана к очередному элементу списка.
+<p>Возвращает результат выполнения <i>result-form</i> (по-умолчанию nil).
+<p>DOLIST выполняется в неявном блоке с меткой NIL. Можно вернуть результат из любоко места оператором <a href="#return">return</a>.
+<h5>Примеры</h5>
+<pre>
+(let (r)
+  (dolist (a '(1 2 3) r)
+    (push a r)))          →  (3 2 1)
+</pre>
+
+<hr/><h4 id="dotimes">Оператор DOTIMES</h4>
+<p><b>dotimes</b> (var count-form [result-form]) {statements} → result
+<a class="clhs" href="http://clhs.lisp.se/Body/m_dotime.htm">CLHS</a></p>
+<p>Выполняет итерации <i>statements</i> <i>count-form</i> раз. Переменная <i>var</i> при этом привязана к номеру элемента начиная с 0.
+<p>Возвращает результат выполнения <i>result-form</i> (по-умолчанию nil).
+<p>DOTIMES выполняется в неявном блоке с меткой NIL. Можно вернуть результат из любоко места оператором <a href="#return">return</a>.
+<h5>Примеры</h5>
+<pre>
+(dotimes (n 3 n)
+  (print n))      →  0
+                  →  1
+                  →  2
+                  →  3  ; результат
+</pre>
+
+<hr/><h4 id="let">Оператор LET</h4>
+<p><b>let</b> ({var | (var [init-form])}*) form* → result
+<a class="clhs" href="http://clhs.lisp.se/Body/s_let_l.htm">CLHS</a></p>
+<p>Привязывет символы <i>var</i> к значениям вычисленных <i>init-form</i>. В полученном окружении (лексическом или динамическом в зависимости от символов <i>var</i>) выполняет
+<i>forms</i> и возвращает результат последней.
+<p>Присваивания выполняются параллельно.
+<h5>Примеры</h5>
+<pre>
+(setq a '1)
+(let ((a 2)
+      (b a))
+  (list a b))  →  (2 1)
+</pre>
+
+<hr/><h4 id="let*">Оператор LET*</h4>
+<p><b>let*</b> ({var | (var [init-form])}*) form* → result
+<a class="clhs" href="http://clhs.lisp.se/Body/s_let_l.htm">CLHS</a></p>
+<p>Похоже на <a href="#let">let</a>, но присваивания выполняются последовательно. Каждая очередная <i>init-form</i> видит значения предыдущих привязок из этого же оператора let.
+<h5>Примеры</h5>
+<pre>
+(setq a '1)
+(let ((a 2)
+      (b a))
+  (list a b))  →  (2 2)
+</pre>
+
+
+<hr/><h4 id="prog1">Оператор PROG1</h4>
+<p><b>prog1</b> first-form form* → result-1
+<a class="clhs" href="http://clhs.lisp.se/Body/m_prog1c.htm">CLHS</a>
+<p>Вычисляет <i>first-form</i>, запоминает результат, и возвращает его после выполнения остальных форм <i>form*</i>.
+<h5>Примеры</h5>
+<pre>
+(prog1 'A 'B (prin1 1) 'D)      →  1   ; побочный эффект
+                                →  A   ; результат
+</pre>
+
+<hr/><h4 id="prog2">Оператор PROG2</h4>
+<p><b>prog2</b> first-form second-form form* → result-2
+<a class="clhs" href="http://clhs.lisp.se/Body/m_prog1c.htm">CLHS</a>
+<p>Вычисляет <i>first-form</i>, затем <i>second-form</i> запоминает результат <i>second-form</i>, и возвращает его после выполнения остальных форм <i>form*</i>.
+<h5>Примеры</h5>
+<pre>
+(prog2 'A 'B (prin1 1) 'D)      →  1   ; побочный эффект
+                                →  B   ; результат
+</pre>
+
+<hr/><h4 id="progn">Оператор PROGN</h4>
+<p><b>progn</b> form* → result
+<a class="clhs" href="http://clhs.lisp.se/Body/s_progn.htm">CLHS</a>
+<p>progn выполняет <i>forms</i> по очереди и возвращает результат последней.
+<p>Многие конструкции в Lisp заканчиваются неявным progn: <a href="#let">let</a>, <a href="#degun">defun</a>.
+<h5>Примеры</h5>
+<pre>
+(progn 1 2 3)  →  3
+</pre>
+
+<hr/><h4 id="progv">Оператор PROGV</h4>
+<p><b>progv</b> symbols values form* → result
+<a class="clhs" href="http://clhs.lisp.se/Body/s_progv.htm">CLHS</a>
+<p>Вычисляет списки <i>symbols</i> и <i>values</i>. Динамически привязывает символы из <i>symbols</i> к значениям из <i>values</i>. Выполняет <i>forms</i> в этом динамическом
+окружении и возвращает результат последней из <i>forms</i>.
+<p>Не влияет на лексически-привязанные переменные.
+<h5>Примеры</h5>
+<pre>
+(let ((*x* 3))
+  (progv '(*x*) '(4)
+    (list *x* (symbol-value '*x*))))  →  (3 4)
+</pre>
+
+<hr/><h3>Коды ошибок</h3>
+Коды ошибок совпадают по смыслу с кодами БЕЙСИК, когда возможно.
+<p id="error-1"><b>ОШИБКА 1</b> - Переполнение стека.
+<p id="error-2"><b>ОШИБКА 2</b> - Синтаксическая ошибка.
+<p id="error-5"><b>ОШИБКА 5</b> - Неверный аргумент функции,  например <i>(<a href="#sqrt">SQRT</a> -1)</i>.
+<p id="error-6"><b>ОШИБКА 6</b> - Арифметическое переполнение.
+<p id="error-7"><b>ОШИБКА 7</b> - Нехватка памяти.
+<p id="error-9"><b>ОШИБКА 9</b> - Индекс за пределами размера вектора или строки.
+<p id="error-11"><b>ОШИБКА 11</b> - Деление на 0.
+<p id="error-13"><b>ОШИБКА 13</b> - Ошибка типов, неожиданный тип аргумента функции.
+<p id="error-14"><b>ОШИБКА 14</b> - Неопределённая ошибка.
+<p id="error-15"><b>ОШИБКА 15</b> - Попытка создать строку длиннее 255 characters.
+<p id="error-16"><b>ОШИБКА 16</b> - Недопустимая размерность массива
+<p id="error-18"><b>ОШИБКА 18</b> - Неопределённая функция.
+<p id="error-19"><b>ОШИБКА 19</b> - Ошибка Ввода/Вывода (файловой операции).
+<p id="error-25"><b>ОШИБКА 25</b> - Переполнение буфера ввода. Попытка ввести строку длиннее 255 characters.
+
+
+<h2>Литература</h2>
+<table class="bibliography">
+	<tr><td>Conrad Barski</td>	<td>2010</td>	<td><a href="http://landoflisp.com/">Land of LISP: Learn to Program in LISP, One Game at a Time</a></td> <td>Интересная книжка с весёлыми картинками</td></tr>
+	<tr><td>Kent Pitman</td> <td>1996</td>	<td><a href="http://clhs.lisp.se/">Common Lisp HyperSpec (CLHS)</a></td> <td>Справочник по стандарту</td></tr>
+	<tr><td>Paul Graham</td> <td>1995</td>	<td><a href="http://www.paulgraham.com/acl.html">ANSI Common Lisp</a></td>	<td>Подходит в качестве учебника, но выходит за пределы возможностей BkLisp</td></tr>
+	<tr><td>Paul Graham</td> <td>1993</td>	<td><a href="http://www.paulgraham.com/onlisp.html">On Lisp</a></td>  <td>Для углубленного изучения языка</td></tr>
+	<tr><td>Guy L. Steel Jr.</td>	<td>1990</td>	<td><a href="http://www.cs.cmu.edu/afs/cs.cmu.edu/project/ai-repository/ai/html/cltl/clm/node1.html#SECTION00100000000000000000">Common Lisp the Language, 2nd Edition</a></td> <td>Этот текст лёг в основу стандарта</td></tr>
+	<tr><td>Hasemer</td>	<td>1984</td>	<td><a href="https://www.amazon.com/Looking-Lisp-Micro-computer-books/dp/0201120801">Looking at Lisp</a></td> <td>Описаны реализации LISP для микрокомпьютеров 1980-х годов, подходит для изучения BkLisp</td></tr>
+</table>
+
+</article>
+
+<h2 id="symbol-index">Индекс символов</h2>
+
+<div class="index">
+
+<a href="#&optional">&OPTIONAL</a>
+<a href="#&rest">&REST</a>
+<a href="#multiply">* функция</a>
+<a href="#***">* переменная</a>
+<a href="#***">**</a>
+<a href="#***">***</a>
+<a href="#*gensym-counter*">*GENSYM-COUNTER*</a>
+<a href="#*print-base*">*PRINT-BASE*</a>
+<a href="#*print-escape*">*PRINT-ESCAPE*</a>
+<a href="#*print-radix*">*PRINT-RADIX*</a>
+<a href="#*random-state*">*RANDOM-STATE*</a>
+<a href="#*standard-input*">*STANDARD-INPUT*</a>
+<a href="#*standard-output*">*STANDARD-OUTPUT*</a>
+<a href="#divide">/</a>
+<a href="#num-ne">/=</a>
+<a href="#add">+ функция</a>
+<a href="#+++">+ переменная</a>
+<a href="#+++">++</a>
+<a href="#+++">+++</a>
+<a href="#subtract">-</a>
+<a href="#num-eq">=</a>
+<a href="#num-lt">&lt;</a>
+<a href="#num-le">&lt;=</a>
+<a href="#num-gt">&gt;</a>
+<a href="#num-ge">&gt;=</a>
+<a href="#1+">1+</a>
+<a href="#1-">1-</a>
+<a href="#abs">ABS</a>
+<a href="#acons">ACONS</a>
+<a href="#acos">ACOS</a>
+<a href="#adjoin">ADJOIN</a>
+<a href="#alpha-char-p">ALPHA-CHAR-P</a>
+<a href="#alphanumericp">ALPHANUMERICP</a>
+<a href="#and">AND</a>
+<a href="#append">APPEND</a>
+<a href="#apply">APPLY</a>
+<a href="#aref">AREF</a>
+<a href="#array-type">ARRAY</a>
+<a href="#array-dimension">ARRAY-DIMENSION</a>
+<a href="#array-dimensions">ARRAY-DIMENSIONS</a>
+<a href="#array-rank">ARRAY-RANK</a>
+<a href="#array-row-major-index">ARRAY-ROW-MAJOR-INDEX</a>
+<a href="#array-total-size">ARRAY-TOTAL-SIZE</a>
+<a href="#arrayp">ARRAYP</a>
+<a href="#asin">ASIN</a>
+<a href="#assoc">ASSOC</a>
+<a href="#atan">ATAN</a>
+<a href="#atom">ATOM</a>
+<a href="#block">BLOCK</a>
+<a href="#boundp">BOUNDP</a>
+<a href="#system-function-type">SYSTEM-FUNCTION</a>
+<a href="#butlast">BUTLAST</a>
+<a href="#caar">CAAR</a>
+<a href="#cadr">CADR</a>
+<a href="#car">CAR</a>
+<a href="#cdar">CDAR</a>
+<a href="#cddr">CDDR</a>
+<a href="#cdr">CDR</a>
+<a href="#char">CHAR</a>
+<a href="#char-code">CHAR-CODE</a>
+<a href="#char-downcase">CHAR-DOWNCASE</a>
+<a href="#char-equal">CHAR-EQUAL</a>
+<a href="#char-int">CHAR-INT</a>
+<a href="#char-name">CHAR-NAME</a>
+<a href="#char-upcase">CHAR-UPCASE</a>
+<a href="#char-eq">CHAR=</a>
+<a href="#char-ne">CHAR/=</a>
+<a href="#character">CHARACTER</a>
+<a href="#characterp">CHARACTERP</a>
+<a href="#code-char">CODE-CHAR</a>
+<a href="#cond">COND</a>
+<a href="#cons">CONS</a>
+<a href="#consp">CONSP</a>
+<a href="#copy-alist">COPY-ALIST</a>
+<a href="#copy-list">COPY-LIST</a>
+<a href="#copy-seq">COPY-SEQ</a>
+<a href="#copy-tree">COPY-TREE</a>
+<a href="#cos">COS</a>
+<a href="#cosh">COSH</a>
+<a href="#decf">DECF</a>
+<a href="#defparameter">DEFPARAMETER</a>
+<a href="#defun">DEFUN</a>
+<a href="#defvar">DEFVAR</a>
+<a href="#digit-char">DIGIT-CHAR</a>
+<a href="#digit-char-p">DIGIT-CHAR-P</a>
+<a href="#do">DO</a>
+<a href="#do*">DO*</a>
+<a href="#dolist">DOLIST</a>
+<a href="#dotimes">DOTIMES</a>
+<a href="#elt">ELT</a>
+<a href="#endp">ENDP</a>
+<a href="#eq">EQ</a>
+<a href="#eql">EQL</a>
+<a href="#equal">EQUAL</a>
+<a href="#equalp">EQUALP</a>
+<a href="#error">ERROR</a>
+<a href="#exp">EXP</a>
+<a href="#expt">EXPT</a>
+<a href="#extroom">EXTROOM</a>
+<a href="#eval">EVAL</a>
+<a href="#evenp">EVENP</a>
+<a href="#fboundp">FBOUNDP</a>
+<a href="#fdefinition">FDEFINITION</a>
+<a href="#fill">FILL</a>
+<a href="#find-symbol">FIND-SYMBOL</a>
+<a href="#first">FIRST</a>
+<a href="#float">FLOAT</a>
+<a href="#floatp">FLOATP</a>
+<a href="#floor">FLOOR</a>
+<a href="#fmakunbound">FMAKUNBOUND</a>
+<a href="#format">FORMAT</a>
+<a href="#fresh-line">FRESH-LINE</a>
+<a href="#funcall">FUNCALL</a>
+<a href="#function">FUNCTION</a>
+<a href="#functionp">FUNCTIONP</a>
+<a href="#gensym">GENSYM</a>
+<a href="#get">GET</a>
+<a href="#get-internal-real-time">GET-INTERNAL-REAL-TIME</a>
+<a href="#get-output-stream-string">GET-OUTPUT-STREAM-STRING</a>
+<a href="#getf">GETF</a>
+<a href="#go">GO</a>
+<a href="#graphic-char-p">GRAPHIC-CHAR-P</a>
+<a href="#identity">IDENTITY</a>
+<a href="#if">IF</a>
+<a href="#incf">INCF</a>
+<a href="#inkey">INKEY</a>
+<a href="#input-stream-p">INPUT-STREAM-P</a>
+<a href="#integer-type">INTEGER</a>
+<a href="#integerp">INTEGERP</a>
+<a href="#intern">INTERN</a>
+<a href="#internal-time-units-per-second">INTERNAL-TIME-UNITS-PER-SECOND</a>
+<a href="#intersection">INTERSECTION</a>
+<a href="#isqrt">ISQRT</a>
+<a href="#lambda">LAMBDA</a>
+<a href="#last">LAST</a>
+<a href="#ldiff">LDIFF</a>
+<a href="#length">LENGTH</a>
+<a href="#let">LET</a>
+<a href="#let*">LET*</a>
+<a href="#lisp-implementation-type">LISP-IMPLEMENTATION-TYPE</a>
+<a href="#lisp-implementation-version">LISP-IMPLEMENTATION-VERSION</a>
+<a href="#list">LIST</a>
+<a href="#list*">LIST*</a>
+<a href="#list-length">LIST-LENGTH</a>
+<a href="#listify">LISTIFY</a>
+<a href="#listp">LISTP</a>
+<a href="#load">LOAD</a>
+<a href="#log">LOG</a>
+<a href="#logand">LOGAND</a>
+<a href="#logandc1">LOGANDC1</a>
+<a href="#logandc2">LOGANDC2</a>
+<a href="#logeqv">LOGEQV</a>
+<a href="#logior">LOGIOR</a>
+<a href="#lognand">LOGNAND</a>
+<a href="#lognor">LOGNOR</a>
+<a href="#lognot">LOGNOT</a>
+<a href="#logorc1">LOGORC1</a>
+<a href="#logorc2">LOGORC2</a>
+<a href="#logxor">LOGXOR</a>
+<a href="#machine-type">MACHINE-TYPE</a>
+<a href="#machine-version">MACHINE-VERSION</a>
+<a href="#make-array">MAKE-ARRAY</a>
+<a href="#make-list">MAKE-LIST</a>
+<a href="#make-random-state">MAKE-RANDOM-STATE</a>
+<a href="#make-sequence">MAKE-SEQUENCE</a>
+<a href="#make-string">MAKE-STRING</a>
+<a href="#make-string-input-stream">MAKE-STRING-INPUT-STREAM</a>
+<a href="#make-string-output-stream">MAKE-STRING-OUTPUT-STREAM</a>
+<a href="#make-symbol">MAKE-SYMBOL</a>
+<a href="#makunbound ">MAKUNBOUND</a>
+<a href="#mapc">MAPC</a>
+<a href="#mapcar">MAPCAR</a>
+<a href="#max">MAX</a>
+<a href="#member">MEMBER</a>
+<a href="#min">MIN</a>
+<a href="#minusp">MINUSP</a>
+<a href="#name-char">NAME-CHAR</a>
+<a href="#nconc">NCONC</a>
+<a href="#nil">NIL</a>
+<a href="#not">NOT</a>
+<a href="#nreverse">NREVERSE</a>
+<a href="#nstring-downcase">NSTRING-DOWNCASE</a>
+<a href="#nstring-upcase">NSTRING-UPCASE</a>
+<a href="#nth">NTH</a>
+<a href="#nthcdr">NTHCDR</a>
+<a href="#null">NULL</a>
+<a href="#numberp">NUMBERP</a>
+<a href="#oddp">ODDP</a>
+<a href="#or">OR</a>
+<a href="#pairlis">PAIRLIS</a>
+<a href="#peek">PEEK</a>
+<a href="#peek-char">PEEK-CHAR</a>
+<a href="#pi">PI</a>
+<a href="#plusp">PLUSP</a>
+<a href="#poke">POKE</a>
+<a href="#pop">POP</a>
+<a href="#prin1">PRIN1</a>
+<a href="#princ">PRINC</a>
+<a href="#print">PRINT</a>
+<a href="#prog1">PROG1</a>
+<a href="#prog2">PROG2</a>
+<a href="#progn">PROGN</a>
+<a href="#progv">PROGV</a>
+<a href="#psetq">PSETQ</a>
+<a href="#push">PUSH</a>
+<a href="#quit">QUIT</a>
+<a href="#quote">QUOTE</a>
+<a href="#random">RANDOM</a>
+<a href="#rassoc">RASSOC</a>
+<a href="#read">READ</a>
+<a href="#read-char">READ-CHAR</a>
+<a href="#read-delimited-list">READ-DELIMITED-LIST</a>
+<a href="#realp">REALP</a>
+<a href="#reduce">REDUCE</a>
+<a href="#rem">REM</a>
+<a href="#remprop">REMPROP</a>
+<a href="#rest">REST</a>
+<a href="#return">RETURN</a>
+<a href="#return-from">RETURN-FROM</a>
+<a href="#reverse">REVERSE</a>
+<a href="#room">ROOM</a>
+<a href="#rotatef">ROTATEF</a>
+<a href="#row-major-aref">ROW-MAJOR-AREF</a>
+<a href="#rplaca">RPLACA</a>
+<a href="#rplacd">RPLACD</a>
+<a href="#save">SAVE</a>
+<a href="#second">SECOND</a>
+<a href="#set">SET</a>
+<a href="#set-difference">SET-DIFFERENCE</a>
+<a href="#setf">SETF</a>
+<a href="#setq">SETQ</a>
+<a href="#signum">SIGNUM</a>
+<a href="#simple-vector-p">SIMPLE-VECTOR-P</a>
+<a href="#sin">SIN</a>
+<a href="#sinh">SINH</a>
+<a href="#sleep">SLEEP</a>
+<a href="#special-operator">SPECIAL-OPERATOR</a>
+<a href="#special-operator-p">SPECIAL-OPERATOR-P</a>
+<a href="#sqrt">SQRT</a>
+<a href="#stream-type">STREAM</a>
+<a href="#streamp">STREAMP</a>
+<a href="#string">STRING</a>
+<a href="#stringp">STRINGP</a>
+<a href="#string-downcase">STRING-DOWNCASE</a>
+<a href="#string-equal">STRING-EQUAL</a>
+<a href="#string-upcase">STRING-UPCASE</a>
+<a href="#string-eq">STRING=</a>
+<a href="#string-ne">STRING/=</a>
+<a href="#subsetp">SUBSETP</a>
+<a href="#subst">SUBST</a>
+<a href="#svref">SVREF</a>
+<a href="#symbol-function">SYMBOL-FUNCTION</a>
+<a href="#symbol-name">SYMBOL-NAME</a>
+<a href="#symbol-plist">SYMBOL-PLIST</a>
+<a href="#symbol-value">SYMBOL-VALUE</a>
+<a href="#symbolp">SYMBOLP</a>
+<a href="#t">T</a>
+<a href="#tagbody">TAGBODY</a>
+<a href="#tailp">TAILP</a>
+<a href="#tan">TAN</a>
+<a href="#tanh">TANH</a>
+<a href="#terpri">TERPRI</a>
+<a href="#third">THIRD</a>
+<a href="#time">TIME</a>
+<a href="#truncate">TRUNCATE</a>
+<a href="#type-of">TYPE-OF</a>
+<a href="#unintern">UNINTERN</a>
+<a href="#union">UNION</a>
+<a href="#unless">UNLESS</a>
+<a href="#unread-char">UNREAD-CHAR</a>
+<a href="#vector">VECTOR</a>
+<a href="#vectorp">VECTORP</a>
+<a href="#when">WHEN</a>
+<a href="#write">WRITE</a>
+<a href="#write-char">WRITE-CHAR</a>
+<a href="#write-line">WRITE-LINE</a>
+<a href="#write-string">WRITE-STRING</a>
+<a href="#y-or-n-p">Y-OR-N-P</a>
+<a href="#zerop">ZEROP</a>
+
+
+
+</div>
+</body>
+</html>
