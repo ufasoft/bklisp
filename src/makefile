@@ -36,21 +36,3 @@ bklisp.sav: $(SOURCES)
 
 clean:
 	-rm *.bin *.LST *.OBJ *.SAV
-
-
-#-------FOR DEVELOPMENT ONLY-- Remove for RELEASE
-
-bklisp.bin: bklisp.OBJ symdef.OBJ
- 	pclink11 bklisp.OBJ symdef.OBJ
- 	dd if=bklisp.sav of=$@ bs=1 skip=492
- 	rm bklisp.sav
-
-bklisp.OBJ: $(SOURCES)
-	echo C$$BK10=1 >config.inc
-	echo C$$AMAL=0 >>config.inc
- 	START /WAIT RT11 MACRO /LIST:bklisp.lst bklisp.mac
-
-symdef.OBJ: bk1001.inc defcfg.inc macros.inc pdp11.inc k1801.inc symdef.mac init.mac
-	echo C$$BK10=1 >config.inc
-	echo C$$AMAL=0 >>config.inc
- 	START /WAIT RT11 MACRO /LIST:symdef.lst symdef.mac
