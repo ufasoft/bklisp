@@ -1,13 +1,13 @@
-;;; Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
+;;; Copyright (c) 2021-2022 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
 ;;;
 ;;; SPDX-License-Identifier: MIT
 
 ;;; Symbol definitions
 
-.LIST	ME		; Macro expansions
+.SBTTL
 
-.INCLUDE	/bk1001.inc/
-.INCLUDE	/macros.inc/
+.INCLUDE	/config.inc/
+.IIF EQ C$AMAL	.INCLUDE	/macros.inc/
 
 
 .MACRO	.RAD40	a, b, c
@@ -28,7 +28,7 @@
 
 		.IF	NE ''c-'*
 		.IF	NE ''c-'-
-.IF DF C$RAD40
+.IF NE C$RAD40
 		.IF	NE ''c-'+
 			.IIF	LT, ''c-'1, $good = 0
 			.IF	GT ''c-'2
@@ -58,7 +58,7 @@
 			.IIF	GE, ''c-'A, $cn = ''c - 'A + 1
 			.IIF	EQ, ''c-'*, $cn = 33
 			.IIF	EQ, ''c-'-, $cn = 34
-			.IF DF C$RAD40
+			.IF NE C$RAD40
 				.IIF	EQ, ''c-'+, $cn = 35
 				.IIF	EQ, $cn, $cn = ''c-'1 + 36
 			.IFF
@@ -67,7 +67,7 @@
 			.ENDC
 
 			.IF EQ $ir - 2
-				.IF DF C$RAD40
+				.IF NE C$RAD40
 					.IIF	NE, $cnt - 1, $c0 = $c0	+ 100000	; set flag for non-last-word
                                		.RAD40	<$c0><$c1><$cn>
 				.IFF
@@ -82,7 +82,7 @@
 			$cnt = $cnt - 1
 		.ENDR
 
-		.IF DF C$RAD40
+		.IF NE C$RAD40
 			.IIF	EQ, $ir - 1, .RAD40	<$c0><0><0>
 			.IIF	EQ, $ir - 2, .RAD40	<$c0><$c1><0>
 		.IFF
@@ -132,13 +132,24 @@
 		.NAM	^|name|
 	.ENDC
 
-	ALIGN4
+	ALGN4
 .ENDM
 
+.IF NE C$BK11			; system area in 042600
+	. = 42604
+	.WORD	4000		; Start address
 
-.ASECT
+	. = 42700 		; End of system area
+.ENDC
 
-.	= HEAP
+
+.IF NE C$AMAL
+	. = . + 37 & 177740
+	HEAP:
+.IFF
+	.ASECT
+	.	= HEAP
+.ENDC ; C$AMAL
 
 S.PREV	= 0
 ;;--- T must be second in memory after symbol with lame length==4, to define Bit.2 of V.T. Used by AND/OR
@@ -155,7 +166,12 @@ S.PREV	= 0
 	.SYM	LTYP, <LISP-IMPLEMENTATION-TYPE>
 	.SYM	MVER, <MACHINE-VERSION>
 	.SYM	MTYP, <MACHINE-TYPE>
-.IF DF C$MDAR
+.IF NE C$RT11
+	.SYM	SVER, <SOFTWARE-VERSION>
+	.SYM	STYP, <SOFTWARE-TYPE>
+	.SYM	CLOSE
+.ENDC
+.IF NE C$MDAR
 	.SYM	ARP, <ARRAYP>
 	.SYM	ARTSIZ, <ARRAY-TOTAL-SIZE>
 	.SYM	ARMI, <ARRAY-ROW-MAJOR-INDEX>
@@ -236,7 +252,7 @@ S.PREV	= 0
 	.SYM	SORT
 	.SYM	TYPEOF, <TYPE-OF>
 ;;-------------- Used by TYPE-OF. Order does matter: NULL is the middle
-.IIF DF C$MDAR, .SYM	0, <ARRAY>,, V.AR
+.IIF NE C$MDAR, .SYM	0, <ARRAY>,, V.AR
 	.SYM	0, <SPECIAL-OPERATOR>,, V.SPOP
 	.SYM	FUNCTION,,, V.FUN
 	.SYM	0, <SYSTEM-FUNCTION>,, V.BIFU
@@ -312,14 +328,14 @@ S.PREV	= 0
 	.SYM	FIRST,,,, X.CAR
 	.SYM	SECOND,,,, X.SECOND
 	.SYM	THIRD,,,, X.THIRD
-.IF DF C$FULL
-	.SYM	FOURTH
-	.SYM	FIFTH
-	.SYM	SIXTH
-	.SYM	SEVENTH
-	.SYM	EIGHTH
-	.SYM	NINTH
-	.SYM	TENTH
+.IF NE C$FULL
+	.SYM	FOURTH,,,, X.FOURTH
+	.SYM	FIFTH,,,, X.FIFTH
+	.SYM	SIXTH,,,, X.SIXTH
+	.SYM	SEVENTH,,,, X.SEVENTH
+	.SYM	EIGHTH,,,, X.EIGTH
+	.SYM	NINTH,,,, X.NINTH
+	.SYM	TENTH,,,, X.TENTH
 .ENDC
 	.SYM	ACONS
 	.SYM	TAILP
@@ -446,7 +462,7 @@ S.PREV	= 0
 	.SYM	S.MUL, <*>, 0, V.M
 	.SYM	V.U, <**>, 0, V.MM
 	.SYM	V.U, <***>, 0, V.MMM
-.IF DF C$MVAL
+.IF NE C$MVAL
 	.SYM	S.DIV, </>, 0, V.D
 	.SYM	V.U, <//>, 0, V.DD
 	.SYM	V.U, <///>, 0, V.DDD
@@ -462,9 +478,7 @@ S.END:
 L.PREV::
 	.WORD	V.P, 0, V.PP, L.PREV, V.PPP, L.PREV+4, V.M, L.PREV+10, V.MM, L.PREV+14
 	.WORD	V.MMM, L.PREV+20
-.IF DF C$MVAL
-	.WORD	V.D, L.PREV+24, V.DD, L.PREV+30, V.DDD, L.PREV+34
-.ENDC
+.IIF NE C$MVAL,	.WORD	V.D, L.PREV+24, V.DD, L.PREV+30, V.DDD, L.PREV+34
 	.WORD	V.S, . - 6
 A.PREV::
 
@@ -474,20 +488,23 @@ S.ZERO:	.WORD	0, 0, 0, 0
 C.RND:	.WORD	S.RND+2, S.ZERO+2				; (CONS S.RND S.ZERO)
 S.INI::	.BYTE	<E.INI - S.INI - 1>
 E.INI::
-	ALIGN4
+	ALGN4
 S.ISTM::
 	.WORD	V.STM, S.INI + 3, 0, E.INI - S.INI - 1		; Stream for init load
 STDIN::	.WORD	V.STM, V.0, 0, 0
 
 
-ALIGN4
+ALGN4
 HEAPFRE::
 	.WORD	<HIMEM-.>/4		; Size
 	.WORD	0                       ; Next
+
+.IIF NE C$BK10	.INCLUDE	/init.mac/
+.IIF EQ C$BK10	.INCLUDE	/init.mac/
+
 A.END::
 ;.	= 14512.			; Just to determine .BIN size for build process
 ;	.WORD	0
 
 
-
-.END
+;.IIF EQ C$AMAL	.END

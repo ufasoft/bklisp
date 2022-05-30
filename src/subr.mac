@@ -1,19 +1,20 @@
-;#######   Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com #####
-;#                                                                                                                                #
-;#       See LICENSE for licensing information                                                                                    #
-;##################################################################################################################################
+;;; Copyright (c) 2021-2022 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
+;;;
+;;; SPDX-License-Identifier: MIT
 
 ;; Subroutines
 
 ASUBR0:
 
-;; (QUIT) => exit into MONITOR operating system
-QUIT::	.EXIT
+;; (QUIT) => exit into operating system
+QUIT::
+M.QUIT::.EXIT
+
+
 
 ;; (LIST &rest objects) => list
 LIST::	MOV	R5, R1		; R5: &REST
 RE.LIS:	RETURN
-
 
 
 
@@ -52,27 +53,27 @@ LOGEQV::
 	COM	R0
 	BR	LOGXO1
 
-;; (EXTROOM) => nil
+;; (EXTROOM) => free bytes
 ;; Switches to Extended Memory mode (+12 KB RAM)
 ;; The operation cannot be reversed
 EXTROOM::
-.IF DF BK10.01
+.IF NE C$BK10
 	MOV	#C.EXTM, R0
 	MOVB	R0, @#$EXTM	; Set ExtMem byte explicitly to non-(0 or 377 value) to prevent switching off
 	EMT	16		; Switch on ExtMem mode
-.ENDC
+.ENDC	; C$BK10
 ;	MOV	#HIMEME, EHEAP
 ;; (ROOM) => free bytes
 ROOM::	.GC
-	MOV	#FREEL-2, R2
+ROOM1::	MOV	#FREEL-2, R2
 	CLR	R1
 1$:	ADD	(R2)+, R1
-2$:	MOV	(R2), R2
+	MOV	(R2), R2
 	BNE	1$
 	ASL	R1		; R2: 0, used as stream; BYTES == CELLS * 4
 	ASL	R1
 	F.U16
-	.PRINT
+	.PRNT
 	.P.STR	A.ROOM
 	RETURN
 
@@ -122,12 +123,13 @@ NCONC::	.POP5
 	BR	NCONC
 
 ;; (GET-INTERNAL-REAL-TIME) => internal-time
+.IF EQ C$RT11
 GETTIM::
 	MOV	#$TMCNT, R2
 	MOV	(R2)+, R1		; Read CNT
 	TSTB	(R2)			; R2: $TMCSR, test CSR.FL bit (overflow)
 	BPL	1$			; No overflow, R1 contains count
-	MOV	#F32768+2, R1		; Add duration of one timer cycle 65536==2*32768
+	MOV	#F32768 + 2, R1		; Add duration of one timer cycle 65536==2*32768
 	.PUSH0
 	.PUSH0
 	MOV	@#$TMCNT, R1		; Re-read CNT because of Race Condition with two volatile vars: FL and CNT, recheck
@@ -137,11 +139,30 @@ GETTIM::
 	.PUSH0
 	MOV	PRVTIM, R1
 	.PUSH0
+.IFF
+TIMVAL:	.WORD	0, 0
+GETTIM::
+	.GTIM	#AREA, #TIMVAL
+	MOV	#F65536+2, R1
+	.PUSH0
+	MOV	TIMVAL, R1
+	F.U16
+	.PUSH0
+	MOV	R0, R5
+	.SUBR	S.MUL
+	CLR	R0
+	.PUSH0
+	MOV	TIMVAL + 2, R1
+	F.U16
+	.PUSH0
+.ENDC	; C$RT11
 	MOV	R0, R5
 	.SUBR	S.ADD
 	MOV	R1, PRVTIM
 	RETURN
 
+;; Multiply list in R1
+S.MUL1:	MOV	R1, R5
 ;; (* &rest numbers) => product
 S.MUL::	MOV	#$DMUL, R4
 	INC	R0
@@ -156,14 +177,20 @@ ADDMUL:	ADD	#V.0, R0
 
 ;; (INKEY) => char-p
 INKEY::
-.IF DF BK10.01
+.IF NE C$BK10
 	TSTB	$TSTKEY
 	BEQ	R.0		; no pressed key
 	.TTYIN	R1
 .IFF
-	.TTINR
-	BCS	R.0		; no pressed key
-.ENDC
+	.IF NE C$BK11
+		.BINKEY
+		BCS	R.0	; no pressed key
+		MOV	R0, R1
+	.IFF
+		.TTINR
+		BCS	R.0	; no pressed key
+	.ENDC ; C$BK11
+.ENDC ; C$BK10
 	BR	CODEC3		; (CODE-CHAR R1)
 
 ;; (Y-OR-N-P &optional control &rest arguments) => generalized-boolean
@@ -185,6 +212,13 @@ YORNP::	TST	R5
 	BEQ.F
 	BR	1$
 
+.IF NE C$RT11
+;; (SOFTWARE-VERSION) => description
+SVER::	ADD	#V.SVER - V.STYP, R0
+;; (SOFTWARE-TYPE) => description
+STYP::	ADD	#V.STYP - V.MTYP, R0
+.ENDC	; C$RT11
+
 ;; (MACHINE-TYPE) => description
 MTYP::	ADD	#V.MTYP - V.MVER, R0
 ;; (MACHINE-VERSION) => description
@@ -195,6 +229,7 @@ LTYP::	ADD	#V.LTYP - V.LVER, R0
 LVER::	ADD	#V.LVER, R0
 R.0:	MOV	R0, R1
 	RETURN
+
 
 ;; (MAKE-STRING-OUTPUT-STREAM) => string-stream
 MKSOS::	.ALL.2

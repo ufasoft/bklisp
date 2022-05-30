@@ -1,7 +1,6 @@
-;#######   Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com #####
-;#                                                                                                                                #
-;#       See LICENSE for licensing information                                                                                    #
-;##################################################################################################################################
+;;; Copyright (c) 2021-2022 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
+;;;
+;;; SPDX-License-Identifier: MIT
 
 ;; Print Subroutines
 
@@ -9,13 +8,13 @@
 P.NIL:	.P.STR	A.NIL
 	RETURN
 
-.IF DF C$MDAR
+.IF NE C$MDAR
 P.AR:
 	MOV	R1, R3
 	INC	R3
 	.P.CHR	'#
 	.SUBR	ARRANK		; R1: (ARRAY-RANK array)
-	.WRITE
+	.$WRITE
 	.P.CHR	'A
 	MOV	(R3)+, R5	; R5: (ARRAY-DIMENSIONS array), R3: points to first element
 ;; Print sub-array
@@ -33,7 +32,7 @@ P.SBAR:	.POP5
 	SOB	R0, 1$
 	BR	P.RPAP
 9$:	MOV	(R3)+, R1
-	.WRITE
+	.$WRITE
 	RETURN
 
 .ENDC	; C$MDAR
@@ -79,27 +78,27 @@ P.CONS:	MOV	R1, R5
 	BEQ	P.QUOT
 P.LIST:	.P.CHR	'(
 3$:	.POP5			; Print CAR
-	.WRITE
+	.$WRITE
 	MOV	R5, R1
 	BEQ	P.RPAP
 	.P.CHR	C.SP
 	.CONSP
 	BCS	3$
 	.P.CHR	'., C.SP	; Print dot pair
-	.WRITE
+	.$WRITE
 P.RPAP:	.P.CHR	')
 	RETURN
 
 P.VEC:	.P.CHR	'#, '(
 	MOV	R1, R0
-.IIF NDF K1801, DEC	R0
+.IIF EQ C$VM1, DEC	R0
 	MOV	(R0)+, R5	; LEN
 	SUB	#FIXOFF, R5
 	BEQ	P.RPAP
 	BR	2$
 1$:	.P.CHR	C.SP
 2$:	MOV	(R0)+, R1
-	.WRITE
+	.$WRITE
 	SOB	R5, 1$
 	BR	P.RPAP
 
@@ -120,9 +119,16 @@ WRITE1:	.TCASE
 	.BYTE	<P.FUN - 1$> / 2
 	.BYTE	<P.LAMB - 1$> / 2
 	.BYTE	<P.SPOP - 1$> / 2
-.IIF DF C$MDAR, .BYTE	<P.AR - 1$> / 2
+.IIF NE C$MDAR, .BYTE	<P.AR - 1$> / 2
 	.EVEN
 
+
+W.CH2A:	.SH210
+	MOV	R0, R1
+	.CONS
+	MOV	R1, 1(R3)
+W.CH2B:	MOV	R0, R1		;!!!TODO: optimize
+	RETURN
 
 
 P.FIX:	SUB	#FIXOFF, R1
@@ -176,17 +182,20 @@ W.CH2:	MOV	#V.CHB, R0
 	MOV	R1, R3
 	MOV	1(R3), R1
 	.LISTP
-	BCS	W.CH2A		; STRING OUTPUT STREAM
-	.TTYOUT   		; TO TERMINAL
+	BCS	W.CH2A		; To String Output Stream
+
+.IF NE C$BK11
+	CMPB 	R0, #C.NL
+	BNE	M.OUT
+	PUSH	R0
+	MOV	#C.CR, R0		; Print CRLF as Newline sequence
+M.OUT1::
+	.TTYOUT
+	POP	R0
+.ENDC ; C$BK11
+
+M.OUT::	.TTYOUT
 	BR	W.CH2B
-
-W.CH2A:	.SH210
-	MOV	R0, R1
-	.CONS
-	MOV	R1, 1(R3)
-W.CH2B:	MOV	R0, R1		;!!!TODO: optimize
-	RETURN
-
 
 P.SYMB: MOV	R1, R3
 	.SYVAL	V.PESC
@@ -255,7 +264,7 @@ W.STR9:	.WORD	0			; print decimal suffix?
 	ADD	R3, R4			; R4: points at the end
 	MOVB	#'., (R4)+		; decimal suffix
 	SUB	R3, R4
-W.STR8:	POP	R2		; R2: Stream
+W.STR8:	POP	R2			; R2: Stream
 	CMPB	(R4), #C.SP
 	BNE	7$
 	CMPB	(R4)+, -(R3)		; INC R4, DEC R3
@@ -289,7 +298,7 @@ P.STR.:	MOV	PC.OFF+4(SP), R4
 	MOV	R4, PC.OFF+4(SP)
 ;; (PRINC object &optional output-stream) => object
 PRINC::	.BIND	V.PESC, 0		; (LET ((*PRINT-ESCAPE* NIL)) ...)
-PRINC1:	.WRITE
+PRINC1:	.$WRITE
 	CMP	(SP)+, (SP)+		; restore Dynamic environment
 	POP	DYNENV
 	RETURN

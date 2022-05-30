@@ -1,6 +1,7 @@
 Prompt
-  Lisp (.+) ufasoft.com/bklisp (re)
-  (c) Sergey Pavlov  dev@ufasoft.com 2021
+  Lisp (.+)ufasoft.com (re)
+  Lisp (re)
+  Bytes free (re)
 I/O variables
   $ *print-base*
   10
@@ -89,7 +90,9 @@ WRITE
   B
   #<STREAM>
 PRINC
-  $ (let ((stm (make-string-output-stream))) (princ "A" stm) (fresh-line stm) (fresh-line stm) (princ "B" stm) (length (get-output-stream-string stm)))
+  $ (defun fillstm (stm) (princ "A" stm) (fresh-line stm) (fresh-line stm) (princ "B" stm))
+  FILLSTM 
+  $ (let ((stm (make-string-output-stream))) (fillstm stm) (length (get-output-stream-string stm)))
   3
 PRINT
   $ (print 123)

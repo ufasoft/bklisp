@@ -1,4 +1,4 @@
-;;; Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
+;;; Copyright (c) 2021-2022 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
 ;;;
 ;;; SPDX-License-Identifier: MIT
 
@@ -8,30 +8,10 @@
 
 MASKTB:	.BYTE	1, 2, 4, 10, 20, 40, 100, 200
 
-
-; IN: R1 - pointer to heap object
-; RETURNS:  R5: Pointer into GCBM, R4: bitmask; ZF=0 if the object is marked, R1 += 4
-; Assumes EHEAP < 32K, else use "CLC; ROR R5" instructions
-TSTMSK: MOV	R1, R5
-	ASR	R5
-        ASR	R5
-        MOV	R5, R4
-        BIC	#177770, R4     	;GET 3 LOWEST SIGNIFICANT BITS,
-        MOVB	MASKTB(R4), R4
-        ASR	R5
-        ASR	R5
-        ASR	R5              	;GET REMAINING BITS =INDEX IN BITMAP
-	ADD	(PC)+, R5		; R5: address in GC bitmap
-I.BMOF:	.WORD	0			;SELF-MODIFYING CODE
-	BIT	(R1)+, (R1)+		; R1 += 4;
-	BITB	R4, (R5)
-R.GC:	RETURN
-
-
 ; IN: R0 = pointer to heap CELL
 ; OUT: R0 = R0 + 4
 ; Clobber: R1, R4, R5
-M.BIT:	MOV	R0, R1
+M.BIT::	MOV	R0, R1
 	CALL	TSTMSK
 	MOV	R1, R0
 	BISB	R4, (R5)	; Else mark
@@ -55,10 +35,39 @@ M.PUSH:	MOV	-(R0), R1
 	MOV	(R0), (SP)	; Push object
 	JMP	(R5)
 
-GCBMSZ	= HIMEME - HEAP / 32.		; max GC bitmap size
+
+; IN: R1 - pointer to heap object
+; RETURNS:  R5: Pointer into GCBM, R4: bitmask; ZF=0 if the object is marked, R1 += 4
+TSTMSK: MOV	R1, R5
+.IF NE C$BK10
+	ASR	R5			; Assume EHEAP <= 32K
+.IFF
+	CLC
+	ROR	R5
+.ENDC ; C$BK10
+        ASR	R5
+        MOV	R5, R4
+        BIC	#177770, R4     	; Get 3 lowest significant bits
+        MOVB	MASKTB(R4), R4
+        ASR	R5
+        ASR	R5
+        ASR	R5              	; Get remaining bits = index in Bitmap
+	ADD	(PC)+, R5		; R5: address in GC bitmap
+I.BMOF:	.WORD	0			;SELF-MODIFYING CODE
+	BIT	(R1)+, (R1)+		; R1 += 4;
+	BITB	R4, (R5)
+R.GC:	RETURN
+
+.IF NE C$BK10
+	GCBMSZ	= HIMEME - HEAP / 32.		; max GC bitmap size
+.IFF
+	GCBMSZ:	.WORD	0
+.ENDC	; C$RT11
+
 GC:	POP	GCRET
-	PUSH	@$KBCTL
-	BIS	#$KBDI, @$KBCTL		; Disable Keyboard interrupt to use Status Line as GC bitmap
+.IF NE C$BK10
+	PUSH	$KBCTL
+	BIS	#$KBDI, $KBCTL		; Disable Keyboard interrupt to use Status Line as GC bitmap
 	MOV	@#$BAZVP, R1		; Find continuous space of 512. bytes in status line for GC bitmap temporary space
 1$:	SUB	#GCBMSZ, R1
 	BCS	1$
@@ -67,6 +76,12 @@ GC:	POP	GCRET
 	MOVB	@#$ANVP+1, R2
 	ASL	R2
 	ASL	R2			; R2: (GC bitmap size) / 2: <256. words for full-screen mode, 296. words for ExtMem mode
+.IFF
+	MOV	GCBMSZ, R2
+	MOV	EHEAP, R1
+	ADD	R2, R1
+	ASR	R2
+.ENDC ; C$BK10
 2$:	CLR	-(R1)			; Clear GC bitmap
 	SOB	R2, 2$
 	SUB	#HEAP/32., R1
@@ -92,7 +107,10 @@ M.ROOT:	CALL	MARK
 1$:	CALL	MARK
 	CMP	R0, SP
 	BHI	1$
-SWEEP:	MOV	#FREEL, R3	; R3 = First Free Block
+SWEEP:
+.IIF NE C$BK11	MOV	#10000, $SYREG	; Disable STOP key
+
+	MOV	#FREEL, R3	; R3 = First Free Block
 	MOV	#HEAP, R1
 	MOV	(R3), R2	; R2 = Next free block
 	BNE	1$
@@ -130,9 +148,12 @@ SWEEP:	MOV	#FREEL, R3	; R3 = First Free Block
 	BNE	2$		; End of Free sequence
 	INC	(R3)		; Extend current Free block
 	BR	8$
-9$:	POP	@$KBCTL		; Restore keyboard interrupts
+9$:
+.IIF NE C$BK10	POP	$KBCTL	; Restore keyboard interrupts
+.IIF NE C$BK11	CLR	$SYREG	; Enable STOP key
+
 	JMP	@(PC)+		; End of list
-GCRET:	.WORD	0		; Addres may be changed by I.STOP
+GCRET:	.WORD	0		; Address may be changed by I.STOP
 
 
 ;; Process Root in R0
@@ -156,7 +177,7 @@ MARKSP:	.WORD	0		; SP AT ENTRY TO MARK
 	BCS	M.STR
 ;; SYMBOL, VECTOR, LAMBDA, STREAM
 M.SVLS:
-.IIF NDF K1801,	DEC	R0
+.IIF EQ C$VM1,	DEC	R0
 	MOV	(R0)+, R2
 	BEQ	1$		; Symbol
 	CMP	R2, #FIXEND
@@ -178,7 +199,7 @@ M.SVLS:
 	TST	6(R0)
 	BEQ	4$
 	ADD	#6, R0
-.IF DF C$RAD40
+.IF NE C$RAD40
 6$:	TST	(R0)+
 	BPL	MARKL		; end of RADIX-40 string
 .IFF
@@ -190,12 +211,6 @@ M.SVLS:
 	.MBIT
 	CMP	-(R0), -(R0)	; R0 -= 4
 	BR	6$
-;!!!R	CALL	(R3)		; NEXT SYMBOL, FUNCTION OR LAMBDA BODY
-;!!!R	CALL	(R3)		; FUNCTION OR LAMBDA BODY
-;!!!R	CALL	(R3)		; VALUE	OR LAMBDA LIST
-;!!!R	CALL	(R3)		; PLIST
-	BIT	#1, (R0)
-	BNE	MARKL		; LAMBDA OR STREAM
 4$:	ADD	#11., R0	; Mark Symbol-Name
 ;; Mark String
 ;; Assumes R0==0
@@ -212,7 +227,7 @@ M.DBL:	TST	(R0)+		; R0 += 2
 	BR	MARKL
 M.VEC:	SUB	#FIXOFF, R2
 	BEQ	MARKL
-.IF DF C$MDAR
+.IF NE C$MDAR
 	BPL	M.VEC1
 	NEG	R2
 .ENDC

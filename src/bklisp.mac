@@ -1,28 +1,21 @@
-;;; Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
+;;; Copyright (c) 2021-2022 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
 ;;;
 ;;; SPDX-License-Identifier: MIT
 
 
 ;;; Lisp interpreter for BK-0010.01
-;;; Version 2021
+;;; Version 2022
 ;;;
 ;;; Implements subset of COMMON LISP
 ;;; Uses Vilnus BASIC 1985 ROM (firmware 106, 107, 108)
 ;;;
 ;;; https://ufasoft.com/bklisp
-;;; Documentation: https://github.com/ufasoft/bk0010/bklisp
 ;;;
 
 
 .TITLE	bklisp
 
-.LIST	ME		; Macro expansions
-.ENABL	AMA		; address mode 37
-
-.INCLUDE	/bk1001.inc/
 .INCLUDE	/macros.inc/
-
-
 
 
 ;; HEAP STRUCTURE
@@ -129,48 +122,107 @@ SY.PREV=0
 
 .ASECT
 
+.GLOBL	START2
 .GLOBL	A.END, A.PREV, HEAPFR, S.ISTM
-.GLOBL	V.BIFU, V.D, V.ERR, V.FLT, V.FREQ, V.FUN, V.FUNC, V.GCNT, V.GO, V.BLOCK, V.IF, V.UNLESS, V.INT, V.LAMB, V.LAST, V.LET
+.GLOBL	V.BIFU, V.ERR, V.FLT, V.FREQ, V.FUN, V.FUNC, V.GCNT, V.GO, V.BLOCK, V.IF, V.UNLESS, V.INT, V.LAMB, V.LAST, V.LET
 .GLOBL	V.LETA, V.LIST, V.NULL, V.OPT, V.PBAS, V.PESC, V.PPP, V.PRAD, V.PROG, V.QUOT, V.REST, V.RNDS, V.S, V.SETF, V.SETQ, V.SPEC
 .GLOBL	V.SPOP, V.STDI, V.STM, V.STR, V.CONS, V.SYM, V.SYVA, V.T, V.TAGB, V.CHAR, V.VEC, V.PSETQ, V.QUIT
-.IIF DF C$MDAR, 	.GLOBL	 V.AR
 
+.IIF NE C$MVAL,		.GLOBL	 V.D
+.IIF NE C$MDAR, 	.GLOBL	 V.AR
+
+.IF NE C$RT11
+.	= 34
+	.WORD	I.TRAP, 0		; don't mask interrupts for TRAP
+
+.	= $USRSP
+	.WORD	ASTKUP
+.ENDC	; C$RT11
+
+
+.IF EQ C$BK10
+	.GLOBL	$RNDSAV, $III, $SAVJMP, $BUFOUT, $WSTOP
 
 .	= 300
-ASTKLO:
 
-FILALG	= 16.
+$III::	.BLKW	4	; Working Area of RND
+$RNDSAV::
+	.BLKW	4	; Current value of RND
+$SAVJMP::
+	.BLKW	1	; temporary var for saving return address
+$BUF::	.BLKB	400	; Input buffer
+$BUFOUT::.BLKB	30	; Output buffer
 
-.IF DF BK10.01									; Loader header
-.	= 754
-	.WORD	LDRSTK, <A.END + FILALG - 1 / FILALG * FILALG - LDRSTK>
-LDRSTK:	.WORD	START, START, START, START, START, START, START, START		; return addresses for auto-run
-.ENDC
+.ENDC ; C$BK10
 
-.	= 1000
-ASTKUP:
+.IF EQ C$RT11
+	FILALG	= 512.									; Loader header for BK
+	.IIF NE C$BK10	.	= 754
+	;.IIF	NE C$BK11	.	= ASTKUP - 100. - 24				; Reserve 100. bytes as space for init code
 
-;START:  JMP	START2		; Replaced by `BR RESET` instruction
+	.IF NE C$BK11
+		.	= ASTKUP - 4
+		.WORD	ASTKUP								; Loader header: Start address
+	.IFF
+		.WORD	RETADR
+	.ENDC ; C$BK11
 
-.INCLUDE	/gc.mac/	; GC CODE BEFORE SUBR TO MAKE SPACE FOR FIXNUM VALUES
+	.WORD	<A.END + FILALG - 1 / FILALG * FILALG - RETADR>			; Loader header: Image size
+
+RETADR:	BR	START								; in case if autorun does not work (loaded on BK-0011)
+	.WORD	1000, 1000, 1000, 1000, 1000, 1000, 1000			; return addresses for auto-run, don't use label becase this code is relocatable
+START:
+	.IF NE C$BK11
+	;; Move code above stack space
+;		MOV	#A.END - <ASTKUP - 1000>, R1
+;	1$:	MOV	-(R1), ASTKUP - 1000(R1)
+;		CMP	R1, PC
+;		BNE	1$
+	.ENDC	; C$BK11
+
+	JMP	@#START2
+.ENDC ; C$RT11
+
+;.IIF EQ C$BK10	.INCLUDE	/init.mac/
+
+.IIF NE C$BK10	.	= ASTKUP
+
+.INCLUDE	/gc.mac/	; Put GC code before SUBRs to give more space for FIXNUM values
+
+.IIF NE C$BK11	EHEAP:	.WORD	HIMEME
+
+.IF NE C$RT11
+EHEAP:	.WORD	0
+AREA:	.BLKW	2
+SCCA:	.WORD	0
+.ENDC	; C$RT11
 
 H.STOP:	MOV	#$WSTOP, R1	; Handler of STOP key
-I.STO2:	MOV	#$WSTOP+6, R2
+I.STO2:
+.IF NE C$BK10
+	MOV	#$WSTOP+6, R2
 	SUB	R1, R2
+.IFF
+	MOV	R1, R0
+.ENDC ; C$BK10
 	MOV	#ASTKUP, SP
+M.PRIN::
 	EMT	20
-RESET:	CLR	INEND		; flush input
+RESET::
+.IIF NE C$BK10,	CLR	INEND		; flush input
 	CLR	(PC)+
 CATCH:	.WORD	0		; Stack pointer to catch errors
 REPL:   CLR	LEXENV
 	CLR	DYNENV
 	CLR	R2		; *STANDARD-INPUT*, used also in .CONS
-	.P.STR	A.PROM
-	.READ
+	.P.CHR	C.NL, '>
+	.P.CHR	C.SP
+	.$READ
 	MOV	R1, R2
 	MOV	#V.S, R1	; '-' Symbol
 	.SET			; (SETQ - form); R1: read form
 
+.IIF NE C$BK11	CLR	$SYREG	; Enable STOP key
 	; CALL	EVAL		; Don't use .EVAL to save stack space in every evaluation
 	.EVAL1
 
@@ -181,64 +233,67 @@ REPL:   CLR	LEXENV
 	.SET			; (SETQ +++ value)  to be rotated into *; R1: evaluated value
 	CLR	R2
 	.PRIN1			; Print evaluated value
-.IF DF C$MVAL
+.IF NE C$MVAL
 	.CONS			; R2 == 0 HERE
 	MOV	R1, R2
 	MOV	#V.D, R1
 	.SET			; Assign *** to be rotated into /
-.ENDC
+.ENDC	; C$MVAL
 	MOV	#A.PREV-4, R5
 	.SUBR	ROTATEF		; (ROTATEF - /// // / *** ** * +++ ++ +)
 	BR	REPL
 
-.IF	DF, LDRTAB
-; Int vector init table. Pairs: value, address
-;;-- 16. words
-LDRTBL:	.BYTE	34, 20, 10, 4			; reversed order
-	.WORD	I.STOP, I.PCHR, M.BIT, I.TRAP
-LOADER:	MOV	#LDRTBL, R1
-1$:	MOV	#LOADER, R2
-	MOVB	(R1)+, R5
-	MOV	-(R2), (R5)
-	CMP	R1, R2
-	BLO	1$
-;; R5: 4
-	CLR	-(R5)			; CLR 2
-	CLR	-(R5)			; CLR 0
-;; R5: 0
-.IFF
 ;;-- 12. words
-LOADER:
+LOADER::
  	MOV	#M.BIT, @#20
-	MOV	#I.TRAP, @#34
 ;	CLR	@#36
 	CLR	R1
 	CLR	(R1)+
 	CLR	(R1)+			; Init NIL
+.IF EQ C$RT11
 	MOV	#I.STOP, (R1)+		; Init STOP key vector
 	CLR	(R1)+
 	MOV	#I.PCHR, (R1)+
-.ENDC	; LDRTAB
-;	MOV	#ASTKUP, SP
+	MOV	#I.TRAP, @#34
+.IFF
+	MOV	#I.PCHR, @#10
+	.TRPSET	#AREA, #TRPLOC
+	.SCCA	#AREA, #SCCA
+.ENDC
+
+	MOV	#ASTKUP, SP
 	MOV	(PC)+, R1
 A.MAIN:	.WORD	0
-	BEQ	REPL
+	BEQ	RESET
 	CLR	R5
 	CALL	FUNCALL
 	.EXIT
 
-
+.IF NE C$BK10
 .	= $III		; 2060
 	.BLKW 4		; USED BY $RAN
 .	= $RNDSAV	; 2070
 	.BLKW 4
 .	= $SAVJMP	; 2134
 	.WORD		0
+.ENDC	; C$BK10
+
 ;;-- 90 words
 
-I.STOP: BIT	#$KBDI, @#$KBCTL	; GC is in progress?
-	BEQ	H.STOP
-	MOV	#H.STOP, GCRET	; Defer STOP handling to end of GC
+I.STOP::
+.IF NE C$RT11
+	PUSH	R0, R1
+	.TRPSET	#AREA, #TRPLOC	; Reset trap vectors
+	POP	R1, R0
+.IFF
+	.IF NE C$BK10
+		BIT	#$KBDI, $KBCTL	; GC is in progress?
+		BEQ	H.STOP
+		MOV	#H.STOP, GCRET	; Defer STOP handling to end of GC
+	.IFF
+		BR	H.STOP
+      	.ENDC
+.ENDC	; C$RT11
 	RTI
 
 
@@ -333,7 +388,7 @@ DPUR2:	.SWP12
 	PU.FL
 	JMP	@(R4)+
 
-;;--------
+.IF NE C$BK10
 .	= $BUF-2	; 2422
 	.WORD	0	; used by GENSYM
 .	= $BUF
@@ -342,21 +397,17 @@ DPUR2:	.SWP12
 .	= $BUFOUT	; 3022
 	.BLKB	30	; USED BY BASIC $UNPCK
 E.SYS:			; End address of system area
+.ENDC	; C$BK10
 
-.	= $BUF		; 2422
-.INCLUDE	/init.mac/
-.	= E.SYS
-
-
-.IF DF C$RAD40
+.IF NE C$RAD40
 	.INCLUDE	/rad40.mac/
 .IFF
 	.INCLUDE	/rad50.mac/
 .ENDC
 
-.IF DF C$MDAR
+.IF NE C$MDAR
 
-.IF DF $COMME	; COMMENT OUT  TEMPORARY!!!
+.IF NE 0	; COMMENT OUT  TEMPORARY!!!
 ;; R1: list of FIXNUM dimensions
 ;; Returns R1: product as UINT
 MULDIM:	MOV	#1, R5
@@ -395,6 +446,25 @@ FILLAR:	PUSH	R0, R1
 
 .ENDC	; C$MDAR
 
+.IF NE C$BK10
+P.ERR:	MOV	#$ERROR, R1
+	MOV	#8., R2
+	EMT	20
+.ENDC ; C$BK10
+
+.IF NE C$BK11
+$ERROR: .ASCII	<C.CY.O><C.CY.W><C.CY.I><C.CY.B><C.CY.K><C.CY.A>/ /<C.BEL><200>		; 'ERROR' in russian
+	.EVEN
+P.ERR:	MOV	#$ERROR, R0
+	.PRINT
+.ENDC ; C$BK11
+
+.IF NE C$RT11
+$ERROR: .ASCIZ	/ ERROR/<C.BEL>
+	.EVEN
+P.ERR:	.PRINT	#$ERROR
+.ENDC ; C$RT11
+	RETURN
 
 
 ;; Return: true if char is constituent
@@ -407,10 +477,26 @@ CSTITP:	MOV	#TERM, R2
 	CMPB	#40, R1
 	B.CF
 
+;; Find place in property-list
+;; Input: R1: symbol, R2: property-indicater
+;; Returns: R5: (pointer to place)+2, R4: pointer to current list item; ZF=1, R5=0 if not found
+PLSPLC: T.SYM
+.IIF EQ C$VM1,	DEC	R1
+PLSPL4:	MOV	R1, R5
+PLSPL2:	MOV	R5, R4		; R4: &tail
+	MOV	(R4), R5	; R5: Property-list
+;; Assume ZF: R5==0
+PLSPL1:	BEQ	9$
+	MOV	(R5)+, R0	; R0: property name
+	MOV	(R5), R5
+	TST	(R5)+		; R5: &tail
+	CMP	R0, R2
+	BNE	PLSPL2        	; continue search
+	CLZ
+9$:	RETURN
 
-;;;---------------------------------------
-;;; BK-0010.01 Specific code
 
+.IF NE C$BK10
 ;; Prepare filename argument for File API
 ;; R1: filename as STRING object
 PSNAME: MOV	#15, R4		; #words of param block segment
@@ -424,7 +510,7 @@ PSNAME: MOV	#15, R4		; #words of param block segment
 2$:	MOVB	(R1)+, (R4)+
 	SOB	R2, 2$
 	JMP	(R5)
-
+.ENDC	; C$BK10
 
 ASIN1:	.BASN
 	.WORD	DDUP, DDUP, $DMUL, $PUSH1, DSWAP, $DSUB, $SQRT, $DDIV, $ATAN, R.R4
@@ -432,7 +518,7 @@ ASIN1:	.BASN
 ACOS1:	.BASN
 	.WORD	ASIN1, PUPID2, DSWAP, $DSUB, R.R4
 
-.IF DF C$RAD40
+.IF NE C$RAD40
 	R40TAB:	.ASCII	/*-+12/
 .IFF
 	R50TAB:	.ASCII	/*-=0123456789/
@@ -441,9 +527,9 @@ ACOS1:	.BASN
 TERM:	.ASCII	<C.SEMI>/()"'`, /
 E.TER:	.EVEN
 
-
-
+.IIF EQ C$BK10	.INCLUDE	/math.mac/
 .INCLUDE	/trap.mac/
+
 
 FIXEND:
 .INCLUDE	/subr.mac/
@@ -464,55 +550,60 @@ E.ROOT:
 
 ;; EHEAP:	.WORD	HIMEM 	; same as $ANVP
 
-ALIGN4
-A.LTYP:	.ASCII	<14.>/Ufasoft BkLisp/
+ALGN4
+A.LTYP:	.ASCIP	<Ufasoft BkLisp>
 
-ALIGN4
-A.LVER:	.ASCII	<4>/2021/
+ALGN4
+A.LVER:	.ASCIP	<2022>
 
-ALIGN4
-A.MTYP:	.ASCII	<6>/PDP-11/
+ALGN4
+A.MTYP:	.ASCIP	<PDP-11>
+
+.IF NE C$RT11
+ALGN4
+A.SVER:	.ASCIP	<5.0>        ;!!!TODO determine OS version at runtime
+ALGN4
+A.STYP:	.ASCIP	<RT-11>
+.ENDC
 
 ;;------Order does matter: ROOM uses zero from FREEL-2 word
-ALIGN4
+ALGN4
 A.EMPTY:.ASCII	<0>//
 .EVEN
 FREEL:	.WORD	HEAPFRE
 ;;;----
 
-ALIGN4
-A.NIL:	.ASCII	<3>/NIL/
+ALGN4
+A.NIL:	.ASCIP	<NIL>
 
-ALIGN4
-A.MVER:	.ASCII	<10.><C.CY.B><C.CY.K>/-0010.01/
-
+ALGN4
+A.MVER:
+.IIF NE C$BK10		.ASCII	<10.><C.CY.B><C.CY.K>/-0010.01/
+.IIF NE C$BK11		.ASCII	<8.><C.CY.B><C.CY.K>/-0011/<C.CY.M>
 
 ;;----Order does matter. Used by NAME-CHAR
-ALIGN4
-A.SPAC:	.ASCII	<5>/SPACE/
+ALGN4
+A.SPAC:	.ASCIP	<SPACE>
 
-ALIGN4
-A.RETU:	.ASCII	<6>/RETURN/
+ALGN4
+A.RETU:	.ASCIP	<RETURN>
 
-ALIGN4
-A.NEWL:	.ASCII	<7>/NEWLINE/
+ALGN4
+A.NEWL:	.ASCIP	<NEWLINE>
 
-ALIGN4
-A.TAB:	.ASCII	<3>/TAB/
+ALGN4
+A.TAB:	.ASCIP	<TAB>
 ;;------------
 
 
-ALIGN4
+ALGN4
 A.MS:	.ASCII	<3>/ms/<C.NL>
 
-ALIGN4
+ALGN4
 A.ROOM: .ASCII	<11.>/Bytes free/<C.NL>
 
-ALIGN4
-A.PROM: .ASCII	<7><C.NL>/lisp> /
-
-ALIGN4
-A.GSYM: .ASCII	<4>/~A~A/			; used by GENSYM
+ALGN4
+A.GSYM: .ASCIP	<~A~A>			; used by GENSYM
 
 VS.NIL	= A.NIL + 3
 V.EMPTY	= A.EMPTY + 3
@@ -522,19 +613,27 @@ V.LTYP	= A.LTYP + 3
 V.LVER	= A.LVER + 3
 V.GSYM 	= A.GSYM + 3
 
-ALIGN4
+.IF NE C$RT11
+V.STYP	= A.STYP + 3
+V.SVER	= A.SVER + 3
+.ENDC
+
+ALGN4
 TOKLEN:	.BYTE	0
 TOKBUF:	.BLKB	MAXTOK
 
 
-ALIGN4
+ALGN4
 F32768:	.FLT4	32768.
+.IIF NE C$RT11	F65536:	.FLT4	65536.
 
-ALIGN4
+
+ALGN4
 
 ;	ALGN32		; Align to 32 bytes to simplify GC bit operations
 ;HEAP:
-;.INCLUDE	/symdef.mac/
+
+.IIF NE C$AMAL .INCLUDE	/symdef.mac/
 
 
-.END
+.END	START2

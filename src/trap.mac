@@ -1,4 +1,4 @@
-;;; Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
+;;; Copyright (c) 2021-2022 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
 ;;;
 ;;; SPDX-License-Identifier: MIT
 
@@ -20,7 +20,7 @@ ST.OFF	= 14	; FIRST WORK BEFORE STACK FRAME ;   NUMBER OF SAVED BYTES IN STACK F
 SUBRS:	.WORD	LENGTH, CONS, FUNCALL, PRIN1, EVAL1, READ1, PEEKCH, CHRUP
 	.WORD	SYVAL, SET, R.CHRT, R.CHR0, P5EVL, MKAR, FORMAT, LAST
 	.WORD	CPTREE, SUBST1
-.IIF DF C$MDAR,	.WORD	ARDIMS
+.IIF NE C$MDAR,	.WORD	ARDIMS
 
 
 ;;---------------------------
@@ -28,7 +28,7 @@ SUBRS:	.WORD	LENGTH, CONS, FUNCALL, PRIN1, EVAL1, READ1, PEEKCH, CHRUP
 PREDS: 	.WORD	SYMP	, VECP	, W.CH2	, WRITE1, STREQ, ZEROP, MEMBER, INTP
 	.WORD	EQL	, UNR.CH, PRINT	, CSTITP, GC, P.STR., CONSP, LISTP
 	.WORD	BOUNDP, FRESHL, FUNAMP, PROGN, SORT34
-.IIF DF C$MDAR,	.WORD	ARP
+.IIF NE C$MDAR,	.WORD	ARP
 
 
 ;; Starts with TRAP 60
@@ -66,11 +66,22 @@ SUBR$:	.WORD	SUBR.
 SYVAL$:	.WORD	SYVAL.
 
 
-
-
+.IF NE C$RT11
+TRPLOC::
+	BCS	1$		; vector 4
+	PUSH	R0, R1		; vector 10
+	.TRPSET	#AREA, #TRPLOC	; Reset trap vectors
+	POP	R1, R0
+	BR	I.PCHR		;!!!TODO review it
+1$:	TST	SCCA
+	BPL	I.PCHR
+	CLR	SCCA
+	JMP	I.STOP		; CTRL/C, CTRL/C
+.ENDC
 ;; TRAP instruction handler.
 ;; Savas all registers except R1
-I.TRAP:	PUSH	R0, R2, R3, R4
+I.TRAP::
+	PUSH	R0, R2, R3, R4
 	PUSH	R5.OFF(SP)		; PSW
 	MOV	R5, R5.OFF+2(SP)
 	MOV	PC.OFF+2(SP), R4	; Get PC after CALL instruction.
@@ -87,9 +98,10 @@ NOW.PU:	.SUBR	GETTIM
 PU.FL.: MOV	#8., R3
 	CALL	INSER.
 	PUSH	R1
+	MOV	R1, R2
 	MOV	SP, R5
 	MOV	SP, R3
-	ADD	#ST.OFF+2, R5
+	ADD	#ST.OFF+2, R3
 	.FIXP
 	BCC	PUFL1.
 	SUB	#FIXOFF, R1
@@ -146,7 +158,8 @@ I.ST1A:	MOV	#$WNL, R1
 
 ;;-- 7 words
 ;; Handler of	.P.CHR ch
-I.PCHR:	PUSH	R1
+I.PCHR::
+	PUSH	R1
 	MOV	2(SP), R1
 	MOV	-(R1), R1
 	.W.CH2			; (WRITE-CHAR R1 R2)
@@ -166,8 +179,6 @@ SYVAL.:	MOV	(R4)+, R1
 	.SYVAL
 	BR	E.6TRP
 ;;----
-
-
 
 
 
@@ -217,14 +228,11 @@ SUBR4.:	PUSH	R0
 ;;-- 4 words
 PUFL1.:	.FLTP
 	BCC	ER.TYP
-	TST	-(R1)
+	TST	-(R2)
 	BR	PUFL3.
 ;;----
 
 
-
-;;-- Space: 1 word
-;;---
 
 
 .	= TRPSEC + B.TYP
@@ -235,25 +243,17 @@ TRPTYP:	MOV	#1$, (SP)
 	CMP	R0, -(R4)
 	BR	B.ZF.
 
-;;---  7 words
+;;---  6 words
 ;; TO.FUN macro
 FUN.TO:	.PRED	FUNP
 	BCS	E.RTI2
 	.SUBR	FBOUNDP
-	BEQ.E
-;!!!R	.SYMP
-;!!!R	BCC	2$
-	;!!!RCALL	SYFUN
-;!!!R	BR	E.RTI2
-;!!!R2$:	.POP1
-;!!!R	CMP	R0, #V.SETF
-;!!!R	BNE.E
-	BR	E.RTI2
+	BR	BEQ.E.
 ;;--------
 
 .	= TRPSEC + B.LONG
 TRPLON:	ADD	#TRAPS - <OP.TRAP + B.LONG * 2>, (SP)
-.IF DF K1801
+.IF NE C$VM1
 	MOV	@(SP)+, -(SP)
 .IFF
 	MOV	@(SP), (SP)
@@ -305,12 +305,9 @@ SEC.:	SEC
 
 
 
-PUFL2.: MOV	SP, R1
-PUFL3.:	MOV	(R1)+, (R5)+
-	MOV	(R1)+, (R5)+
-	MOV	(R1)+, (R5)+
-	MOV	(R1)+, (R5)+
-	MOV	R3, SP
+PUFL2.: MOV	SP, R2
+PUFL3.:	CALL	COPY4
+	MOV	R5, SP
 PCLC.:	POP	R1
 CLC.:	CLC
 ;	BR	E.RTI3		; fallback
@@ -435,20 +432,23 @@ E.TRP0:	BR	E.TRP7
 AFALS.:	CLR	R1
 	BR	B.RET1
 
+.IF NE C$BK10
 .	= A.TRAP + <110 - B.2.4 * 4>
 ;; Called by BASIC
 ;; R2: line length, R3: $BUF
-T110:	ADD	#16, SP
-	ADD	R2, R3			; R: end of line
-	MOV	R3, R1
+T110:	ADD	#14, SP
+	POP	R1		; R1: end of line
+;	ADD	R2, R3
+;	MOV	R3, R1
 	MOVB	#C.NL, (R1)+		; terminate line by NL
 	JMP	GETLI1
+	NOP
+.ENDC	; C$BK10
 
-.IF DF C$MDAR
+.IF NE C$MDAR
 T.AR.:	.ARP
 	BR	ENSTYP
 .ENDC
-
 
 
 SWP13.:	MOV	R1, R3.OFF(SP)
@@ -568,7 +568,6 @@ F.U16.:	CMP	R1, #FIXEND-FIXOFF
 
 
 
-
 ;; TO.U16
 TOU16.: MOV	#F32768+2, R2
 	.BASN
@@ -582,7 +581,12 @@ E.RTJ:	MOV	R5.OFF(SP), R5
 E.RTK:	MOV	R3, R5.OFF(SP)
 R.BAS:	POP	R4, R3
 	.CKSTK
+.IF NE C$BK10
 	JMP	$RTI20        		; POP R2, R0; RTI
+.IFF
+	POP	R2, R0
+	RTI
+.ENDC
 
 TYCOD.: CLR	R0
 	PUSH	R1
@@ -603,14 +607,14 @@ TYCOD.: CLR	R0
 	BR	Q.FLT
 1$:	ASR	R2
 	BCS	Q.STR
-.IF DF K1801
+.IF NE C$VM1
 	MOV	(R1), R1
 .IFF
 	MOV	-1(R1), R1
 .ENDC
 	;to save stack .LISTP
 	BEQ	Q.SYMB
-.IF DF C$MDAR
+.IF NE C$MDAR
 	CMP	R1, #V.0	; R1 - negative for ARRAYS
 	BCS     Q.ARR
 .ENDC
@@ -621,7 +625,7 @@ TYCOD.: CLR	R0
 	CMP	R1, #V.STM
 	BEQ	Q.STM
 	BR	Q.SYMB		;!!!TODO check R1 is list here
-.IIF DF C$MDAR,		Q.ARR:	INC	R0
+.IIF NE C$MDAR,		Q.ARR:	INC	R0
 Q.SPOP:	INC	R0
 Q.LAMB:	INC	R0
 Q.FUN:	INC	R0
@@ -649,7 +653,7 @@ PO.FL.:	.ALL.2
 	MOV	(R4)+, (R1)+
 	MOV	(R4)+, (R1)
 	CMP	-(R1), -(R1)		; R1: DOUBLE object
-;; REMOVE WORDS FROM STACK UNTIL R4
+;; Remove words from Stack until R4
 REMOV.:	MOV	SP, R0
 	ADD	#ST.OFF, R0
 1$:	MOV	-(R0), -(R4)

@@ -1,4 +1,4 @@
-;;; Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
+;;; Copyright (c) 2021-2022 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
 ;;;
 ;;; SPDX-License-Identifier: MIT
 
@@ -24,19 +24,6 @@ LAST::	MOV	R1, R5		; second-list lagging by n
 	BR	1$
 
 
-;; (1+ number) => successor
-INCR::	TST	(R0)+			; R0 = 2
-;; (1- number) => predecessor
-DECR::	ADD	#V.0-1, R0
-	MOV	R0, R2
-	MOV	#$DADD, R4
-BAS1:	MOV	R4, BAS2A
-BAS2:	.BASN
-	.WORD	DPUR12
-BAS2A:	.WORD	$DADD
-DREFLT:	.WORD	RBAS.5
-
-
 ;; (LOG number &optional base) => logarithm
 LOG::	PU.FL
 	.BASIC	$LOG                       ;!!!TODO OPTIMIZE
@@ -47,12 +34,10 @@ LOG::	PU.FL
 
 
 
-
-
 ;; (SVREF simple-vector index) => element
 SVREF::	T.VEC
 	.SWP12
-.IIF NDF K1801, DEC	R2
+.IIF EQ C$VM1, DEC	R2
 	MOV	(R2)+, R0	; R0: vector length
 	SUB	#FIXOFF, R0
 SVREF1:	TO.U16
@@ -63,11 +48,7 @@ SVREF1:	TO.U16
 	MOV	(R2), R1
 	RETURN
 
-.IF DF C$MDAR
-
-
-
-
+.IF NE C$MDAR
 ;; (ARRAY-DIMENSION array axis-number => dimension
 ARDIM::	.ARDMS			; (ARRAY-DIMENSIONS array)
 .ENDC
@@ -81,14 +62,28 @@ ELT::	.STRP
 	BNE	R.CAR
 E.RANG:	TRAP	9.			; index is out of range
 
-.IF DF C$MDAR
+;; (1+ number) => successor
+INCR::	TST	(R0)+			; R0 = 2
+;; (1- number) => predecessor
+DECR::	ADD	#V.0-1, R0
+	MOV	R0, R2
+	MOV	#$DADD, R4
+BAS1:	MOV	R4, BAS2A
+BAS2:	.BASN
+	.WORD	DPUR12
+BAS2A:	.WORD	$DADD
+DREFLT:	.WORD	RBAS.5
+
+
+
+.IF NE C$MDAR
 
 ;; (ROW-MAJOR-AREF array index) => element
 RMAR::	.VECP
 	BCS	ELT		; (elt rray index)
 	T.AR
 	.SWP12			; R1: index
-	.IIF NDF K1801, DEC	R2
+	.IIF EQ C$VM1, DEC	R2
 	MOV	#FIXOFF-1, R0
 	SUB	(R2)+, R0	; R0: (ARRAY-TOTAL-SIZE array)
 	TST	(R2)+
@@ -121,17 +116,6 @@ TAILP::	.SWP12
 	BR	1$
 
 
-
-
-
-;!!!R	STR:
-;!!!R		MOV	#3, R0
-;!!!R	CMTBIT:
-;!!!R		CALL	HEAPP
-;!!!R		BCC.F
-;!!!R		BIC	#177774, R1
-;!!!R		CMP	R1, R0
-;!!!R		B.ZF
 
 EQLPCH: .SWP12
 	.CHARP
@@ -236,12 +220,12 @@ EQUALP::
        .BYTE   <2$ - 1$> / 2		; SYSTEM FUNCTION
        .BYTE   <2$ - 1$> / 2		; LAMBDA FUNCTION
        .BYTE   <2$ - 1$> / 2		; SPECIAL OPERATOR
-.IIF DF C$MDAR .BYTE   <5$ - 1$> / 2	; ARRAY
+.IIF NE C$MDAR .BYTE   <5$ - 1$> / 2	; ARRAY
        .EVEN
 2$:    RE.NIL
 
-.IF  DF C$MDAR
-5$:	.IIF NDF K1801, DEC	R1
+.IF  NE C$MDAR
+5$:	.IIF EQ C$VM1, DEC	R1
 	MOV	(R1), R5
 	NEG	R5
 	ADD	#FIXOFF+1, R5
@@ -249,13 +233,11 @@ EQUALP::
 .ENDC	; C$MDAR
 
 4$:
-.IIF NDF K1801, DEC	R1
+.IIF EQ C$VM1, DEC	R1
 	MOV	(R1), R5
 	SUB	#FIXOFF - 1, R5		; LOOP COUNTER: LEN + 1 TO COMPARE LENGTH FIELD TOO
 6$:
-.IF NDF K1801
-	BITB	-(R3), -(R4)		; --R3; --R4
-.ENDC
+.IIF EQ C$VM1,	BITB	-(R3), -(R4)		; --R3; --R4
 3$:	.PRED	EQLP2
 	BCC.F
 	CMP	(R3)+, (R4)+	; R3 += 2; R4 += 2
@@ -339,6 +321,11 @@ LOGOC1::
 LOGOC3: BIC	R2, R1
 	BR	LOGNO1
 
+;; (LOGNOT integer) => result-integer
+LOGNOT::
+	TO.I16
+	BR	LOGNO1
+
 ;; (LOGNOR integer-1 integer-2) => result-integer
 LOGNOR:: .TI16B
 	BIS	R2, R1
@@ -399,13 +386,20 @@ UNR.CH::
 	MOV	(R4)+, R1
 	.STRP
 	BCS	1$		; string-input-stream
+.IF NE C$RT11
+	MOV	R2, (PC)+
+UNRCH:	.WORD	0
+	BR	9$
+.IFF
+;!!!TODO
 	MOV	#INCUR, R4
 ;!!!R	MOV	(R4), R3
 	CMP	(R4), #$BUF + 1
 	BLO.E
 ;!!!R	MOVB	R2, -(R3)
+.ENDC	; C$RT11
 1$:	DEC	(R4)		; --curPos
-	CLR	R1
+9$:	CLR	R1
 	RETURN
 
 
@@ -445,29 +439,10 @@ FILL::	MOV	R2, R3		; R3: item
 	.SH210			; R1: sequence, R2: (LENGTH sequence)
 1$:	DEC	R2
      	CMP	R2, #V.0
-	BLO	R.PLSP
+	BLO	R.SORT
 	.PRED	X.ELT
 	BR	1$
 
-;; Find place in property-list
-;; Input: R1: symbol, R2: property-indicater
-;; Returns: R5: (pointer to place)+2, R4: pointer to current list item; ZF=1, R5=0 if not found
-PLSPLC: T.SYM
-.IF NDF K1801
-	DEC	R1
-.ENDC
-PLSPL4:	MOV	R1, R5
-PLSPL2:	MOV	R5, R4		; R4: &tail
-	MOV	(R4), R5	; R5: Property-list
-;; Assume ZF: R5==0
-PLSPL1:	BEQ	R.PLSP
-	MOV	(R5)+, R0	; R0: property name
-	MOV	(R5), R5
-	TST	(R5)+		; R5: &tail
-	CMP	R0, R2
-	BNE	PLSPL2        	; continue search
-	CLZ
-R.PLSP:	RETURN
 
 ;; (REMPROP symbol indicator) => bool
 REMPROP::
@@ -494,30 +469,19 @@ SORT34: MOV	R2, R0
 	MOV	(R3), R1      	; swap @(R3), (R4)
 	MOV	(R4), (R3)
 	MOV	R1, (R4)
-1$:	RETURN
+1$:
+R.SORT:	RETURN
 
 
 ;; (SORT sequence predicate) => sorted-sequence
-SORT::	PUSH	R1
+SORT::	MOV	R1, R3
 	.LENGTH
-	CMP	R1, #V.2
-	BLO	9$
-	MOV	R1, R5
-	MOV	(SP), R1
+	MOV	R1, R5		; R5: length
+	MOV	R3, R1
 	.SVECP
-	BCS	5$
-	MOV	R1, R3		; SORT LIST
-	BR	4$
-2$:	MOV	2(R4), R4
-	BEQ	3$
-	.SORT34
-	BR	2$
-3$:	MOV	2(R3), R3
-	BEQ	9$
-4$:	MOV	R3, R4
-	BR	2$
-5$:	MOV	R1, R3		; SORT VECTOR
-	SUB	#FIXOFF + 1, R5
+	BCC	4$      	; Sort List
+	SUB	#FIXOFF + 1, R5	; Sort Vector
+	BLOS	9$
 6$:	TST	(R3)+
 	MOV	R3, R4
 	PUSH	R5
@@ -526,8 +490,14 @@ SORT::	PUSH	R1
 	SOB	R5, 7$
 	POP	R5
 	SOB	R5, 6$
-9$:	POP	R1
-	RETURN
+9$:	RETURN
+3$:	MOV	2(R3), R3
+	BEQ	9$
+4$:	MOV	R3, R4
+2$:	MOV	2(R4), R4
+	BEQ	3$
+	.SORT34
+	BR	2$
 
 ;; (RASSOC item alist) => entry
 RASSOC::
@@ -616,7 +586,7 @@ RPLACA::
 	MOV	R2, (R1)
 	RETURN
 
-.IF DF C$FULL
+.IF NE C$FULL
 TENTH::	INC	R0
 NINTH::	INC	R0
 EIGHTH::
@@ -655,8 +625,13 @@ MEMBER::
 R.M31:	MOV	R3, R1
 	RETURN
 
-.IF DF BK10.01
-
+.IF NE C$RT11
+GETCH:	MOV	UNRCH, R1
+	CLR	UNRCH
+	TST	R1
+	BNE	9$
+M.IN::	.TTYIN	R1
+.IFF
 GETLIN: CALL	$IVEIL
 GETLI1:	MOV	#$BUF, (PC)+
 INCUR:	.WORD	$BUF
@@ -668,10 +643,8 @@ INEND:	.WORD	$BUF
 	MOV	#V.CHB, R1
 	BISB	@(R0)+, R1	; READ CHAR INTO R1
 	INC	-(R0)
-.IFF
-	.TTYIN	R1
-.ENDC
-	RETURN
+.ENDC	; C$RT11
+9$:	RETURN
 
 
 ;; (READ-CHAR input-stream T)
@@ -711,7 +684,6 @@ X.SYFU::
 	MOV	R2, 1(R1)
 R.M21:	MOV	R2, R1
 R.A:	RETURN
-
 
 
 

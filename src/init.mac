@@ -1,49 +1,150 @@
-;#######   Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com #####
-;#                                                                                                                                #
-;#       See LICENSE for licensing information                                                                                    #
-;##################################################################################################################################
+;;; Copyright (c) 2021-2022 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
+;;;
+;;; SPDX-License-Identifier: MIT
 
-;;; Initialization code discarded after start
+;;; Initialization code, discarded after starting
 
-START:
-START2:	MOV	#GREET, R1
-	CLR	R2
-	EMT	20
-CKBK10:	CMP	132716, #033070		; Check some Vilnus BASIC ROM - specific word
+.GLOBL	LOADER, RESET, ROOM1, I.PCHR, I.STOP, I.TRAP, M.BIT
+.GLOBL	M.IN, M.OUT, M.POS, M.PRIN, M.QUIT
+
+.IF NE C$BK10
+EBK11M:	CALL	@140160		; .PRINT
+	MOV	#BK11ME, R1
+ 	CALL	@140160		; .PRINT
+ 	CALL	@140012		; .EXIT
+.ENDC	; C$BK10
+
+START2::
+	MOV	#INCMPT, R1
+.IF NE C$BK10
+CKBK10:	CMP	160000, #104405	; Check some Vilnus BASIC ROM - specific word
 	BEQ	INIT
-	MOV	#NOBK10, R1
-	CLR	R2
-	EMT	20
-	RETURN
-
-INIT:	MOV	#GREET - STATUS, R1
-1$:	MOVB	STATUS-1(R1), R0
-	EMT	22			; write to Status Line
-	SOB	R1, 1$
-
-	MOV	#I.PCHR, @#10
-	MOV	#M.BIT, @#20		; Init IOT vector
-	MOV	#I.TRAP, @#34
-	CLR	@#36
+	CMP	140010, #150414
+	BEQ	EBK11M
+	CMP	140010, #5746
+	BEQ	EBK11
+	CLR	R2		; BK-0010 without BASIC
+	EMT	20		; .PRINT
+	MOV	#BK10E, R1
+	EMT	20		; .PRINT
+	.EXIT
+EBK11:	MOV	R1, R0
+	EMT	20		; .PRINT
+	MOV	#BK11ME, R0
+ 	EMT	20		; .PRINT
+	.EXIT
+.IFF	; BK-0011 case
+	CMP	140010, #150414
+	BNE	INIT
+	;; Init for BK-0011M
+	MOV	#104001, M.QUIT		; EMT 1
+	MOV	#104033, M.IN		; EMT 33
+	MOV	#104060, M.POS		; EMT 60
+	MOV	#104063, M.OUT		; EMT 63
+	MOV	#104063, M.OUT1		; EMT 63
+	MOV	#104064, M.PRIN		; EMT 64
+	MOV	#104064, M.PRI1		; EMT 64
+	.BSFUN	#0, #0			; Reset function keys for BK-0011M
+	BR	INIT2
+.ENDC	; C$BK10
+INIT::
+.IF NE C$BK10
 	CLR	R1
-	CLR	(R1)+
-	CLR	(R1)+			; Init NIL
-	MOV	#I.STOP, (R1)+		; Init STOP key vector
-	CLR	(R1)+
+	MOV	#ESTATU - STATUS, R2
+1$:	MOVB	STATUS(R1), R0
+	EMT	22			; Write to Status Line
+	INC	R1
+	SOB	R2, 1$
+	MOV	#GREET, R0
+.IFF
+	CLR	-(SP)
+	CLR	-(SP)
+	EMT	12    			; Reset function keys for BK-0011
+INIT2:
+	.IIF NE C$BK11 MOV	#MODE64, R0
+	.IIF EQ C$BK11 MOV	#STATUS, R0
+.ENDC	; C$BK10
+
+	MOV	R0, R1
+	CLR	R2
+M.PRI1:	EMT	20
 	MOV	#S.ISTM + 1, R1
 ;	MOV	#400 + <RESET-START>/2 - 2, START		; `BR RESET` opcode
+.IF NE C$1801
 	CLR	@#$TMLIM
 	MOV	#$TMMOD, @#$TMCSR
+.ENDC	; C$1801
+.IF NE C$BK10
 	TSTB	@#$EXTM
 	BEQ	2$		; non-ExtMem mode
 	MOVB	#1, @#$EXTM	; Lock ExtMem mode
 ;	MOV	#HIMEME, EHEAP
+.ENDC	; C$BK10
 2$:
-;!!!T	.SUBR	LOAD			; (LOAD init-stream)
-	JMP	RESET
 
-STATUS:	.ASCII	"Lisp v.2021  ufasoft.com/bklisp"
-GREET:	.ASCII	"Lisp v.2021 for "<C.CY.B><C.CY.K>"-0010.01 ufasoft.com/bklisp"<C.NL>
-GREET1:	.ASCIZ	"(c) Sergey Pavlov  dev@ufasoft.com 2021"<C.NL>
-NOBK10:	.ASCII	<C.NL>/ERROR!/<C.NL>/Incompatible System detected/
-	.ASCIZ	<C.NL>/This software requires Vilnus BASIC 1986 firmware (/<C.CY.B><C.CY.K>/-0010.01)/<C.NL>
+;;--- Init TRAPs & Heap ----------------------
+ 	MOV	#M.BIT, @#20
+	CLR	R1
+	CLR	(R1)+
+	CLR	(R1)+			; Init NIL
+.IF NE C$RT11
+	MOV	#I.PCHR, @#10
+
+	.SETTOP	$SYPTR			; Allocate max space
+	MOV	$USRTO, EHEAP
+.IFF
+	MOV	#I.STOP, (R1)+		; Init STOP key vector
+	CLR	(R1)+
+	MOV	#I.PCHR, (R1)+
+	MOV	#I.TRAP, @#34
+.ENDC ; C$RT11
+
+
+.IF NE C$BK11
+	.BKRES
+	.BPAGE	#2, #1			; Map RAM Page #2 to address 100000
+	BCC	5$
+	MOV	#100000, EHEAP		; Fallback to lower memory limit
+5$:
+.ENDC ; C$BK11
+
+;; Calculate GCBMSZ
+.IF EQ C$BK10
+	MOV	EHEAP, R1
+	MOV	R1, R2		; R1, R2: EHEAP
+	SUB	#HEAP, R1
+	CLR	R0
+6$:	TST	(R0)+		; R0 += 2
+	SUB	#66., R1
+	BHI	6$
+	MOV	R0, GCBMSZ	; GCBMSZ: Heap size / 32, even
+	SUB	R0, R2
+	BIC	#37, R2
+	MOV	R2, EHEAP
+;; Init heap free size
+	SUB	#HEAPFRE, R2
+	ASR	R2
+	ASR	R2
+	MOV	R2, HEAPFRE
+.ENDC ; C$BK10
+
+
+INIT4:	MOV	#ASTKUP, SP
+;!!!T	.SUBR	LOAD			; (LOAD init-stream)
+	CALL	ROOM1			; Print Room
+	JMP	RESET
+;	JMP	LOADER
+
+MODE64:	.ASCII	<033><061><C.CR><C.NL>		; 64 columns/line
+STATUS:	.ASCII	"BkLisp 2022  ufasoft.com/bklisp"
+ESTATU: .ASCII	<C.CR><C.NL>
+GREET:	.ASCII	"Lisp for "
+.IIF NE C$RT11	.ASCII	"RT-11"
+.IIF NE C$BK10	.ASCII	<C.CY.B><C.CY.K>"-0010.01"
+.IIF NE C$BK11	.ASCII	<C.CY.B><C.CY.K>"-0011["<C.CY.M>"]"
+	.ASCIZ	"  (c) Sergey Pavlov dev@ufasoft.com"<C.CR>
+INCMPT:	.ASCIZ	<C.CR><C.NL>/ERROR!/<C.CR><C.NL>/Incompatible System detected/
+BK11ME:
+.IIF NE C$BK10		.ASCIZ	<C.CR>/For /<C.CY.B><C.CY.K>/-0011[/<C.CY.M>/] run bklisp.11m/
+.IIF NE C$BK10	BK10E:	.ASCIZ	<C.CR><C.NL>/Vilnus BASIC 1986 firmware (/<C.CY.B><C.CY.K>/-0010.01) is required/<C.CR><C.NL>
+.IIF NE C$BK11		.ASCIZ	<C.CR><C.CY.B><C.CY.K>/-0011 ROM required/<C.CR>

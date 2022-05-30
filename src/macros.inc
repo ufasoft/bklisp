@@ -1,13 +1,38 @@
-;;; Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
+;;; Copyright (c) 2021-2022 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
 ;;;
 ;;; SPDX-License-Identifier: MIT
 
-
 ;; Macro definitions for frequent procedures
 
+
+.INCLUDE	/defcfg.inc/
+.IIF NE C$RT11	.INCLUDE	/rt11.inc/
+.IIF NE C$BK10	.INCLUDE	/bk1001.inc/
+.IIF NE C$BK11	.INCLUDE	/bk11.inc/
+
 C.EXTM	= 214
+
+C.BC	= 23	; BC key (return previous string)
+
+;; Cyrillic letters in KOI8 encoding
+C.CY.A	= 341
 C.CY.B	= 342
+C.CY.I	= 351
 C.CY.K	= 353
+C.CY.M	= 355
+C.CY.O	= 357
+C.CY.W	= 373		; 'Sh'
+
+;; Stack overflow
+.MACRO	.E.SO
+	TRAP	1
+.ENDM
+
+.MACRO	.CKSTK
+	CMP	SP, #ASTKLO	; out-of-TRAP check to speedup EVAL
+	BHIS	.+4
+	.E.SO
+.ENDM
 
 
 ;; Syntax error
@@ -15,9 +40,19 @@ C.CY.K	= 353
 	TRAP	2
 .ENDM
 
+;; Syntax error
+.MACRO	.E.ARG
+	TRAP	5
+.ENDM
+
 ;; Math error
 .MACRO	ER.MATH
 	TRAP	6
+.ENDM
+
+;; Divide by zero
+.MACRO	.E.DIVZ
+	TRAP	11.
 .ENDM
 
 ;; UNKNOWN ERROR
@@ -26,17 +61,17 @@ C.CY.K	= 353
 .ENDM
 
 ;; Array dimension is too big
-.MACRO	ER.DIM
+.MACRO	.E.DIM
 	TRAP	16.
 .ENDM
 
 ;; Undefined function
-.MACRO	ER.FUN
+.MACRO	.E.FUN
 	TRAP	18.
 .ENDM
 
 ;; I/O error
-.MACRO	ER.IO
+.MACRO	.E.IO
 	TRAP	19.
 .ENDM
 
@@ -97,12 +132,6 @@ B.TYPP	= 340			; Base for .TYPEP
 .ENDM
 
 
-.MACRO	.CKSTK
-	CMP	SP, #ASTKLO	; out-of-TRAP check to speedup EVAL
-	BHIS	.+4
-	TRAP	1
-.ENDM
-
 .MACRO	.LENGTH
 	.TJ	LENGT., B.SUBR+0
 .ENDM
@@ -127,7 +156,7 @@ B.TYPP	= 340			; Base for .TYPEP
 .ENDM
 
 ;; READ OBJECT FROM R2 STREAM
-.MACRO	.READ
+.MACRO	.$READ
 	.TJ	READ., B.SUBR+5		; calls READ1
 .ENDM
 
@@ -216,7 +245,7 @@ B.TYPP	= 340			; Base for .TYPEP
 .ENDM
 
 ;; (WRITE R1 :stream R2)
-.MACRO	.WRITE
+.MACRO	.$WRITE
 	.TJ	, B.PRED+3
 .ENDM
 
@@ -247,7 +276,7 @@ B.TYPP	= 340			; Base for .TYPEP
 .ENDM
 
 ;; Print object R1 into stream designator R2
-.MACRO	.PRINT
+.MACRO	.PRNT
 	.TJ	, B.PRED+12
 .ENDM
 
@@ -675,13 +704,35 @@ U.SVEC	= 10	; SIMPLE VECTOR
 U.FUN	= 11	; SYSTEM FUNCTION
 U.LAMB	= 12	; LAMBDA FUNCTION
 U.SPOP	= 13	; SPECIAL OPERATOR
-.IIF DF C$MDAR, U.AR	= 14
+.IIF NE C$MDAR, U.AR	= 14
 
 MAXTOK = 31.	; Max token length 4*n-1
 
-;; Hardcoded for modularization
-HEAP	= 022400	; Bit.2 of HEAP address must be 0. Used by AND/OR
-HIMEM	= 40000		; End of Heap
-HIMEME	= 70000		; End of Heap in Extended-memory mode
 
-EHEAP	= $ANVP
+.IF NE C$BK10
+	ASTKLO	= 300
+	ASTKUP	= 1004	; +4: space for JMP @#START instruction
+.IFF
+	ASTKLO	= 400
+	ASTKUP	= 4000	; Includes 1K for GC bitmap
+.ENDC
+
+
+.IF EQ C$AMAL
+	;; Hardcoded for modularization
+	;; Bit.2 of HEAP address must be 0. Used by AND/OR
+	.IIF NE C$BK10,	HEAP	= 022400
+	.IIF NE C$BK11,	HEAP	= 042700		; because of system area in 042600
+.ENDC
+
+.IF NE C$BK10
+	HIMEM	= 40000		; End of Heap
+	HIMEME	= 70000		; End of Heap in Extended-memory mode
+.ENDC ; C$BK10
+
+.IF NE C$BK11
+	HIMEM	= 140000	; End of Heap  BK-11
+	HIMEME	= HIMEM
+.ENDC ; C$BK11
+
+.IIF NE C$BK10	EHEAP	= $ANVP

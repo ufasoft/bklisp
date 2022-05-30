@@ -1,6 +1,7 @@
 Prompt
-  Lisp (.+) ufasoft.com/bklisp (re)
-  (c) Sergey Pavlov  dev@ufasoft.com 2021
+  Lisp (.+)ufasoft.com (re)
+  Lisp (re)
+  Bytes free (re)
 Addition
   $ (+ 1 2 3)
   6

@@ -1,4 +1,4 @@
-;;; Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
+;;; Copyright (c) 2021-2022 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
 ;;;
 ;;; SPDX-License-Identifier: MIT
 
@@ -71,7 +71,7 @@ MKSEQ::	MOV	R1, R2		; R2: result-type
 	BNE.E
 ;; (MAKE-ARRAY dimensions) =>	vector
 MKAR::
-.IF DF C$MDAR
+.IF NE C$MDAR
 	MOV	R1, R5		; R5: dimensions
 	.LISTP
 	BCS	5$
@@ -84,15 +84,14 @@ MKAR::
 	BNE	4$
 	.NREV0			; R1: dimensions as FIXNUMS
 	MOV	R1, R4		; R4: dimensions
-	MOV	R1, R5		; R5: dimensions
-	.SUBR	S.MUL
+	.SUBR	S.MUL1
 	TO.U16
 	INC	R1
 	PUSH	#1$
 	CLR	R0		; R0: init element
 3$:	CMP	R1, #FIXEND/2
 	BLO	6$
-	ER.DIM
+	.E.DIM
 6$:	MOV	R1, R3
 	ADD	#FIXOFF, R3
 	MOV	R1, R5
@@ -103,14 +102,14 @@ MKAR::
 	BR	INC1RA
 
 1$:	MOV	R4, 1(R1)		; dimensions
-.IIF NDF K1801,		DEC	R1
+.IIF EQ C$VM1,	DEC	R1
 	NEG	(R1)
 	ADD	#FIXOFF*2, (R1)
-.IIF NDF K1801,		INC	R1
+.IIF EQ C$VM1,		INC	R1
 	RETURN
 .ENDC
 
-.IF DF C$MDAR
+.IF NE C$MDAR
 
 ;; (ARRAY-ROW-MAJOR-INDEX array &rest subscripts) => index
 ARMI::	CLR	R4		; result index
@@ -120,11 +119,8 @@ ARMI::	CLR	R4		; result index
 
 
 ;	.SUBR	MULDIM
-	PUSH	R5
-	MOV	R1, R5
-	.SUBR	S.MUL
+	.SUBR	S.MUL1
 	TO.U16
-	POP	R5
 
 	MOV	R1, R2		; R2: (APPLY '* (CDR dimensions))
 	.POP5
@@ -141,7 +137,7 @@ ARMI::	CLR	R4		; result index
 .ENDC	; C$MDAR
 
 
-.IF DF C$MDAR
+.IF NE C$MDAR
 
 R.AR2:	MOV	R1, R5
 	.LENGTH
@@ -154,7 +150,7 @@ R.AR1:	SOB	R3, R.AR2
 	MOV	R1, R0		; R0: dimensions
 	.MKAR			; R1: (MAKE-ARRAY dimensions)
 	MOV	R1, R2
-.IIF NDF K1801,	DEC R2
+.IIF EQ C$VM1,	DEC R2
 	CMP	(R2)+, (R2)+	; R2: points to first element
 	.SWP01			; R0: array, R1: dimensions
 	CALL	FILLAR
@@ -179,7 +175,7 @@ MKSTR1:	CMP	R1, #256.
 	MOV	R1, R4
 	.ALLOC
 	MOVB	R4, (R1)+	; SAVE LEN HEADER
-.IF DF K1801
+.IF NE C$VM1
 	TST	(R1)+		; R1 += 2
 .IFF
 	ADD	#2, R1
@@ -242,10 +238,10 @@ FMT.S:	.POP5
 
 
 
-.IF DF C$MDAR
+.IF NE C$MDAR
 ;; #nA(...) syntax reader
 ;; INPUT: R3: n+1
-R.AR:	.READ
+R.AR:	.$READ
 	MOV	R1, R4		; R4: array as list structure
 	BR	R.AR1
 .ENDC	; C$MDAR
@@ -291,8 +287,8 @@ PO.STR:	MOV	R0, R1
 	BEQ	RE.STR		; EMPTY STRING
 	.SUBR	MKSTR1
 	ADD	R5, R1
-.IIF DF K1801, 	TST	-(R1)	; R1 -= 2: points after last char in the string
-.IIF NDF K1801,	SUB	#2, R1	; R1: points after last char in the string
+.IIF NE C$VM1, 	TST	-(R1)	; R1 -= 2: points after last char in the string
+.IIF EQ C$VM1,	SUB	#2, R1	; R1: points after last char in the string
 2$:	MOVB	(R0), -(R1)	; TRAVERSE SAVED CHARS, FROM LAST TO FIRST
 	MOV	2(R0), R0
 	SOB	R5, 2$
@@ -339,7 +335,7 @@ R.TOK1:	.ROCHR
 5$:	MOV	#TOKBUF, R3
 	MOV	R3, R1
 	MOV	R3, R5
-.IF DF K1801
+.IF NE C$VM1
 	TST	(R1)+		; R1: token as string object
 .IFF
 	ADD	#2, R1
@@ -376,7 +372,7 @@ R.SHARP:CLR	R3
 3$:	.CHRUP
 	.CCASE
 1$:	.WORD	4$ - . - 2 / 2
-.IIF DF C$MDAR	.BYTE	'A, <R.AR - 1$>/2
+.IIF NE C$MDAR	.BYTE	'A, <R.AR - 1$>/2
 	.BYTE	'|, <R.LCOM - 1$>/2
 	.BYTE	'\, <RS.CH - 1$>/2
 	.BYTE	'(, <R.VEC - 1$>/2
@@ -445,7 +441,7 @@ READ.1:	.ROCHR
 ;; R1: CHAR
 ;; R2: STREAM
 	.CCASE
-.IF DF C$MACR
+.IF NE C$MACR
 1$:	.WORD	13.
 	.BYTE	'`	, <R.BACK - 1$>/2
 	.BYTE	',	, <R.COMMA - 1$>/2
@@ -461,7 +457,7 @@ READ.1:	.ROCHR
 	.BYTE	C.SEMI	, <R.SEMI - 1$>/2
 	.BYTE	C.HT	, <R.SPACE - 1$>/2
 	.BYTE	C.NL	, <R.SPACE - 1$>/2
-	.BYTE	C.LF	, <R.SPACE - 1$>/2
+	.BYTE	C.FF	, <R.SPACE - 1$>/2
 	.BYTE	C.CR	, <R.SPACE - 1$>/2
 
 	CALL	R.TOK3
@@ -480,7 +476,7 @@ READ.1:	.ROCHR
 	SUB	R5, R3
 	CMP	R3, R4
 	BNE	3$
-	POFL.R			; NUMBER IS PARSED, Allocate and return DOUBLE object
+	POFL.R			; Number is parsed, Allocate and return DOUBLE object
 3$:	ADD	#10, SP
 5$:	MOVB	R4, -(R5)	; TOKLEN = len
 	MOV	#TOKLEN+3, R1	; TOKEN AS STRING OBJECT
@@ -507,7 +503,7 @@ R.SEMI: MOV	#V.C.NL, R1
 	BR	READ.1
 
 
-.IF DF C$MACR
+.IF NE C$MACR
 R.BACK:			;!!!TODO BACKQUOTE
 	.E.SX
 
@@ -522,7 +518,7 @@ R.FUN:	ADD	#V.FUN - V.QUOT, R1	; (FUNCTION function-name)
 ;; R1: V.C.QO
 R.QUOTE:ADD	#V.QUOT - V.C.QO, R1		; (QUOTE x)
 	.PUSH0
-	.READ
+	.$READ
 	.PUSH0
 R.NREV:	.NREV0
 	RETURN
@@ -539,7 +535,7 @@ R.DELI::
 R.DEL1:	PUSH	R0		; (SP): dotted element (initally NIL), R0: list
 	CLR	R5		; HAVE DOT
 	BR	4$
-1$:	.READ
+1$:	.$READ
 	CMP	R1, #V.DOT
 	BEQ	2$
 	TST	R5		; DOTTED ELEMENT
@@ -560,7 +556,7 @@ R.DEL1:	PUSH	R0		; (SP): dotted element (initally NIL), R0: list
 
 
 
-.IF DF C$MDAR
+.IF NE C$MDAR
 
 ;; (ARRAY-RANK array) => rank
 ARRANK::
@@ -570,18 +566,24 @@ ARDIMS::
 	.VECP
 	BCS	2$
 	T.AR
-	MOV	1(R1), R1
+	BR	SYFUN1
 	RETURN
 2$:	.LISTP
 	BCS.E
 	.LENGTH
 .ENDC	; C$MDAR
-
 LISTIFY::
 	.LISTP
 	BCS	RET.8
 LISTI1:	MOV	R0, R2		; CLR R2
 	BR	RCONS3
+
+;; (SYMBOL-FUNCTION symbol) => contents
+SYFUN::	.PRED	FBOUNDP
+	BCC.E
+SYFUN1:	MOV	1(R1), R1
+	RETURN
+
 
 ;; (COPY-TREE tree) => new-tree
 CPTREE::
@@ -610,17 +612,6 @@ MKRNDS::
 
 
 
-;; (LOGNOT integer) => result-integer
-LOGNOT::
-	TO.I16
-	COM	R1
-	FI16.R
-
-P.ERR: 	MOV	#$ERROR, R1
-	MOV	#8., R2
-	EMT	20
-	RETURN
-
 ;; (ERROR datum) =>
 ERROR::	.PRED	P.ERR
 	CLR	R2
@@ -633,12 +624,13 @@ FRESHL::
 	MOV	R1, R3		; R3: stream
         MOV	1(R1), R1
         .LISTP
-        BCC	2$		; STDOUT
+        BCC	1$		; STDOUT
         CMP	(R1), #V.C.NL	; is last char NL ?
-        BR	8$
-2$:	EMT	26		; Get terminal Cursor coordinates
+        BR	FRESH8
+1$:
+M.POS::	EMT	26		; Get terminal Cursor coordinates
 	TST	R1
-8$:	BEQ	R.R0		; zero pos in terminal line or last char was NL
+FRESH8:	BEQ	R.R0		; zero pos in terminal line or last char was NL
 	MOV	R3, R1		; R1: stream
 	MOV	R3, R0		; R0: return true value
 ;; (TERPRI &optional output-stream) => nil
@@ -716,7 +708,7 @@ NREVE1:	BNE	NREVE4		; THIS IS CALLED EXTERNALLY
 NREV.V:	.SVECP
         BCC	NREV.S
 	MOV	R1, R0
-.IIF NDF K1801,	DEC	R1
+.IIF EQ C$VM1,	DEC	R1
 	MOV	(R1)+, R2	; R1: points to begin
 	SUB	#FIXOFF, R2	; R2: vector length
 	MOV	R1, R4
@@ -737,7 +729,7 @@ R.IDE:
 NREV.S:	T.STR
 	BISB	-3(R1), R0	; R0: length
 	MOV	R1, R2
-.IF DF K1801
+.IF NE C$VM1
 	TST	-(R2)
 .IFF
 	SUB	#2, R2
@@ -773,7 +765,7 @@ SYNAM::	T.SYM
 	TST	(R1)
 	BEQ	SYNAM8		; ASCII name
 
-.IF DF C$RAD40
+.IF NE C$RAD40
 	.R2STR
 .IFF
 	CALL	R2STR
@@ -845,7 +837,7 @@ GENSYM::
 MKSYM::	T.STR
 MKSYM1:
 	CALL	STR2R
-	BCS	2$			; RASIC-50 ffaild, fallback to ASCII
+	BCS	2$			; RADIX-50/40 failed, fallback to ASCII
 	MOV	R3, R5
 	ADD	#11 - $BUFOUT, R5
 	MOV	#$BUFOUT, R4
@@ -865,7 +857,7 @@ MKSYM1:
 	CLR	R0			; to clear PLIST, function field and last word
 	.ALLOC
 	ADD	R1, R2
-8$:	MOVB	(R4)+, (R2)+		; COPY NAME
+8$:	MOVB	(R4)+, (R2)+		; Copy name
 	SOB	R3, 8$
 	BR	INC1.R			; R1: Symbol
 
@@ -891,9 +883,7 @@ CPSEQ::	.LISTP
 	BCS	CPLIST
 	.SVECP
 	BCC	CPSTR
-.IF NDF K1801
-	DEC	R1
-.ENDC
+.IIF EQ C$VM1,	DEC	R1
 	MOV	R1, R5		; R5 src buf
 	MOV	(R1)+, R1
 	MOV	R1, R0
@@ -901,9 +891,7 @@ CPSEQ::	.LISTP
 	SUB	#FIXOFF-1, R0
 	BEQ	CPSEQ2
 	MOV	R1, R4  	; R4: dest buf
-.IF NDF K1801
-	DEC	R4
-.ENDC
+.IIF EQ C$VM1,	DEC	R4
 CPSEQ1:	MOV	(R5)+, (R4)+
 	SOB	R0, CPSEQ1
 CPSEQ2:	RETURN
@@ -947,7 +935,7 @@ FINSY::	MOV	#VS.NIL, R2
 	MOV	R1, R5		; Compare RADIX-50 strings
 	ADD	#5, R5
 	MOV	#$BUFOUT, R4
-.IF DF C$RAD40
+.IF NE C$RAD40
 8$:	CMP	(R5)+, (R4)	; ASCII names starts with ZERO word and will be filtered-out
 	BNE	6$		; strings differ
 	TST	(R4)+
@@ -1023,7 +1011,7 @@ CN.TAB:	ADD	#A.TAB + 3 - V.C.HT, R1
 ;; (STRINGP object) => bool
 STRP::	.TYP	U.STR
 
-.IF DF C$MDAR
+.IF NE C$MDAR
 ;; (ARRAYP object) => bool
 ARP::	.VECP
 	BCS.T
@@ -1044,7 +1032,7 @@ UNINTERN::
 1$:	MOV	R0, R2		; R2: pointer to next field of SYMBOL
 	MOV	(R2), R0
 	BEQ.F			; End of OBLIST
-.IF DF K1801
+.IF NE C$VM1
 	CMP	(R0)+, (R0)+	; R0 += 4
 .IFF
 	ADD	#3, R0
@@ -1156,12 +1144,6 @@ FMAKUNBOUND::
 	CLR	1(R1)		; works for NIL too
 	RETURN
 
-;; (SYMBOL-FUNCTION symbol) => contents
-SYFUN::	.PRED	FBOUNDP
-	BCC.E
-	MOV	1(R1), R1
-	RETURN
-
 
 ;; (SLEEP seconds) => nil
 SLEEP::	TO.U16
@@ -1178,7 +1160,7 @@ SUBRP::	.TYP	U.FUN
 
 ;; (SPECIAL-OPERATOR-P symbol) => bool
 SPECOP::
-.IIF NDF K1801,	BEQ.F
+.IIF EQ C$VM1,	BEQ.F
 	T.SYM
 	MOV	1(R1), R1
 	.TYP	U.SPOP
@@ -1341,11 +1323,13 @@ TANH::	MOV	R1, R2
 	.WORD	DPUR12, $DDIV, RBAS.5
 
 
+.IF NE C$BK11
+LOAD:	.E.IO		;!!!TODO NOT IMPLEMENTED
+SAVE:	.E.IO
+.ENDC	; C$BK11
 
-;;;---------------------------------------
-;;; BK-0010.01 Specific code
-
-EIO:	ER.IO
+.IF NE C$BK10
+EIO:	.E.IO
 
 ;; (LOAD filename) => bool
 LOAD::	JSR	R5, PSNAME
@@ -1384,6 +1368,7 @@ SAVE::	MOV	#$AURET, R3
 	PUSH	#2
 	BR	LOAD1
 
+.ENDC	; C$BK10
 
 ;; (EVAL form) => result
 ;; Evaluate form in R1 in null-environment
@@ -1394,7 +1379,7 @@ EVAL::	MOV	#LEXENV, R4
 	POP	(R4)
 	RETURN
 
-.IF DF C$MDAR
+.IF NE C$MDAR
 
 ;; (ARRAY-TOTAL-SIZE array) => size
 ARTSIZ::
@@ -1402,10 +1387,10 @@ ARTSIZ::
 	BCS	LENGT1
 	T.AR
 	MOV	#FIXOFF*2-1, R4
-	.IIF NDF K1801, DEC	R1
+	.IIF EQ C$VM1, DEC	R1
 	SUB	(R1), R4
 	BR	LSTLE1
-.ENDC
+.ENDC ; C$MDAR
 
 ;; (LENGTH sequence) => n
 ;; ASSUME R0 == 0
@@ -1446,9 +1431,6 @@ SYVAL1:	BEQ.E
 	MOV	(R4), R1
 SYVAL2:	RETURN
 
-VECLEN:	T.VEC
-	BR	VECLE1
-
 P5EVL:	ADD	#ST.OFF-2, SP
 ;; Evaluate form in R1 in the current environment
 EVAL1:	.CONSP
@@ -1486,6 +1468,9 @@ EVAL1:	.CONSP
 	BCC	SYVAL2		; return
 	.PLACE
 	BR	SYVAL1
+
+VECLEN:	T.VEC
+	BR	VECLE1
 
 ;; INTERPRETED FUNCTION
 INTERP:	POP	R3		; R3: lambda-function
@@ -1554,7 +1539,7 @@ NSTRUP::
 	MOV	R0, 3$+2
 	T.STR
 	MOV	R1, R5
-.IF DF K1801
+.IF NE C$VM1
 	TST	-(R1)
 .IFF
 	SUB	#2, R1
@@ -1577,7 +1562,7 @@ R.M51:	MOV	R5, R1
 ;; (SYMBOL-PLIST symbol) => plist
 SYPLS::	T.SYM
 VECLE1:
-.IIF NDF K1801,	DEC	R1
+.IIF EQ C$VM1,	DEC	R1
 R.CAR:	MOV	(R1), R1
 	RETURN
 
@@ -1607,7 +1592,7 @@ APPLY$:	MOV	(SP), R3
 	RETURN			; Invoke SUBR; Contract: R0: 0, R1..R4: ARGS, R5: &REST
 
 
-.IF DF C$MDAR
+.IF NE C$MDAR
 
 ;; (SETF (AREF array &rest subscripts) new-element) => element
 X.AREF::
@@ -1647,9 +1632,18 @@ RBAS.5: POFL.R
 FDEFINITION::
 	.SUBR	FBOUNDP
 	BNE	R.9
-	ER.FUN
+	.E.FUN
 
 ;; (WRITE object) => object
 WRITE::	CLR	R2		; R2: *STANDARD-OUTPUT* designator
-	.WRITE
+	.$WRITE
 R.9:	RETURN
+
+.IF NE C$RT11
+;; (CLOSE stream) => result
+CLOSE::
+;!!!TODO	.FSTMP
+;	BCC.F
+	.CLOSE	1(R1)		; 1(R1): chan#
+	B.NCF
+.ENDC	; C$RT11
