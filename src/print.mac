@@ -2,7 +2,7 @@
 ;;;
 ;;; SPDX-License-Identifier: MIT
 
-;; Print Subroutines
+.SBTTL	Print Subroutines
 
 
 P.NIL:	.P.STR	A.NIL
@@ -38,6 +38,7 @@ P.SBAR:	.POP5
 .ENDC	; C$MDAR
 
 
+P.FILE:
 P.STM:
 P.FUN:
 P.LAMB:
@@ -48,24 +49,37 @@ P.OBJ:	.P.CHR	'#, '<
 	.PRIN1
 	MOV	#OBLIST-3, R1	; Search symbol by function
 1$:	MOV	3(R1), R1
+.IF NE C$FILE
+	BEQ	5$
+.IFF
 	BEQ	7$
+.ENDC
 	CMP	1(R1), R0
 	BNE	1$
-	.P.CHR	C.SP
+6$:	.P.CHR	C.SP
 	.PRIN1
-7$:	CMP	(R0)+, #V.LAMB
+7$:
+.IIF EQ C$VM1	DEC	R0
+	CMP	(R0)+, #V.LAMB
 	BNE	9$
-	.P.CHR	C.SP
-	MOV	(R0)+, R1
-	.PRIN1			; print lambda-list
+	MOV	(R0)+, R1	; print lambda-list
 	MOV	(R0)+, R5
-8$:	.POP5
-	BEQ	9$
-	.P.CHR	C.SP
+2$:	.P.CHR	C.SP
 	.PRIN1			; print function body
-	BR	8$
+8$:	.POP5
+	BNE	2$
 9$:	.P.CHR	'>
 	RETURN
+
+
+
+5$:
+.IF NE C$FILE
+	CMP	(R0), #V.FILE
+	BNE	7$
+	MOV	2(R0), R1	; R1: filename
+	BR	6$
+.ENDC ; C$FILE
 
 
 P.CONS:	MOV	R1, R5
@@ -120,15 +134,73 @@ WRITE1:	.TCASE
 	.BYTE	<P.LAMB - 1$> / 2
 	.BYTE	<P.SPOP - 1$> / 2
 .IIF NE C$MDAR, .BYTE	<P.AR - 1$> / 2
+.IIF NE C$FILE, .BYTE	<P.FILE - 1$> / 2
 	.EVEN
 
-
-W.CH2A:	.SH210
-	MOV	R0, R1
-	.CONS
-	MOV	R1, 1(R3)
+;; Write into STRING-OUTPUT-STREAM
+;; R2: &string
+W.CH2A: MOV	(R2)+, R4	; R4: string
+	INCB	(R2)		; increment position
+	BEQ.E			; string overflow
+	ADD	(R2), R4	; R4: offset in string + FIXOFF + 3
+	MOVB	R0, -FIXOFF-3(R4)
 W.CH2B:	MOV	R0, R1		;!!!TODO: optimize
 	RETURN
+
+P.CHAR:	MOV	R1, R0
+	.SYVAL	V.PESC
+	BEQ	W.CHA1
+	.P.CHR	'#, '\
+	MOV	R0, R1
+	.SUBR	CHNAME
+	BNE	W.STR0
+W.CHA1:	MOV	R0, R1
+;; (WRITE-CHAR character &optional output-stream) => character
+W.CHAR::
+	T.CHR
+W.CH2:	MOV	#V.CHB, R0
+	BISB	R1, R0
+	MOV	R2, R1
+	TO.STM
+	MOVB	R0, 5(R1)	; set last-char field
+	MOV	R1, R2
+	ADD	#3, R2		; R2: &position
+.IF NE C$FILE
+	.TYPEP	U.FILE
+	BCS	WCHFIL
+.ENDC	; C$FILE
+	MOV	-(R2), R1
+	.STRP
+	BCS	W.CH2A		; To String Output Stream
+
+.IF NE C$BK10
+	W.CH3:
+	M.OUT::	.TTYOUT
+		BR	W.CH2B
+.ENDC ; C$BK10
+
+.IF NE C$BK11
+		CMPB 	R0, #C.NL
+		BNE	W.CH3
+		PUSH	R0
+		MOV	#C.CR, R0		; Print CRLF as Newline sequence
+	M.OUT1::.TTYOUT
+		POP	R0
+	W.CH3:
+	M.OUT::	.TTYOUT
+		BR	W.CH2B
+.ENDC ; C$BK11
+
+.IF NE C$RT11
+		MOV	R0, R1
+		TSTB	R0
+		BPL	3$		; LAT
+		.TTYOUT #16    		; Switch to KOI-7 cyrillic page
+		.TTYOUT	R1
+		MOV	#17, R0		; Switch back to ASCII
+	3$:	.TTYOUT
+		RETURN			; R1: char
+.ENDC ; C$RT11
 
 
 P.FIX:	SUB	#FIXOFF, R1
@@ -139,11 +211,12 @@ P.INT: 	PUSH	R2, R1
 	TO.U16
 	.CCASE
 1$:	.WORD	4
-	.BYTE	2., <P.BIN - 1$>/2
-	.BYTE	8., <P.OCT - 1$>/2
-	.BYTE	10., <P.DEC - 1$>/2
-	.BYTE	16., <P.HEX - 1$>/2
+	.SBYTE	2., <P.BIN-1$/2>
+	.SBYTE	8., <P.OCT-1$/2>
+	.SBYTE	10., <P.DEC-1$/2>
+	.SBYTE	16., <P.HEX-1$/2>
 	.E.UNK
+
 
 P.FLT:	.INTP
 	BCC	1$
@@ -164,38 +237,6 @@ W.STR1:	POP	R3, R4		; R3: Len, R4: Ptr
 	BR	W.STR8
 
 
-P.CHAR:	MOV	R1, R0
-	.SYVAL	V.PESC
-	BEQ	W.CHA1
-	.P.CHR	'#, '\
-	MOV	R0, R1
-	.SUBR	CHNAME
-	BNE	W.STR0
-W.CHA1:	MOV	R0, R1
-;; (WRITE-CHAR character &optional output-stream) => character
-W.CHAR::
-	T.CHR
-W.CH2:	MOV	#V.CHB, R0
-	BISB	R1, R0
-	MOV	R2, R1
-	TO.STM
-	MOV	R1, R3
-	MOV	1(R3), R1
-	.LISTP
-	BCS	W.CH2A		; To String Output Stream
-
-.IF NE C$BK11
-	CMPB 	R0, #C.NL
-	BNE	M.OUT
-	PUSH	R0
-	MOV	#C.CR, R0		; Print CRLF as Newline sequence
-M.OUT1::
-	.TTYOUT
-	POP	R0
-.ENDC ; C$BK11
-
-M.OUT::	.TTYOUT
-	BR	W.CH2B
 
 P.SYMB: MOV	R1, R3
 	.SYVAL	V.PESC
@@ -227,8 +268,8 @@ W.STR2:	MOVB	(R4)+, R1
 	BEQ	5$		; *PRINT-ESCAPE* is NIL
 	.CCASE
 1$:	.WORD	2
-	.BYTE	'\, <3$ - 1$>/2
-	.BYTE	'", <3$ - 1$>/2
+	.SBYTE	'\, <3$-1$/2>
+	.SBYTE	'", <3$-1$/2>
 	BR	5$
 3$:	.P.CHR	'\		; ESCAPING
 5$:	.W.CH2
@@ -238,6 +279,31 @@ W.STR4:	TST	R0		; print " if *PRINT-ESCAPE*
  	BEQ	9$
 	.P.CHR	'"
 9$: 	RETURN
+
+
+.IF NE C$FILE
+WCHFIL:	PUSH	R0		; save character
+	MOV	(R2)+, R1	; R1: position as Object
+	TST	(R2)+		; R2: &channel
+	MOV	R2, R4		; R4: &channel
+	TST	(R2)+		; R2: &buffer
+	TO.U16
+	MOV	R1, R3
+	BIC	#777, R3
+	ADD	R2, R3
+	MOVB	R0, (R3)	; write character into buffer
+	INC	R1   		; ++filepos
+	BIT	#777, R1
+	BNE	1$
+	MOV	#S$WRI * 256., R3
+	CALL	REAWRI
+1$:	F.U16
+	MOV	R1, -4(R4)	; save new position
+	POP	R1		; restore character
+	RETURN
+.ENDC	; C$FILE
+
+
 
 P.BIN:	ADD	#$BIN - $OCT - 2. + 8., R1
 	ADD	#'b-'o, R0

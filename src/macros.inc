@@ -12,15 +12,16 @@
 
 C.EXTM	= 214
 
-C.BC	= 23	; BC key (return previous string)
 
 ;; Cyrillic letters in KOI8 encoding
 C.CY.A	= 341
 C.CY.B	= 342
+C.CY.G	= 347
 C.CY.I	= 351
 C.CY.K	= 353
 C.CY.M	= 355
 C.CY.O	= 357
+C.CY.V	= 367
 C.CY.W	= 373		; 'Sh'
 
 ;; Stack overflow
@@ -53,6 +54,11 @@ C.CY.W	= 373		; 'Sh'
 ;; Divide by zero
 .MACRO	.E.DIVZ
 	TRAP	11.
+.ENDM
+
+;; Type error
+.MACRO	.E.TYP
+	TRAP	13.
 .ENDM
 
 ;; UNKNOWN ERROR
@@ -155,7 +161,7 @@ B.TYPP	= 340			; Base for .TYPEP
 	.TJ	EVAL1., B.SUBR+4
 .ENDM
 
-;; READ OBJECT FROM R2 STREAM
+;; Read Object from R2 Stream
 .MACRO	.$READ
 	.TJ	READ., B.SUBR+5		; calls READ1
 .ENDM
@@ -225,11 +231,23 @@ B.TYPP	= 340			; Base for .TYPEP
 	.TJ	, B.SUBR+21
 .ENDM
 
-;; (ARRAY-DIMENSIONS R1)
-.MACRO	.ARDMS
+;; (CAR R1)
+.MACRO	.CAR
 	.TJ	, B.SUBR+22
 .ENDM
 
+
+;; (ARRAY-DIMENSIONS R1)
+.MACRO	.ARDMS
+	.TJ	, B.SUBR+23
+.ENDM
+
+;; Filespace in R1 into 4-word RADIX-50 RT-11 filepath in $BUFOUT
+.IF NE C$FILE
+	.MACRO	.R50FN
+		.TJ	, B.SUBR+24
+	.ENDM
+.ENDC
 
 .MACRO	.SYMP
 	.TJ	, B.PRED+0
@@ -325,8 +343,12 @@ B.TYPP	= 340			; Base for .TYPEP
 	.TJ	, B.PRED+24
 .ENDM
 
-.MACRO	.ARP
+.MACRO	.OPENP
 	.TJ	, B.PRED+25
+.ENDM
+
+.MACRO	.ARP
+	.TJ	, B.PRED+26
 .ENDM
 
 .MACRO	BEQ.E
@@ -459,11 +481,6 @@ B.TYPP	= 340			; Base for .TYPEP
 	.TJ	SWP12.
 .ENDM
 
-;; SWAP R1, R3
-.MACRO	.SWP13
-	.TJ	SWP13.
-.ENDM
-
 ;; SWAP R0, R1
 .MACRO	.SWP01
 	 .TJ	SWP01.
@@ -530,7 +547,7 @@ B.TYPP	= 340			; Base for .TYPEP
 	.TJL	PU.FL$
 .ENDM
 
-;; POP DOUBLE INTO OBJECT (INT OR DOUBLE)
+;; POP Double into object in R1 (INT OR DOUBLE)
 .MACRO	PO.FL
 	.TJL	PO.FL$
 .ENDM
@@ -547,21 +564,22 @@ B.TYPP	= 340			; Base for .TYPEP
 	.IIF NB, B,	.WORD	7000 + B
 .ENDM
 
+;; Allocate  cell in R1
+.MACRO	.ALL.1
+	.TJL	ALL.1$
+.ENDM
 
 ;; Allocate 2 cells in R1
 .MACRO	.ALL.2
 	.TJL	ALL.2$
 .ENDM
 
-.MACRO	.ALL.1
-	.TJL	ALL.1$
-.ENDM
-
+;; R5: size in bytes
 .MACRO	.ALLOC
 	.TJL	ALLOC$
 .ENDM
 
-;; FROM INT16 INTO OBJECT AND RETURN
+;; From INT16 into Object and return
 .MACRO	FI16.R
 ;	.TJL	FI16R$
 	.TJ	FI16R.
@@ -572,6 +590,12 @@ B.TYPP	= 340			; Base for .TYPEP
 	.TJL	PLACE$
 .ENDM
 
+.MACRO	.PLAC1			; used in init.mac, where trap symbols are not available
+	TRAP	300
+.ENDM
+
+;; R1: Symbol
+;; Returns R4: address of symbol place
 .MACRO	.GPLAC
 	.TJL	GPLAC$
 .ENDM
@@ -585,7 +609,7 @@ B.TYPP	= 340			; Base for .TYPEP
 	.TJL	DF1NI$
 .ENDM
 
-;; TYPE CODE
+;; Returns R0: Type code of Object in R1
 .MACRO	.TYCOD
 	.TJL	TYCOD$
 .ENDM
@@ -641,6 +665,7 @@ B.TYPP	= 340			; Base for .TYPEP
 	.TJL	TCASE$
 .ENDM
 
+;; Searches byte value in R1 in array
 .MACRO	.CCASE
 ;	.TJL	CCASE$
 	.TJ	CCASE.
@@ -650,9 +675,6 @@ B.TYPP	= 340			; Base for .TYPEP
 	.TJL	SUBR$
 	.WORD	A
 .ENDM
-
-
-
 
 
 V.CHB	= 177000
@@ -680,16 +702,6 @@ V.U	= 177777		; Unbound value
 V.DOT	= 177776		; Special DOT token
 ;!!!not used; V.EOF	= 177775
 
-FIXOFF	= 1500.
-V.M.1K	= FIXOFF + -1000.
-V.M.1	= FIXOFF + -1
-V.0	= FIXOFF + 0
-V.1	= FIXOFF + 1
-V.2	= FIXOFF + 2
-V.8	= FIXOFF + 8.
-V.10	= FIXOFF + 10.
-V.16	= FIXOFF + 16.
-V.1000	= FIXOFF + 1000.
 
 ;; TYPE CODES
 U.NULL	= 0	; NULL
@@ -705,9 +717,9 @@ U.FUN	= 11	; SYSTEM FUNCTION
 U.LAMB	= 12	; LAMBDA FUNCTION
 U.SPOP	= 13	; SPECIAL OPERATOR
 .IIF NE C$MDAR, U.AR	= 14
+.IIF NE C$FILE, U.FILE	= 15
 
 MAXTOK = 31.	; Max token length 4*n-1
-
 
 .IF NE C$BK10
 	ASTKLO	= 300
@@ -717,13 +729,32 @@ MAXTOK = 31.	; Max token length 4*n-1
 	ASTKUP	= 4000	; Includes 1K for GC bitmap
 .ENDC
 
+;FIXOFF	= ASTKUP + 2500. / 2 & 177774		; multiple of 4 for calendaric calculations
+FIXOFF	= ASTKUP + 2500. / 2 & 177400		; multiple of 4 for calendaric calculations & multiple of 256. for GET-OUTPUT-STREAM-STRING
+
+V.M.1K	= FIXOFF + -1000.
+V.M.1	= FIXOFF + -1
+V.0	= FIXOFF + 0
+V.1	= FIXOFF + 1
+V.2	= FIXOFF + 2
+V.8	= FIXOFF + 8.
+V.10	= FIXOFF + 10.
+V.16	= FIXOFF + 16.
+V.24	= FIXOFF + 24.
+V.60	= FIXOFF + 60.
+V.254	= FIXOFF + 254.
+V.255	= FIXOFF + 255.
+V.1000	= FIXOFF + 1000.
+V.1900	= FIXOFF + 1900.
+
 
 .IF EQ C$AMAL
 	;; Hardcoded for modularization
 	;; Bit.2 of HEAP address must be 0. Used by AND/OR
 	.IIF NE C$BK10,	HEAP	= 022400
-	.IIF NE C$BK11,	HEAP	= 042700		; because of system area in 042600
-.ENDC
+	.IIF NE C$BK11,	HEAP	= 042700	; because of system area in 042600
+	.IIF NE C$RT11,	HEAP	= 042700
+.ENDC ; C$AMAL
 
 .IF NE C$BK10
 	HIMEM	= 40000		; End of Heap
@@ -735,4 +766,16 @@ MAXTOK = 31.	; Max token length 4*n-1
 	HIMEME	= HIMEM
 .ENDC ; C$BK11
 
-.IIF NE C$BK10	EHEAP	= $ANVP
+.IIF NE C$BK10 EHEAP	= $ANVP
+
+.IF NE C$RT11
+	TESTCH	= 0		; must be 0 for .SYS macro
+
+	;; System call with args:	#AREA, #TESTCH, #$BUFOUT
+	;; n: syscall#
+	.MACRO	.SYS n
+		.TJL	SYS$
+		.WORD	n * 256.
+	.ENDM
+
+.ENDC	; C$RT11

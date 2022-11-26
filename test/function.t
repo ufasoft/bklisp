@@ -1,6 +1,5 @@
 Prompt
   Lisp (.+)ufasoft.com (re)
-  Lisp (re)
   Bytes free (re)
 Addition
   $ (+ 1 2 3)
@@ -48,9 +47,9 @@ FDEFINITION
   $ (fdefinition 'if)
   #<SPECIAL-OPERATOR IF>
   $ (fdefinition 'foo)
-  ОШИБКА 18
+  ОШИБКА 18 FOO
   $ (foo 1 2)
-  ОШИБКА 18
+  ОШИБКА 18 FOO
   $ (psetq a 1 b 2)
   NIL
   $ (psetq a (1+ b) b (1+ a))
@@ -355,6 +354,15 @@ MAKE-ARRAY
   #(NIL NIL NIL NIL)
   $ (setq ar23 (make-array '(2 3)))
   #2A((NIL NIL NIL) (NIL NIL NIL))
+ARRAY-IN-BOUNDS-P
+  $ (array-in-bounds-p ar23 0 0)
+  T
+  $ (array-in-bounds-p ar23 1 2)
+  T
+  $ (array-in-bounds-p ar23 0 -1)
+  NIL
+  $ (array-in-bounds-p ar23 10 12)
+  NIL
 AREF
   $ (setf (aref ar23 1 2) 'Z)
   Z
@@ -669,9 +677,10 @@ Function
   (1 (2))
   $ (bar 1 2 3 4)
   (1 (2 3 4))
-Time
+INTERNAL-TIME-UNITS-PER-SECOND
   $ internal-time-units-per-second
   366
+SLEEP
   $ (sleep 5)
   NIL
 Random

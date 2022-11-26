@@ -1,0 +1,152 @@
+;;; Copyright (c) 2021-2022 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
+;;;
+;;; SPDX-License-Identifier: MIT
+
+.SBTTL	File operations on RT-11
+
+
+
+;; (OPEN filespec) => stream
+OPEN::
+	PUSH	R1
+	.R50FN
+	MOV	#12.+512., R5
+	.ALLOC				; Allocate FILE-STREAM Object before .LOOKUP to avoid channel leak in case of out-of memory
+;; Find free channel: #1..8
+;; channel #0 is for Lisp needs
+	CLR	R2		; R2: channel#
+	SEC
+OPEN7:	ROLB	R0
+	BCS	EIO1		; no free channels
+	INC	R2
+	BIT	R0, (PC)+
+CHBMAP:	.WORD	0		; bitmap of open channels
+	BNE	OPEN7
+	BIS	R0, CHBMAP
+	.LOOKUP	#AREA, R2, #$BUFOUT
+	BCS	EIO1
+	MOV	#V.FILE, (R1)+
+	POP	(R1)+		; filename
+	MOV	#V.0, (R1)+	; initial position
+	CLR	(R1)+		; last char
+	MOV	R2, (R1)	; channel#
+	SUB	#7, R1
+	RETURN
+
+EIO1:	MOVB	$ERRBY, R1
+	ADD	#OP.EMT+19., R1
+	MOVB	R1, (PC)
+1$:	.E.IO				; EMT 19.
+
+;; (PROBE-FILE pathspec) => filename
+PROBEF::
+	.TYPEP	U.FILE
+	BCS	1$
+	MOV	R1, R2
+	.R50FN
+	.SYS	S$LOOK		; .LOOKUP #AREA, #TESTCH, #$BUFOUT
+	BCS.F
+	MOV	R2, R1
+	RETURN
+1$:	MOV	1(R1), R1
+RET.15:	RETURN
+
+
+
+.IF NE C$FEXT		; Not implemented on RT-11 v.4
+;; (FILE-WRITE-DATE pathspec) => date
+FDATE::	.SUBR	PROBEF				; (PROBE-FILE pathspec)
+	BEQ	RET.15
+	.R50FN
+	MOV	#14*256, AREA+6		; offset of DATE in deirectory entry
+	.SYS	S$GFIN			; .GFDAT #AREA, #TESTCH, #$BUFOUT
+	BCS	EIO1
+	MOV	R0, R5
+	CALL	DECDMY
+	MOV	#V.0, R1
+	.PUSH0
+	.PUSH0
+	.PUSH0
+	JMP	ECUTI1			; (APPLY #'ENCODE-UNIVERSAL-TIME R5)
+.ENDC	; C$FEXT
+
+
+;; (DELETE-FILE filespec) => T
+DELETF::
+	.SUBR	PROBEF		; (PROBE-FILE pathspec)
+	BEQ.E
+	.R50FN
+	.SYS	S$DELE		; .DELETE #AREA, #TESTCH, #$BUFOUT
+	BCS	EIO1
+	RE.T
+
+;; (FILE-POSITION stream) => position
+FPOSIT::
+	.TYPEP	U.FILE
+	BCC.F
+	MOV	3(R1), R1
+	RETURN
+
+;; (SAVE filename &optional main) => bool
+SAVE::
+;	MOV	#ASTKUP, $USRSP
+	MOV	(R5), A.MAIN		; main
+	.R50FN
+
+	PUSH	EHEAP, $USRTO		; Save memory limiters
+
+
+;; Find last Free Block
+	MOV	FREEL, R1
+	BEQ	2$
+1$:	TST	(R1)+
+	MOV	R1, R2
+	MOV	(R1), R1
+	BNE	1$
+	MOV	R2, R1
+	ADD	-(R1), R1		; R1: pointer to next block or end of heap
+	CMP	R1, EHEAP
+	BLO	2$			; last block is not free
+	MOV	#4, -(R2)		; Trim last Free Block
+	BIT	(R2)+, (R2)+		; R2: temporary EHEAP
+	MOV	R2, EHEAP
+	ADD	#1024., R2		; Enough for 32KB heap
+	MOV	R2, $USRTO
+2$:
+
+	BISB	EHEAP+1, R0
+	ASR	R0
+	INC	R0			; R0: Image size in blocks
+	MOV	R0, AREA+4		; len field
+	MOV	R0, R4			; R4: Number of blocks in .SAV file
+
+	SWAB	R0			; R0: Image size in words
+	CLR	-(SP)			; WRITEW opcode
+	PUSH	R0			; wcnt
+
+	PUSH	R0
+	MOV	#$BUFOUT, R0
+	EMT	40 + TESTCH		; Old API: .ENTER
+
+;; Fill $CCB
+	MOV	#20, R5
+5$:	CLRB	$CCB-1(R5)
+	SOB	R5, 5$
+	MOV	#$CCB-1, R2		; R5: 0
+	SEC
+3$:	INC	R2
+4$:	RORB	R5			; R5: bitmask
+	BCS	3$
+	BISB	R5, (R2)
+	SOB	R4, 4$
+
+
+	CLR	-(SP)			; buffer
+	CLR	R0			; blk
+	EMT	220 + TESTCH		; Old API: .WRITW
+
+	POP	$USRTO, EHEAP		; restore
+
+	BCS	EIO1
+	CLR	R1
+	BR	CLOSE2			; .CLOSE (R1)

@@ -1,6 +1,7 @@
 ;;; Macros for BK-0011/BK-0011M
 
 .INCLUDE	/k1801.inc/
+.INCLUDE	/bkkeys.inc/
 
 
 ..BASE = 140010
@@ -476,4 +477,3 @@
 .MACRO	.TTYOUT	ch
 	.BTOUT	ch
 .ENDM
-

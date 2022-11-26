@@ -1,6 +1,5 @@
 Prompt
   Lisp (.+)ufasoft.com (re)
-  Lisp (re)
   Bytes free (re)
 List
   $ (null nil)
@@ -156,7 +155,8 @@ MAPCAR
   $ (mapcar #'cons '(a b c) '(1 2 3 4))
   ((A . 1) (B . 2) (C . 3))
 MAPC
-  $ (let (dummy) (list (mapc #'(lambda (&rest x) (setq dummy (append dummy x))) '(1 2 3 4) '(a b c d e) '(x y z)) dummy))
+  $ (let (dummy) (list (mapc #'(lambda (&rest x) (setq dummy (append dummy x))) \
+    '(1 2 3 4) '(a b c d e) '(x y z)) dummy))
   ((1 2 3 4) (1 A X 2 B Y 3 C Z))
 A-List
   $ (acons 1 "one" nil)
@@ -191,7 +191,8 @@ A-List
   ((1 . "one") (2 A B C))
   $ (setq object-too object)
   ((1 . "one") (2 A B C))
-  $ (psetq copy-as-list (copy-list object) copy-as-alist (copy-alist object) copy-as-tree (copy-tree object))
+  $ (psetq copy-as-list (copy-list object) copy-as-alist (copy-alist object) \
+    copy-as-tree (copy-tree object))
   NIL
   $ (eq object object-too)
   T

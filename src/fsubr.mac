@@ -1,8 +1,8 @@
-;;; Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
+;;; Copyright (c) 2021-2022 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
 ;;;
 ;;; SPDX-License-Identifier: MIT
 
-;; Special operators (FSUBR)
+.SBTTL	Special operators (FSUBR)
 
 A.FSUBR:
 
@@ -160,6 +160,24 @@ S.POP::	.PLACE
 R.M01A:	MOV	R0, R1
 	RETURN
 
+
+
+.IF NE C$MVAL
+;; (MULTIPLE-VALUE-LIST form) => list
+MVALLS::
+	.EVAL1
+	MOV	MVAL, R0
+	BEQ	8$
+	CMP	R0, SP
+	BHI	8$		; return list in MVAL
+	CLR	R0
+	.PUSH0
+8$:	MOV	SP, MVAL
+	BR	R.M01A
+
+.ENDC ; C$MVAL
+
+
 ;; Make '(BLOCK NIL' environment
 BLENV0:	CLR	R2
 ;; Make BLOCK-environment
@@ -190,7 +208,7 @@ UNW.BL:	MOV	(R5), LEXENV		; restore LEXENV
 
 ;; (FUNCTION name) => function
 FUNCTION::
-.IF NDF K1801
+.IF EQ C$VM1
 	.CONSP
 	BCC	1$
 .ENDC
@@ -208,7 +226,7 @@ LAMBDA::
 	POP	(R1)+		; Lambda list
 	MOV	R5, (R1)+	; body
 	MOV	LEXENV, (R1)
-	SUB	#5, R1
+R1M5.R:	SUB	#5, R1
 	RETURN
 
 
@@ -237,8 +255,7 @@ LETA::	MOV	LEXENV, R3
 	BCS	3$
 	.POP1     		; (var [init-form]) case
 	MOV	R0, R2		; R2: var
-	.POP1
-	MOV	R0, R1		; R1: init-form
+	.CAR          		; R1: init-form
 	.EVAL1
 	MOV	R1, (SP)	; value
 	MOV	R2, R1		; R1: var
@@ -370,20 +387,16 @@ DEFVA2:	MOV	R3, R1		; R1: name
 ;; (TIME form) => result
 TIME::	PUSH	R1		; place in stack for EVAL result
 	MOV	R1, R5
-	MOV	#V.M.1K, R1
-	PU.FL
-	.SYVAL	V.FREQ
-	PU.FL
 	PU.NOW
 	MOV	R5, R1
 	.EVAL1
-	MOV	R1, 30(SP)
+	MOV	R1, 20(SP)
 	PU.NOW
 	.BASN						; (floor (* -1000 (/ (- prev-real-time (GET-INTERNAL-REAL-TIME)) INTERNAL-TIME-UNITS-PER-SECOND)))
-	.WORD	$DSUB, DSWAP, $DDIV, $DMUL, $INT, 2$	; to get milliseconds from timer ticks
+	.WORD	$DSUB, DPFREQ, $DDIV, DPUFL, V.M.1K, $DMUL, $INT, 2$	; to get milliseconds from timer ticks
 2$:	PO.FL
 	CLR	R2
-	.PRINT
+	.PRNT
 	.P.STR	A.MS
 POP1.R:	POP	R1		; Restore first form result
 	RETURN
@@ -395,6 +408,9 @@ RETU::	.SH210          	; (RETURN-FROM NIL result)
 ;;;----------------
 
 FSUBR2:
+
+
+
 ;; (RETURN-FROM name &optional result) =>
 RETUFR::
 	.SWP12                  ; R2: name
@@ -506,6 +522,16 @@ DEFUN::	PUSH	R1    		; SAVE NAME
 	BR	9$
 2$:	.PRED	X.SYFU		; (SETF (SYMBOL-FUNCTION sym) fun)
 9$:	BR	POP1.R
+
+.IF NE C$MVAL
+;; (NTH-VALUE n form) => object
+NTHVAL::
+	.EVAL1			; evaluate n
+	.SWP12
+	.SUBR	MVALLS		; (MULTIPLE-VALUE-LIST form)
+	.SWP12			; R1: evaluated nn, R2: value-list
+	JMP	NTH
+.ENDC ; C$MVAL
 
 
 ;; (PROGV symbols values form*) => result

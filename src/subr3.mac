@@ -1,4 +1,4 @@
-;;; Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
+;;; Copyright (c) 2021-2022 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
 ;;;
 ;;; SPDX-License-Identifier: MIT
 
@@ -37,7 +37,9 @@ ACONS::  .CONS
 	BR	CONS
 
 ;; (SUBST new old tree) => new-tree
-SUBST::	.SWP13		; R1: tree, R3: new
+SUBST::	PUSH	R3		; Swap R1, R3
+	MOV	R1, R3
+	POP	R1		; R1: tree, R3: new
 SUBST1:	.EQL
 	BCS	R.M31
 	.CONSP
@@ -68,8 +70,7 @@ PAIRLIS::
 FBOUNDP::
 	.FUNAMP
 	BCC	3$
-	MOV	1(R1), R1
-	RETURN
+	JMP	SYFUN1
 3$:	.POP1
 	MOV	(R1), R1
 	MOV	#V.SETF, R2
@@ -119,7 +120,7 @@ X.NTH::	.SUBR	NTHCDR
 1$:	MOV	R3, (R1)
 	BR	R.M31A
 
-.IF DF C$MDAR
+.IF NE C$MDAR
 
 ;; (SETF (ROW-MAJOR-AREF array index) new-element) => element
 X.RMAR::
@@ -151,10 +152,9 @@ MKSSTM::
 	BISB	-3(R1), R3	; STRING LEN
 	ADD	#FIXOFF, R3
 1$: 	MOV	R1, R4
-	.ALL.2
+MKSST1:	.ALL.2
 	MOV	#V.STM, (R1)+
 	MOV	R4, (R1)+
 	MOV	R2, (R1)+
 	MOV	R3, (R1)
-	SUB	#5, R1
-	RETURN
+	JMP	R1M5.R		; SUB	#5, R1; RETURN

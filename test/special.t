@@ -1,6 +1,5 @@
 Prompt
   Lisp (.+)ufasoft.com (re)
-  Lisp (re)
   Bytes free (re)
 Control Flow
   $ (funcall '+ 1 2 3)
@@ -61,12 +60,15 @@ DOTIMES
   2
   3
 DO
-  $ (do ((temp-one 1 (1+ temp-one)) (temp-two 0 (1- temp-two))) ((> (- temp-one temp-two) 5) temp-one))
+  $ (do ((temp-one 1 (1+ temp-one)) (temp-two 0 (1- temp-two))) \
+    ((> (- temp-one temp-two) 5) temp-one))
   4
-  $ (do ((temp-one 1 (1+ temp-one)) (temp-two 0 (1+ temp-one))) ((= 3 temp-two) temp-one))
+  $ (do ((temp-one 1 (1+ temp-one)) (temp-two 0 (1+ temp-one))) \
+    ((= 3 temp-two) temp-one))
   3
 DO*
-  $ (do* ((temp-one 1 (1+ temp-one)) (temp-two 0 (1+ temp-one))) ((= 3 temp-two) temp-one))
+  $ (do* ((temp-one 1 (1+ temp-one)) (temp-two 0 (1+ temp-one))) \
+    ((= 3 temp-two) temp-one))
   2
 SETQ
   $ (setq x (cons 'a 'b) y (list 1 2 3))
@@ -177,7 +179,8 @@ Branching
   3
   $ (cond (nil 1) (nil 2))
   NIL
-  $ (defun select-options () (cond ((= a 1) (setq a 2)) ((= a 2) (setq a 3)) ((and (= a 3) (+ a 10))) (t (+ a 20))))
+  $ (defun select-options () (cond ((= a 1) (setq a 2)) \
+    ((= a 2) (setq a 3)) ((and (= a 3) (+ a 10))) (t (+ a 20))))
   SELECT-OPTIONS
   $ (setq a 1)
   1

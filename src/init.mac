@@ -4,8 +4,13 @@
 
 ;;; Initialization code, discarded after starting
 
-.GLOBL	LOADER, RESET, ROOM1, I.PCHR, I.STOP, I.TRAP, M.BIT
-.GLOBL	M.IN, M.OUT, M.POS, M.PRIN, M.QUIT
+.INCLUDE	/k1801.inc/
+
+.SBTTL	Init module
+
+.GLOBL	AREA, SCCA, LOADER, RESET, ROOM1, I.PCHR, I.STOP, I.TRAP, M.BIT, M.PUSH, GCBMSZ, EHEAP, QUIT
+.GLOBL	M.OUT, M.OUT1, M.POS, M.PRN, M.QUIT
+.GLOBL	$ERROR, A.MVER, PARSCL
 
 .IF NE C$BK10
 EBK11M:	CALL	@140160		; .PRINT
@@ -16,7 +21,8 @@ EBK11M:	CALL	@140160		; .PRINT
 
 START2::
 	MOV	#INCMPT, R1
-.IF NE C$BK10
+.IF EQ C$RT11
+	.IF NE C$BK10
 CKBK10:	CMP	160000, #104405	; Check some Vilnus BASIC ROM - specific word
 	BEQ	INIT
 	CMP	140010, #150414
@@ -33,20 +39,20 @@ EBK11:	MOV	R1, R0
 	MOV	#BK11ME, R0
  	EMT	20		; .PRINT
 	.EXIT
-.IFF	; BK-0011 case
+	.IFF	; BK-0011 case
 	CMP	140010, #150414
 	BNE	INIT
 	;; Init for BK-0011M
 	MOV	#104001, M.QUIT		; EMT 1
-	MOV	#104033, M.IN		; EMT 33
 	MOV	#104060, M.POS		; EMT 60
 	MOV	#104063, M.OUT		; EMT 63
 	MOV	#104063, M.OUT1		; EMT 63
-	MOV	#104064, M.PRIN		; EMT 64
+	MOV	#104064, M.PRN		; EMT 64
 	MOV	#104064, M.PRI1		; EMT 64
 	.BSFUN	#0, #0			; Reset function keys for BK-0011M
 	BR	INIT2
-.ENDC	; C$BK10
+	.ENDC	; C$BK10
+.ENDC	; C$RT11
 INIT::
 .IF NE C$BK10
 	CLR	R1
@@ -59,7 +65,7 @@ INIT::
 .IFF
 	CLR	-(SP)
 	CLR	-(SP)
-	EMT	12    			; Reset function keys for BK-0011
+	.IIF NE C$BK11	EMT	12    			; Reset function keys for BK-0011
 INIT2:
 	.IIF NE C$BK11 MOV	#MODE64, R0
 	.IIF EQ C$BK11 MOV	#STATUS, R0
@@ -67,38 +73,112 @@ INIT2:
 
 	MOV	R0, R1
 	CLR	R2
+.IF NE C$RT11
+	.PRINT	R1
+.IFF
 M.PRI1:	EMT	20
+.ENDC ; C$RT11
 	MOV	#S.ISTM + 1, R1
 ;	MOV	#400 + <RESET-START>/2 - 2, START		; `BR RESET` opcode
 .IF NE C$1801
-	CLR	@#$TMLIM
-	MOV	#$TMMOD, @#$TMCSR
+	CLR	$TMLIM
+	MOV	#$TMFMN, $TMCSR
 .ENDC	; C$1801
 .IF NE C$BK10
-	TSTB	@#$EXTM
+	TSTB	$EXTM
 	BEQ	2$		; non-ExtMem mode
-	MOVB	#1, @#$EXTM	; Lock ExtMem mode
+	MOVB	#1, $EXTM	; Lock ExtMem mode
 ;	MOV	#HIMEME, EHEAP
 .ENDC	; C$BK10
 2$:
 
 ;;--- Init TRAPs & Heap ----------------------
- 	MOV	#M.BIT, @#20
+	MOV	#M.PUSH, 14
+	MOV	#340, @#16
+ 	MOV	#M.BIT, 20
 	CLR	R1
 	CLR	(R1)+
 	CLR	(R1)+			; Init NIL
 .IF NE C$RT11
-	MOV	#I.PCHR, @#10
+	MOV	#R50TAB, R1		; Init standard RADIX-50 table
+	MOVB	#'$, (R1)+
+	MOVB	#'., (R1)+
+	MOVB	#'%, (R1)+
 
-	.SETTOP	$SYPTR			; Allocate max space
-	MOV	$USRTO, EHEAP
+	MOV	$SYPTR, R3		; R3: RMON area
+	.SETTOP	R3			; Allocate max space
+
+	MOV	R0, EHEAP
+
+	;; Prepare for SAVE/Loader
+	MOV	#LOADER, $USRPC
+
+;	.QSET	#3000, #10		;!!!?
+	.TRPSET	#AREA, #TRPLOC
+	.SCCA	#AREA, #SCCA
+
+	MOVB	$SYSVE(R3), R0
+	ADD	#'0, R0			; R0: monitor version as ASCII digit
+	MOVB	R0, A.SVER+1		; (SOFTWARE-VERSION) result
+	MOVB	$SYSUP(R3), R0
+	ADD	#'0, R0			; R0: monitor release level as ASCII digit
+	MOVB	R0, A.SVER+3		; (SOFTWARE-VERSION) result
+
+;; Determine CPU model
+DETCPU:
+	MOV	4, R5
+	CLC
+	MOV	#I.RTI, 4		; ignore invalid instructions
+	MOV	$ERREG, R1
+	MOV	R5, 4
+	BCS	5$			; Interrupt 4 occured: non VMx
+	SWAB	R1
+	CMPB	R1, #377
+	BNE	5$			; general LSI-11
+
+	CLR	$TMLIM
+	MOV	#$TMFMX, $TMCSR		; Init K1801VM timer for max frequency
+	MOV	$TMCNT, R1
+	MOV	#10, R2
+1$:	SOB	R2, 1$
+	CMP	$TMCNT, R1
+	BEQ	5$			; general LSI-11
+;; K1801VMx detected
+	CALL	IRUERR
+
+	MOV	#I.RTI, 10		; ignore invalid instructions
+
+	MOV	#A.MVER, R2
+	MOV	#RU.VM1, R1
+	MOV	R1, R3
+	MOV	#1, R4
+	ASH	R4, R3
+	CMP	R1, R3
+	BNE	6$			; non VM1
+	MUL	R4, R4
+	BCS	3$			; K1801VM1[ABV]
+	MOV	#RUVM1G, R1		; K1801VM1G
+	BR	3$
+6$:	MOV	#RU.VM2, R1
+	MFPS	R3
+	MOV	177776, R4		; PSW at 177776 ?
+	CMPB	R3, R4
+	BNE	3$			; K1801VM2
+	MOV	#RU.VM3, R1		; K1801VM3
+3$:	MOVB	(R1)+, (R2)+
+	BNE	3$
+
+5$:
+.IIF NE C$RU	CALL	IRUERR
+
+	MOV	#I.PCHR, 10
+
 .IFF
 	MOV	#I.STOP, (R1)+		; Init STOP key vector
 	CLR	(R1)+
 	MOV	#I.PCHR, (R1)+
-	MOV	#I.TRAP, @#34
+	MOV	#I.TRAP, 34
 .ENDC ; C$RT11
-
 
 .IF NE C$BK11
 	.BKRES
@@ -114,37 +194,86 @@ M.PRI1:	EMT	20
 	MOV	R1, R2		; R1, R2: EHEAP
 	SUB	#HEAP, R1
 	CLR	R0
-6$:	TST	(R0)+		; R0 += 2
+7$:	INC2	R0
 	SUB	#66., R1
-	BHI	6$
+	BHI	7$
 	MOV	R0, GCBMSZ	; GCBMSZ: Heap size / 32, even
 	SUB	R0, R2
-	BIC	#37, R2
+	BIC	#3, R2
 	MOV	R2, EHEAP
 ;; Init heap free size
 	SUB	#HEAPFRE, R2
-	ASR	R2
-	ASR	R2
 	MOV	R2, HEAPFRE
 .ENDC ; C$BK10
 
+INIT4:
+.IF NE C$RT11
 
-INIT4:	MOV	#ASTKUP, SP
-;!!!T	.SUBR	LOAD			; (LOAD init-stream)
+
+;; Calibrate INTERNAL-TIME-UNITS-PER-SECOND
+	MOV	#V.FREQ, R1
+	.PLAC1
+	MOV	#60., (R4)
+	MOV	$SYPTR, R1
+	BIT 	#^B100000, 300(R1)
+	BEQ	1$
+	MOV	#50., (R4)
+1$:	ADD	#FIXOFF, (R4)
+	.SUBR	PARSCL		; R1: *ARGS*
+	BEQ	5$
+
+	MOV	(R1), R1	; R1: command-line
+	.PRED	LOAD
+	JMP	QUIT
+5$:
+.IFF
+	MOV	#ASTKUP, SP
+.ENDC ; C$RT11
+
 	CALL	ROOM1			; Print Room
 	JMP	RESET
 ;	JMP	LOADER
 
+;; Init error message to be russian
+IRUERR:	MOV	#RU.ERR, R1
+	MOV	#$ERROR, R2
+2$:	MOVB	(R1)+, (R2)+
+	BNE	2$
+	RETURN
+
+
 MODE64:	.ASCII	<033><061><C.CR><C.NL>		; 64 columns/line
-STATUS:	.ASCII	"BkLisp 2022  ufasoft.com/bklisp"
-ESTATU: .ASCII	<C.CR><C.NL>
+STATUS:	.ASCII	"BkLisp 2022 ufasoft.com/bklisp"
+.IF NE C$RT11
+	.ASCII	/ /
+.IFF
+	ESTATU: .ASCII	<C.CR><C.NL>
+.ENDC ; C$RT11
 GREET:	.ASCII	"Lisp for "
 .IIF NE C$RT11	.ASCII	"RT-11"
 .IIF NE C$BK10	.ASCII	<C.CY.B><C.CY.K>"-0010.01"
 .IIF NE C$BK11	.ASCII	<C.CY.B><C.CY.K>"-0011["<C.CY.M>"]"
-	.ASCIZ	"  (c) Sergey Pavlov dev@ufasoft.com"<C.CR>
+	.ASCIZ	" (c) Sergey Pavlov dev@ufasoft.com"<C.CR>
 INCMPT:	.ASCIZ	<C.CR><C.NL>/ERROR!/<C.CR><C.NL>/Incompatible System detected/
 BK11ME:
 .IIF NE C$BK10		.ASCIZ	<C.CR>/For /<C.CY.B><C.CY.K>/-0011[/<C.CY.M>/] run bklisp.11m/
 .IIF NE C$BK10	BK10E:	.ASCIZ	<C.CR><C.NL>/Vilnus BASIC 1986 firmware (/<C.CY.B><C.CY.K>/-0010.01) is required/<C.CR><C.NL>
 .IIF NE C$BK11		.ASCIZ	<C.CR><C.CY.B><C.CY.K>/-0011 ROM required/<C.CR>
+
+
+.IF NE C$RT11
+;; Localization String resources
+
+RU.ERR:	.ASCIZ	<16>/o{ibka/<17>/ /<C.BEL><200>			; 'ERROR' russian KOI-7
+RU.VM1:	.ASCIZ	<8.><C.CY.K>/1801/<C.CY.V><C.CY.M>/1/
+RUVM1G:	.ASCIZ	<8.><C.CY.K>/1801/<C.CY.V><C.CY.M>/1/<C.CY.G>
+RU.VM2:	.ASCIZ	<8.><C.CY.K>/1801/<C.CY.V><C.CY.M>/2/
+RU.VM3:	.ASCIZ	<8.><C.CY.K>/1801/<C.CY.V><C.CY.M>/3/
+
+.EVEN
+
+;; Sets CF on interrupt
+I.RTI:	BIS	#FLAG.C, 2(SP)
+	RTI
+
+.ENDC	; C$RT11

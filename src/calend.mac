@@ -1,0 +1,60 @@
+;;; Copyright (c) 2021-2022 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
+;;;
+;;; SPDX-License-Identifier: MIT
+
+.SBTTL	Calendar subroutines
+
+
+.IF NE C$RT11
+
+
+;; (GET-UNIVERSAL-TIME) => int
+;; Implemented as  (ENCODE-UNIVERSAL-TIME (MULTIPLE-VALUE-LIST (GET-DECODED-TIME)))
+GTUTIM::
+	CALL	GDCTIM			; R0: decoded time as multiple values
+ECUTI1:	MOV	R0, R5
+	MOV	SP, MVAL		; switch to 1-value mode
+;; (ENCODE-UNIVERSAL-TIME second minute hour day month year) => int
+ECUTIM::
+	MOV	#6, R0
+1$:	MOV	R1, R4			; R4: month on last iteration
+	.POP5
+	PU.FL
+	TO.U16				; R1: year on last iteration
+	SOB	R0, 1$			; Stack: day hour minute second
+
+	MOVB	#28., FEBRUA
+
+	ADD	#20, SP                 ; R0: 0 here
+	SUB	#1900., R1
+	MOV	R1, R3			; R3: year-1900
+	BEQ	5$			; Year 1900 in not leap
+2$:	ADD	#365., R0
+	SOB	R3, 2$
+	ASR	R1
+	ROL	R3
+	ASR	R1		; R1: leap years
+	ROL	R3
+	BNE	5$		; non-leap year
+	INCB	FEBRUA
+5$:	MOVB	DAYMON-1(R4), R2
+	ADD	R2, R0
+	SOB	R4, 5$
+
+	ADD	R0, R1		; R1: days since 1 January 1900
+	F.U16
+	PU.FL			; Stack: day-from-1900 hour minute second
+	.BASN
+	.WORD	$DADD, $PUSH1, $DSUB		; Stack: days-from-epoch hour minute second
+	.WORD	DPUFL, V.24, $DMUL, $DADD
+	.WORD	DPUFL, V.60, DTUCK2, $DMUL, $DADD
+	.WORD	$DMUL, $DADD, RBAS.5		; (+ second (* 60. (+ minute (* 60. (+ hour (* 24. day-from-1900))))))
+
+
+;; Days per month
+DAYMON:	.BYTE	0, 31.
+FEBRUA:	.BYTE	28.
+	.BYTE	31., 30., 31., 30., 31., 31., 30., 31., 30. ;, 31.
+	.EVEN
+
+.ENDC	; C$RT11

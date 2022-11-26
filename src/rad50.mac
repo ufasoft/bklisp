@@ -1,13 +1,12 @@
-;#######   Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com #####
-;#                                                                                                                                #
-;#       See LICENSE for licensing information                                                                                    #
-;##################################################################################################################################
+;;; Copyright (c) 2021-2022 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
+;;;
+;;; SPDX-License-Identifier: MIT
 
-;;; BkLisp RADIX-50 encoding routines
+.SBTTL	RADIX-50 encoding routines
 
 ;; INPUT: R0: 0, R1: RADIX-50 string
 ;; OUTPUT: ASCII string in TOKBUF & TOKLEN
-R2STR:	MOV	#R50DIG, R5
+R502A:	MOV	#R50DIG, R5
 1$:	MOV	(R1), R2
 	MOV	#50*50, R4
 	CALL	(R5)
@@ -40,20 +39,14 @@ R.RAD:	RETURN
 ;; INPUT: R1: STRING object
 ;; RETURNS: On success CF=0, RADIX-50 string in $BUFOUT, R3 points behind the last word which is < (40. * 40.).
 ;; Saves R1, R2
-STR2R:	PUSH	R1
+A2R50:	PUSH	R1, R2
 	SUB	#3, R1
 	MOVB	(R1)+, R5
 	BLE	8$		; strlen== 0 || strlen>127
 	ADD	R1, R5		; R5: end of string
 	MOV	#$BUFOUT, R3
-	BR	3$
-1$:	MOV	R4, R0
-	ADD	#31 +'A, R0
-2$:	ADD	#1 - 'A, R0
-	ADD	R0, (R3)
-	CMP	(R3)+, #50*50
-	BLO	4$
 3$:	CLR	(R3)+
+	MOV	#3, R2
 4$:	CMP	R1, R5
 	BEQ	9$		; CF=0 here (success)
 	MOV	-(R3), R0	; (R3) *= 40.
@@ -68,10 +61,21 @@ STR2R:	PUSH	R1
 	BHI	8$
 	CMPB	R0, #'A
 	BHIS	2$
+.IF NE C$RT11
+	SUB	#C.SP, R0
+	BEQ	5$
+	ADD	#C.SP, R0	;!!!O
+.ENDC ; C$RT11
 	MOV	#13., R4
 7$:	CMPB	R0, R50TAB-1(R4)
-	BEQ	1$
-	SOB	R4, 7$
+	BNE	1$
+	MOV	R4, R0
+	ADD	#31 +'A, R0
+2$:	ADD	#1 - 'A, R0
+5$:	ADD	R0, (R3)+
+	SOB	R2, 4$
+	BR	3$
+1$:	SOB	R4, 7$
 8$:	SEC
-9$:	POP	R1
+9$:	POP	R2, R1
 	RETURN

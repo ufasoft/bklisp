@@ -8,11 +8,13 @@
 
 
 
-$TMMOD	= 164		; Enable Timer on minimal frequency with Monitoring
+$TMFMX	= 24		; Enable Timer on maximal frequency
+$TMFMN	= 164		; Enable Timer on minimal frequency with Monitoring
 $TMLIM	= 177706
 $TMCNT	= 177710
 $TMCSR	= 177712
 
+$ERREG 	= 177704
 $SYREG	= 177716
 
 $KBCTL	= 177660

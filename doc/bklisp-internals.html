@@ -1,0 +1,169 @@
+﻿<!DOCTYPE html>
+
+<html lang="ru">
+<head>
+	<title>LISP для БК-0010.01, БК-0011М и RT-11. Внутреннее устройство</title>
+	<meta charset="UTF-8">
+	<meta name="description" content="Ufasoft BkLisp - LISP для БК-0010.01, БК-0011М и RT-11. Справочник.">
+	<meta name="keywords" content="Lisp, Common Lisp, BkLisp, Ufasoft, БК-0010, БК-0010.01, БК-0011, БК-0011М, PDP-11, RT-11">
+	<meta name="author" content="Sergey Pavlov">
+
+    <style>
+    	.clhs {
+    		float: right;
+    	}
+
+    	.rt11 {
+    		float: right;
+    		margin-right: 10px;
+    	}
+
+    	.index {
+    		column-width: 15em;
+    		column-count: auto;
+    	}
+
+    	.index a {
+    		display: block;
+			font-size: 70%;
+    	}
+
+    	.bibliography {
+			font-size: 70%;
+    	}
+    </style>
+</head>
+
+<body>
+
+<article>
+
+<h1>Ufasoft BkLisp - LISP для БК-0010.01, БК-0011М и RT-11<br>
+Внутреннее устройство
+</h1>
+<i>Версия 2022.12</i>
+
+
+<h2>SVALUE bit structure</h2>
+<pre>
+
+ 000000: NIL
+ 1..FIXEND-1:  FIXNUM  biased by FIXOFF
+ 177777 #UNBOUND (V.U)
+ 177xxx:  CHARACTER with ASCII code xxx
+ xxxxxx < SUBR address: FIXNUM
+ Else if binary is xxxxx0 < HEAP address: SUBR
+ Else if binary is xxxxx1 < HEAP address: FSUBR
+ Else:
+   Bits 0..1: Type
+	 00: CONS,
+	 01: if first WORD is:
+		LIST: 	SYMBOL
+		FIXNUM:	VECTOR
+		SYMBOL:	INTERPRETED FUNCTION (LAMBDA) OR STREAM
+	 02: DOUBLE (8 bytes)
+	 03: STRING (vector of CHARACTER) max len 255
+   Bits 2..1: Address if are in HEAP Range
+
+</pre>
+
+<h2>Structure of objects in Heap</h2>
+<pre>
+
+Free block
+ -------------------------------
+ | BLOCK SIZE (# bytes)        |
+ +-----------------------------+
+ | NEXT BLOCK PTR              |
+ -------------------------------
+
+SYMBOL
+  +---------------+
+  | Property List | - may include property SYBOL-VALUE
+  +---------------+
+  |   Function    |
+  +---------------+
+  | Next in ObList|
+  +---------------------------------------+
+  | First word of RADIX-50 name or 0      |
+  +---------------------------------------+
+  |NameLen| Name  or rest of RADIX-50 name|   <- This is also  STRING OBJECT
+  |---------------------------------------|
+  |  chars ...                            |
+  +---------------------------------------+
+
+SIMPLE VECTOR
+  +---------------+
+  | Len as FIXNUM |
+  +---------------+
+  | Element [0]   |
+  |   ...         |
+  |Element [Len-1]|
+  +---------------+
+
+ARRAY
+  +-----------------------------+
+  | -(TotalSize + 1)  as FIXNUM |
+  +-----------------------------+
+  | Dimensions (list)           |
+  +-----------------------------+
+  | Element 0                   |
+  |   ...                       |
+  | Element (TotalSize-1)       |
+  +-----------------------------+
+
+STRING
+  +-----------------+
+  |Len BYTE (0..255)|
+  +-----------------+
+  | char [0]        |
+  |   ...           |
+  | char [Len-1]    |
+  +-----------------+
+
+LAMBDA
+  ---------------------------
+  | 'LAMBDA                 |
+  +-------------------------+
+  | Lambda List             |
+  +-------------------------+
+  | FUNCTION BODY           |
+  +-------------------------+
+  | Lexical Environment     |
+  +-------------------------+
+
+Console STREAM or STRING-STREAM
+  ----------------------------
+  | 'STREAM    	             |
+  +--------------------------+
+  | STRING for STRING-STREAM |
+  +--------------------------+
+  | Position	               |
+  +------------------------------------+
+  | ENDPOS / latest char for terminal  |
+  +------------------------------------+
+
+FILE-STREAM - 524 bytes (12-byte struct + 512 buffer)
+  ---------------------------
+  | 'FILE-STREAM            |
+  +-------------------------+
+  | Filename                |
+  +-------------------------+
+  | Position                |
+  +-------------------------+----------+
+  | Low byte: last char,  High byte: 0 |
+  +-------------------------+----------+
+  | #channel 1..15                     |
+  +------------------------------------+
+  | 512 bytes: current block buffer    |
+  +------------------------------------+
+  | reserve                            |
+  +------------------------------------+
+
+
+</pre>
+
+</article>
+
+</body>
+</html>

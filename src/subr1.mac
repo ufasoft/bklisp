@@ -5,9 +5,50 @@
 
 ;;; Subroutines with 1+ arguments
 
+.SBTTL	Subroutines with 1+ arguments
+
 ASUBR1:
 
 
+;; (SLEEP seconds) => nil
+SLEEP::
+.IF NE C$RT11
+	PU.FL
+	PU.NOW
+	.BASN
+	.WORD	DSWAP, DPFREQ, $DMUL, $DADD, 1$
+1$:	PO.FL				; R1:  (+ (GET-INTERNAL-REAL-TIME) (* INTERNAL-TIME-UNITS-PER-SECOND seconds))
+	.PUSH0
+	MOV	R0, R5
+2$:	.SUBR	GETTIM
+	.SUBR	NUMLT
+	BNE	2$
+.IFF
+	TO.U16
+	BEQ	9$
+1$:	SOB	R0, .			;!!!TODO: Calibrate delay
+	SOB	R0, .
+	SOB	R1, 1$
+.ENDC ; C$RT11
+9$:	RETURN
+
+
+.IF NE C$MDAR
+;; (ARRAY-IN-BOUNDS-P array &rest subscripts) => bool
+ARIBP::
+	CALL	ARDIMS
+1$:	.POP1
+	BEQ.T
+	SUB	#FIXOFF, R0
+	PUSH	R1
+	.POP5
+	BEQ.E
+	TO.I16
+	CMP	R1, R0
+	POP	R1
+	BLO	1$
+	RE.NIL
+.ENDC ; C$MDAR
 
 
 ;; (CHARACTER char-designator) => character
@@ -88,18 +129,18 @@ MKAR::
 	TO.U16
 	INC	R1
 	PUSH	#1$
-	CLR	R0		; R0: init element
 3$:	CMP	R1, #FIXEND/2
 	BLO	6$
 	.E.DIM
 6$:	MOV	R1, R3
 	ADD	#FIXOFF, R3
 	MOV	R1, R5
-	ASR	R5
 	INC	R5
+	ASL	R5
 	.ALLOC
 	MOV	R3, (R1)
-	BR	INC1RA
+	INC	R1
+	RETURN
 
 1$:	MOV	R4, 1(R1)		; dimensions
 .IIF EQ C$VM1,	DEC	R1
@@ -108,34 +149,6 @@ MKAR::
 .IIF EQ C$VM1,		INC	R1
 	RETURN
 .ENDC
-
-.IF NE C$MDAR
-
-;; (ARRAY-ROW-MAJOR-INDEX array &rest subscripts) => index
-ARMI::	CLR	R4		; result index
-	.ARDMS		; R1: (ARRAY-DIMENSIONS array)
-	BR	1$
-2$:	MOV	R1, R3		; save dimensions
-
-
-;	.SUBR	MULDIM
-	.SUBR	S.MUL1
-	TO.U16
-
-	MOV	R1, R2		; R2: (APPLY '* (CDR dimensions))
-	.POP5
-	TO.U16			; R1: subscript
-	BEQ	5$
-4$:	ADD	R2, R4
-	SOB	R1, 4$
-5$:	MOV	R3, R1		; restore dimensions
-1$:	.POP1
-	BNE	2$		; has some dimensions
-	MOV	R4, R1		; R1: index
-	ADD	#FIXOFF, R1
-	RETURN
-.ENDC	; C$MDAR
-
 
 .IF NE C$MDAR
 
@@ -159,8 +172,8 @@ R.AR1:	SOB	R3, R.AR2
 .ENDC	; C$MDAR
 
 
-
-
+;; (MAKE-STRING 255)
+MKSTR2:	MOV	#V.255, R1
 ;; (MAKE-STRING size)  => string
 ;; PRESERVES R3
 MKSTR::	TO.U16
@@ -168,21 +181,15 @@ MKSTR1:	CMP	R1, #256.
 	BLO	1$
 	TRAP	15.
 1$:	MOV	R1, R5
-	MOV	#20040, R0	; SPACE:SPACE  INIT VALUE
-	ASR	R5
-	ASR	R5
-	INC	R5		; #CELLS = (SIZE + 4) / 4
 	MOV	R1, R4
+	INC	R5		; size+1 bytes
 	.ALLOC
-	MOVB	R4, (R1)+	; SAVE LEN HEADER
-.IF NE C$VM1
-	TST	(R1)+		; R1 += 2
-.IFF
-	ADD	#2, R1
-.ENDC
+	MOV	R1, R2
+2$:	MOVB	#C.SP, (R2)+	; Init string by spaces
+	SOB	R5, 2$
+	MOVB	R4, (R1)+	; Save len header
+	INC2	R1
 	RETURN
-
-
 
 
 
@@ -237,35 +244,37 @@ FMT.S:	.POP5
 	BR	FORMA1
 
 
-
-.IF NE C$MDAR
-;; #nA(...) syntax reader
-;; INPUT: R3: n+1
-R.AR:	.$READ
-	MOV	R1, R4		; R4: array as list structure
-	BR	R.AR1
-.ENDC	; C$MDAR
-
+;; ~A	- Aesthetic
 FMT.A:	.POP5
 	.SUBR	PRINC
 	BR	FORMA1
 
 
+
 FORMA7:	.CHRUP
 	.CCASE
 6$:	.WORD	10.
-	.BYTE	'~, <FORMA6 - 6$>/2
-	.BYTE	'&, <FMT.AM - 6$>/2
-	.BYTE	'%, <FMT.PC - 6$>/2
-	.BYTE	'A, <FMT.A - 6$>/2
-	.BYTE	'S, <FMT.S - 6$>/2
-	.BYTE	'C, <FMT.C - 6$>/2
-	.BYTE	'B, <FMT.B - 6$>/2
-	.BYTE	'D, <FMT.D - 6$>/2
-	.BYTE	'O, <FMT.O - 6$>/2
-	.BYTE	'X, <FMT.X - 6$>/2
+	.SBYTE	'~, <FORMA6-6$/2>
+	.SBYTE	'&, <FMT.AM-6$/2>
+	.SBYTE	'%, <FMT.PC-6$/2>
+	.SBYTE	'A, <FMT.A-6$/2>
+	.SBYTE	'S, <FMT.S-6$/2>
+	.SBYTE	'C, <FMT.C-6$/2>
+	.SBYTE	'B, <FMT.B-6$/2>
+	.SBYTE	'D, <FMT.D-6$/2>
+	.SBYTE	'O, <FMT.O-6$/2>
+	.SBYTE	'X, <FMT.X-6$/2>
 	.E.SX
 
+.IF NE C$MDAR
+
+;; #nA(...) syntax reader
+;; INPUT: R3: n+1
+R.AR:	.$READ
+	MOV	R1, R4		; R4: array as list structure
+	BR	R.AR1
+
+.ENDC	; C$MDAR
 
 FMT.PC:	MOV	#V.C.NL, R1
 FORMA6:	.W.CH2			; (WRITE-CHARACTER R1 R2)
@@ -278,8 +287,15 @@ FORMA4: POP	R1
 GETOSS::
 	TO.STM
 	INC	R1
- 	MOV	(R1), R0	; R0: reversed list of chars
- 	CLR	(R1)		; Reset string output stream
+	MOV	R1, R3		; R3: &buffer
+	MOV	(R1)+, R2	; R2: result string
+	MOVB	(R1), -3(R2)	; set result string lengt. +FIXOFF does not change low byte
+	.SUBR	MKSTR2		; (MAKE-STRING 255)
+	MOV	R1, (R3)+	; set new buffer
+	MOV	#V.0, (R3)	; set position to zero
+	MOV	R2, R1
+	RETURN
+
 PO.STR:	MOV	R0, R1
  	.LENGTH
  	TO.U16
@@ -287,9 +303,8 @@ PO.STR:	MOV	R0, R1
 	BEQ	RE.STR		; EMPTY STRING
 	.SUBR	MKSTR1
 	ADD	R5, R1
-.IIF NE C$VM1, 	TST	-(R1)	; R1 -= 2: points after last char in the string
-.IIF EQ C$VM1,	SUB	#2, R1	; R1: points after last char in the string
-2$:	MOVB	(R0), -(R1)	; TRAVERSE SAVED CHARS, FROM LAST TO FIRST
+	DEC2	R1		; R1: pointer after last char in the string
+2$:	MOVB	(R0), -(R1)	; Traverse saved chars, from last to first
 	MOV	2(R0), R0
 	SOB	R5, 2$
 	ADD	#2 - V.EMPTY, R1
@@ -335,11 +350,7 @@ R.TOK1:	.ROCHR
 5$:	MOV	#TOKBUF, R3
 	MOV	R3, R1
 	MOV	R3, R5
-.IF NE C$VM1
-	TST	(R1)+		; R1: token as string object
-.IFF
-	ADD	#2, R1
-.ENDC
+	INC2	R1		; token as string object
 	SUB	R3, R4
 	MOVB	R4, -3(R1)
 	CMP	R4, #1
@@ -372,15 +383,15 @@ R.SHARP:CLR	R3
 3$:	.CHRUP
 	.CCASE
 1$:	.WORD	4$ - . - 2 / 2
-.IIF NE C$MDAR	.BYTE	'A, <R.AR - 1$>/2
-	.BYTE	'|, <R.LCOM - 1$>/2
-	.BYTE	'\, <RS.CH - 1$>/2
-	.BYTE	'(, <R.VEC - 1$>/2
-	.BYTE	'', <R.FUN - 1$>/2
-	.BYTE	':, <RS.COL - 1$>/2
-	.BYTE	'B, <R.BIN - 1$>/2
-	.BYTE	'O, <R.OCT - 1$>/2
-	.BYTE	'X, <R.HEX - 1$>/2
+.IIF NE C$MDAR	.SBYTE	'A, <R.AR-1$/2>
+	.SBYTE	'|, <R.LCOM-1$/2>
+	.SBYTE	'\, <RS.CH-1$/2>
+	.SBYTE	'(, <R.VEC-1$/2>
+	.SBYTE	'', <R.FUN-1$/2>
+	.SBYTE	':, <RS.COL-1$/2>
+	.SBYTE	'B, <R.BIN-1$/2>
+	.SBYTE	'O, <R.OCT-1$/2>
+	.SBYTE	'X, <R.HEX-1$/2>
 4$:	.E.SX
 
 
@@ -391,8 +402,8 @@ R.STR2:	.PUSH0                  ; R0: reversed list of chars
 R.STR:	.R.CHR
 	.CCASE
 3$:	.WORD	2
-	.BYTE	'", <PO.STR - 3$>/2	; End of string
-	.BYTE	'\, <R.STR1 - 3$>/2	; Escape
+	.SBYTE	'", <PO.STR-3$/2>	; End of string
+	.SBYTE	'\, <R.STR1-3$/2>	; Escape
 	BR	R.STR2
 
 R.BIN:	ADD	#$CBIN - $COCT, R0
@@ -420,6 +431,7 @@ RS.CH:  .R.CHR
 9$:	RETURN
 
 
+
 ;; Here R5: &rest (eof-error-p eof-value recursive-p)
 READ.8:	.POP5
 	BEQ.E			; eof-error-p is true by deafult
@@ -441,26 +453,24 @@ READ.1:	.ROCHR
 ;; R1: CHAR
 ;; R2: STREAM
 	.CCASE
+1$:	.WORD	<7$ - 1$ - 2> / 2
 .IF NE C$MACR
-1$:	.WORD	13.
-	.BYTE	'`	, <R.BACK - 1$>/2
-	.BYTE	',	, <R.COMMA - 1$>/2
-.IFF
-1$:	.WORD	11.
+	.SBYTE	'`	, <R.BACK-1$/2>
+	.SBYTE	',	, <R.COMMA-1$/2>
 .ENDC	; C$MACR
-	.BYTE	C.SP	, <R.SPACE - 1$>/2
-	.BYTE	'"	, <R.STR - 1$>/2
-	.BYTE	'(	, <R.LIST - 1$>/2
-	.BYTE	')	, <R.ERR - 1$>/2
-	.BYTE	''	, <R.QUOTE - 1$>/2
-	.BYTE	'#	, <R.SHARP - 1$>/2
-	.BYTE	C.SEMI	, <R.SEMI - 1$>/2
-	.BYTE	C.HT	, <R.SPACE - 1$>/2
-	.BYTE	C.NL	, <R.SPACE - 1$>/2
-	.BYTE	C.FF	, <R.SPACE - 1$>/2
-	.BYTE	C.CR	, <R.SPACE - 1$>/2
-
-	CALL	R.TOK3
+	.SBYTE	C.SP	, <R.SPACE-1$/2>
+	.SBYTE	'"	, <R.STR-1$/2>
+	.SBYTE	'(	, <R.LIST-1$/2>
+	.SBYTE	')	, <R.ERR-1$/2>
+	.SBYTE	''	, <R.QUOTE-1$/2>
+	.SBYTE	'#	, <R.SHARP-1$/2>
+	.SBYTE	C.SEMI	, <R.SEMI-1$/2>
+	.SBYTE	C.HT	, <R.SPACE-1$/2>
+	.SBYTE	C.NL	, <R.SPACE-1$/2>
+	.SBYTE	C.FF	, <R.SPACE-1$/2>
+	.SBYTE	C.CR	, <R.SPACE-1$/2>
+.IIF NE C$RT11	.SBYTE	C.NULL	, <R.SPACE-1$/2>
+7$:	CALL	R.TOK3
 	BNE	6$
 	CMPB	(R3), #'.
 	BNE	4$
@@ -495,21 +505,7 @@ INTERN::
 RET.8:	RETURN
 
 
-;; SEMICOLON COMMENT
-R.SEMI: MOV	#V.C.NL, R1
-	MOV	#V.U, R3
-	MOV	R3, R4
-	.PEEKC			; (PEEK-CHAR #\NEWLINE stream)
-	BR	READ.1
 
-
-.IF NE C$MACR
-R.BACK:			;!!!TODO BACKQUOTE
-	.E.SX
-
-R.COMMA:		;!!!TODO BACKQUOTE
-	.E.SX
-.ENDC
 
 ;; #'function-name
 ;; R1: V.C.QO
@@ -527,6 +523,15 @@ R.VEC:	PUSH	#VECTO1
 ;; Assumes R0==0
 R.LIST: MOV	#V.CHB + '), R4
 	BR	R.DEL1
+
+;; SEMICOLON COMMENT
+R.SEMI: MOV	#V.C.NL, R1
+	MOV	#V.U, R3
+	MOV	R3, R4
+	.PEEKC			; (PEEK-CHAR #\NEWLINE stream)
+	BR	READ.1
+
+
 ;; (READ-DELIMITED-LIST char &optional input-stream) => list
 R.DELI::
 	MOV	(R5), R2	; R2: input-stream
@@ -554,6 +559,13 @@ R.DEL1:	PUSH	R0		; (SP): dotted element (initally NIL), R0: list
 	POP	R0		; R0: dotted element
 	BR	NREV.2		; DOTTED ELEMENT
 
+.IF NE C$MACR
+R.BACK:			;!!!TODO BACKQUOTE
+	.E.SX
+
+R.COMMA:		;!!!TODO BACKQUOTE
+	.E.SX
+.ENDC
 
 
 .IF NE C$MDAR
@@ -622,16 +634,17 @@ ERROR::	.PRED	P.ERR
 FRESHL::
 	TO.STM
 	MOV	R1, R3		; R3: stream
-        MOV	1(R1), R1
-        .LISTP
-        BCC	1$		; STDOUT
-        CMP	(R1), #V.C.NL	; is last char NL ?
+;	CMP	5(R1), #V.0
+;	BEQ	1$		; STDOUT
+        CMPB	5(R1), #C.NL	; is last char NL ?
         BR	FRESH8
 1$:
+.IF EQ C$RT11
 M.POS::	EMT	26		; Get terminal Cursor coordinates
 	TST	R1
+.ENDC ; C$RT11
 FRESH8:	BEQ	R.R0		; zero pos in terminal line or last char was NL
-	MOV	R3, R1		; R1: stream
+FRESH9:	MOV	R3, R1		; R1: stream
 	MOV	R3, R0		; R0: return true value
 ;; (TERPRI &optional output-stream) => nil
 TERPRI::
@@ -729,11 +742,7 @@ R.IDE:
 NREV.S:	T.STR
 	BISB	-3(R1), R0	; R0: length
 	MOV	R1, R2
-.IF NE C$VM1
-	TST	-(R2)
-.IFF
-	SUB	#2, R2
-.ENDC
+	DEC2	R2
 	MOV	R2, R4		; R2: string buffer
 	ADD	R0, R4		; R4: end
 	ASR	R0
@@ -766,9 +775,9 @@ SYNAM::	T.SYM
 	BEQ	SYNAM8		; ASCII name
 
 .IF NE C$RAD40
-	.R2STR
+	.R402A
 .IFF
-	CALL	R2STR
+	CALL	R502A
 .ENDC
 
 	MOV	#TOKBUF+2, R1
@@ -793,10 +802,9 @@ CPLIST::
 
 
 
-CDDR::	.POP1
+CDAR::	.CAR
 	BR	CDR
-CDAR::	.POP1
-	MOV	R0, R1
+CDDR::	CALL	(PC)
 REST::
 CDR::	.POP1
 	RETURN
@@ -804,8 +812,13 @@ CDR::	.POP1
 SECOND::
 CADR::	.POP1
 	BR	CAR
-CAAR::	.POP1
-	MOV	R0, R1
+
+.IF NE C$FULL
+CAADR::	.POP1
+	BR	CAAR
+CAAAR::	.CAR
+.ENDC ; C$FULL
+CAAR::	CALL	(PC)
 FIRST::
 CAR::	.POP1
 R.R0B:	BR	R.R0
@@ -852,9 +865,7 @@ MKSYM1:
 	ADD	#14, R5
 	MOV	R1, R4
 	MOV	#10, R2			; R2: offset of name in symbol object
-5$:	ASR	R5
-	ASR	R5			; R5: SYMBOL object length in CELLs
-	CLR	R0			; to clear PLIST, function field and last word
+5$:					; R5: SYMBOL object length in bytes
 	.ALLOC
 	ADD	R1, R2
 8$:	MOVB	(R4)+, (R2)+		; Copy name
@@ -993,10 +1004,10 @@ CHNAME::
 	T.CHR
 	.CCASE
 CHNAM2:	.WORD	4
-CHNAM1:	.BYTE	11, <CN.TAB - CHNAM2>/2		; Order does matter. used in NAME-CHAR
-	.BYTE	12, <CN.NL - CHNAM2>/2
-	.BYTE	15, <CN.CR - CHNAM2>/2
-	.BYTE	40, <CN.SP - CHNAM2>/2
+CHNAM1:	.SBYTE	11, <CN.TAB-CHNAM2/2>		; Order does matter. used in NAME-CHAR
+	.SBYTE	12, <CN.NL-CHNAM2/2>
+	.SBYTE	15, <CN.CR-CHNAM2/2>
+	.SBYTE	40, <CN.SP-CHNAM2/2>
 RENIL2:	RE.NIL
 
 CN.CR:	ADD	#A.RETU - V.C.CR - A.SPAC + V.C.SP, R1
@@ -1058,7 +1069,7 @@ ATOM::	.CONSP
 	B.NCF
 
 
-;; GET WORD FROM MEMORY
+;; Get Word from Memory
 ;; (PEEK address) => int16
 PEEK::	TO.U16
 	MOV	(R1), R1
@@ -1103,14 +1114,23 @@ R.B.CF:	B.CF
 
 
 ;; (STREAMP stream) => bool
-STMP::   .TYP	U.STM
+STMP::
+.IF NE C$FILE
+	.TYPEP	U.FILE
+	BCS.T
+.ENDC
+	.TYP	U.STM
 
 ;; (INPUT-STREAM-P stream) => bool
-ISTMP::	.PRED	STMP
-	BCC.F
-	TO.STM
-	PUSH	#NOT		; output-string-stream has list of chars
-	MOV	1(R1), R1
+ISTMP::	BIT	(R0)+, (R0)+		; R0: 4 to check if OUTPUT-STRING-STREAM has 0 byte at offset 7
+;; (OPEN-STREAM-P stream) => bool
+OPENP::
+	.PRED	STMP
+OPENP1:	BCC.E
+	ADD	R0, R1
+	TSTB	2(R1)
+	B.NZF
+
 ;; (LISTP object) => bool
 LISTP::	BEQ	RE.T1
 CONSP::	BIT	#3, R1		; Don't use  .TYP U.CONS to avoid recursive calls in .TYCOD
@@ -1145,13 +1165,6 @@ FMAKUNBOUND::
 	RETURN
 
 
-;; (SLEEP seconds) => nil
-SLEEP::	TO.U16
-	BEQ	9$
-1$:	SOB	R0, .			;!!!TODO: CALIBRATE DELAY
-	SOB	R0, .
-	SOB	R1, 1$
-9$:	RETURN
 
 ;; (FUNCTIONP object) => bool
 FUNP::	.TYPEP	U.LAMB
@@ -1208,7 +1221,6 @@ TYPEOF::
 1$:	MOV	3(R1), R1
 	SOB	R0, 1$
 RE.11:	RETURN
-
 
 
 
@@ -1281,7 +1293,8 @@ ALLDIF::
 ISQRT::	.SUBR	SQRT
 	BR	FLOOR
 SIGNUM::
-	ADD	#6, R0
+	TST	(R0)+
+.IIF NE C$BK10,	CMP	(R0)+, (R0)+	; R0 += 4.  the $AMATH on BK-0010 contains 2 more items
 ABS::	TST	(R0)+
 TRUNCA::
 	TST	(R0)+
@@ -1379,6 +1392,135 @@ EVAL::	MOV	#LEXENV, R4
 	POP	(R4)
 	RETURN
 
+
+.IF NE C$FULL
+
+
+;; (GET-DECODED-TIME) => second, minute, hour, date, month, year, day-of-week, daylight-p, zone
+GDCTI1:	MOV	R0, R5
+	.SUBR	GETTIM
+GDCTIM::
+	.DATE
+	CMP	R0, R5
+	BNE	GDCTI1			; rollover midnight
+
+	CALL    DECDMY                  ; R0: (day month year)
+
+	MOV	R0, 7$			; save R0
+	MOV	PRVTIM, R1
+	PU.FL
+	.BASN
+	.WORD	DPFREQ, $DDIV, $INT, DIVREM, V.60, DIVREM, V.60, DIVREM, V.24, 2$	; Stack: day hour minute second
+2$:	ADD	#10, SP			; skip day
+	MOV	(PC)+, R0
+7$:	.WORD	0			; restore R0
+
+	MOV	#3, R3
+8$:	PO.FL
+	.PUSH0			; Push hour, minute, second into R0 list
+	SOB	R3, 8$
+	MOV	R0, R5
+	CALL	ECUTIM			; (APPLY #'ENCODE-UNIVERSAL-TIME)
+					; Fallback to DECODE-UNIVERSAL-TIME
+;; (DECODE-UNIVERSAL-TIME universal-time) => second, minute, hour, date, month, year, day-of-week, daylight-p, zone
+DCUTIM::
+
+;; Decode universal time to day, hour, minute second
+;; R1: universal time
+;; Stack on Return: day hour minute, second
+	PU.FL
+	.BASN
+	.WORD	DIVREM, V.60, DIVREM, V.60, DIVREM, V.24, 1$	; Stack: day hour minute second
+1$:
+	CLR	R0
+	MOV	#V.0, R1	; timezone
+	.PUSH0
+	CLR	R1		; no daylight
+	.PUSH0
+
+	PO.FL
+	TO.U16
+	MOV	R1, R5		; R5: day since 1900
+2$:	SUB	#7, R1
+	BHIS	2$
+	ADD	#FIXOFF+7, R1	; R1: day-of-week
+	.PUSH0
+
+	MOV	#V.1900, R1	; R1: year
+	MOV	#365., R2
+	BR	4$		; 1900 is not leap year
+3$:	INC	R1		; ++year
+	MOV	#365., R2
+	BIT	#3, R1
+	BNE	4$		; non-leap year
+	INC	R2		; R2: days in R1 year
+4$:	SUB	R2, R5
+	BHIS	3$
+	ADD	R2, R5		; R5: day-of-year
+	SUB	#365.-28., R2	; R2: days in February
+	MOVB	R2, FEBRUA	; Patch DAYMON table for leap year
+	.PUSH0			; year
+	MOV	#DAYMON+1, R1
+6$:	MOVB	(R1)+, R3
+	SUB	R3, R5
+	BHIS	6$
+	ADD	#FIXOFF - DAYMON - 1, R1
+	.PUSH0			; month
+
+	MOV	#V.1, R1
+	ADD	R3, R1
+	ADD	R5, R1
+	.PUSH0			; day
+
+	MOV	#3, R3
+8$:	PO.FL
+	.PUSH0			; Push hour, minute, second into R0 list
+	SOB	R3, 8$
+
+	MOV	R0, MVAL
+	MOV	(R0), R1
+	RETURN
+.ENDC	; C$FULL
+
+
+.IF NE C$FILE
+	.INCLUDE	/file.mac/
+
+;; (LOAD filespec) => bool
+LOAD::
+	.SUBR	OPEN
+	PUSH	R1		; (SP): stream
+	MOV	#V.U, R1	; R1: #V.U eof value
+	.PUSH0
+	CLR	R1
+	.PUSH0
+	MOV	R0, R5		; R5: (eof-error-p eof-value)
+	BR	3$
+2$:	.P5EVL
+3$:	MOV	(SP), R1
+	.SUBR	READ		; (read input-stream nil eof-value)
+	CMP	R1, #V.U
+	BNE	2$		; not EOF
+	POP	R1		; R1: file-stream
+; fallback
+;	JMP	CLOSE		;!!!O
+.ENDC	; C$FILE
+;; (CLOSE stream) => result
+CLOSE::
+	.OPENP			; (OPEN-STREAM-P stream)
+	BCC	CLOSE9		; already closed
+	.TYPEP	U.FILE
+	INC	R1
+	BCC	CLOSE8			; Clear string of STRING-STREAM
+	CLR	(R1)+			; Clear filename
+	BIT	(R1)+, (R1)+		; R1: &channel
+	MOV	(R1), R2		; R2: channel 1..8
+	BIC	MASKTB-1(R2), CHBMAP	; free channel
+CLOSE2:	.CLOSE	(R1)		; (R1): chan#
+CLOSE8:	MOV	#0, (R1)	; Clear string or filename keeping CF value unaffected
+CLOSE9:	B.NCF
+
+
 .IF NE C$MDAR
 
 ;; (ARRAY-TOTAL-SIZE array) => size
@@ -1426,14 +1568,18 @@ STRLEN:	BISB	-3(R1), R0
 SYVAL::	BEQ	SYVAL2		; NIL
 	.BOUNDP
 	BCC.E
- 	.GPLAC
+	.GPLAC
 SYVAL1:	BEQ.E
 	MOV	(R4), R1
 SYVAL2:	RETURN
 
+
+
 P5EVL:	ADD	#ST.OFF-2, SP
 ;; Evaluate form in R1 in the current environment
-EVAL1:	.CONSP
+EVAL1:
+.IIF NE C$MVAL,	MOV	SP, MVAL			; by default return result in R1
+	.CONSP
 	BCC	7$
 ;!!!?	PUSH	(R4)		; SAVE ENVIRONMENT
 	MOV	R1, R5
@@ -1511,8 +1657,7 @@ INTERP:	POP	R3		; R3: lambda-function
 	CMP	R0, #V.REST
 	BNE	16$		; some optional args
 ;; &REST section
-8$:	.POP1
-	MOV	R0, R1
+8$:	.CAR
 	MOV	R5, R2
 	CALL	BNARG2
 9$:	PUSH	LEXENV
@@ -1539,11 +1684,7 @@ NSTRUP::
 	MOV	R0, 3$+2
 	T.STR
 	MOV	R1, R5
-.IF NE C$VM1
-	TST	-(R1)
-.IFF
-	SUB	#2, R1
-.ENDC
+	DEC2	R1
 	MOV	R1, R4 		; R4: string buf
 	CLR	R0
 	BISB	-(R1), R0	; LEN
@@ -1556,6 +1697,7 @@ NSTRUP::
 2$:
 R.M51:	MOV	R5, R1
 	RETURN
+
 
 
 
@@ -1594,6 +1736,28 @@ APPLY$:	MOV	(SP), R3
 
 .IF NE C$MDAR
 
+;; (ARRAY-ROW-MAJOR-INDEX array &rest subscripts) => index
+ARMI::	CLR	R4		; result index
+	.ARDMS		; R1: (ARRAY-DIMENSIONS array)
+	BR	1$
+2$:	MOV	R1, R3		; save dimensions
+
+;	.SUBR	MULDIM
+	.SUBR	S.MUL1
+	TO.U16
+
+	MOV	R1, R2		; R2: (APPLY '* (CDR dimensions))
+	.POP5
+	TO.U16			; R1: subscript
+	BEQ	5$
+4$:	ADD	R2, R4
+	SOB	R1, 4$
+5$:	MOV	R3, R1		; restore dimensions
+1$:	.POP1
+	BNE	2$		; has some dimensions
+	MOV	R4, R1		; R1: index
+	BR	AFIX.R		; ADD	#FIXOFF, R1; RETURN
+
 ;; (SETF (AREF array &rest subscripts) new-element) => element
 X.AREF::
 	MOV	R1, R4		; R4: array
@@ -1630,20 +1794,13 @@ RBAS.5: POFL.R
 
 ;; (FDEFINITION function-name) => definition
 FDEFINITION::
+	MOV	R1, R2
 	.SUBR	FBOUNDP
 	BNE	R.9
+	MOV	R2, ERDATA
 	.E.FUN
 
 ;; (WRITE object) => object
 WRITE::	CLR	R2		; R2: *STANDARD-OUTPUT* designator
 	.$WRITE
 R.9:	RETURN
-
-.IF NE C$RT11
-;; (CLOSE stream) => result
-CLOSE::
-;!!!TODO	.FSTMP
-;	BCC.F
-	.CLOSE	1(R1)		; 1(R1): chan#
-	B.NCF
-.ENDC	; C$RT11

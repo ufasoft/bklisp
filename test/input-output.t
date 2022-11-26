@@ -1,6 +1,5 @@
 Prompt
   Lisp (.+)ufasoft.com (re)
-  Lisp (re)
   Bytes free (re)
 I/O variables
   $ *print-base*
@@ -41,8 +40,8 @@ Streams
   NIL
   $ (input-stream-p (make-string-input-stream "a"))
   T
-  $ (input-stream-p nil)
-  NIL
+  $ (open-stream-p (make-string-input-stream "a"))
+  T
 Input
   $ (read (make-string-input-stream "123"))
   123
@@ -73,8 +72,9 @@ WRITE-CHAR
   $ (write-char #\ю)
   ю
   #\ю
-  $ (let ((stm (make-string-output-stream))) (write-char #\K stm) (get-output-stream-string stm))
-  "K"
+  $ (let ((stm (make-string-output-stream))) (write-char #\K stm) \
+    (list (get-output-stream-string stm) (get-output-stream-string stm)))
+  ("K" "")
 WRITE
   $ (let ((*print-escape* nil)) (write "ABC"))
   ABC
@@ -90,15 +90,18 @@ WRITE
   B
   #<STREAM>
 PRINC
-  $ (defun fillstm (stm) (princ "A" stm) (fresh-line stm) (fresh-line stm) (princ "B" stm))
+  $ (defun fillstm (stm) (princ "A" stm) (fresh-line stm) \
+    (fresh-line stm) (princ "B" stm))
   FILLSTM 
-  $ (let ((stm (make-string-output-stream))) (fillstm stm) (length (get-output-stream-string stm)))
+  $ (let ((stm (make-string-output-stream))) (fillstm stm) \
+    (length (get-output-stream-string stm)))
   3
 PRINT
   $ (print 123)
   123
   123
-  $ (let ((stm (make-string-output-stream))) (print #\A stm) (length (get-output-stream-string stm)))
+  $ (let ((stm (make-string-output-stream))) (print #\A stm) \
+    (length (get-output-stream-string stm)))
   5
   $ (progn (write-string "AA") (write-string "BB") )
   AABB
@@ -110,9 +113,11 @@ PRINT
   $ (write-line "A\"B")
   A"B
   "A\"B"
-  $ (let ((stm (make-string-output-stream))) (write-line "ABC" stm) (length (get-output-stream-string stm)))
+  $ (let ((stm (make-string-output-stream))) (write-line "ABC" stm) \
+    (length (get-output-stream-string stm)))
   4
-  $ (let ((stm (make-string-output-stream))) (write-string "testing... " stm) (prin1 1234 stm) (get-output-stream-string stm))
+  $ (let ((stm (make-string-output-stream))) (write-string "testing... " stm) \
+    (prin1 1234 stm) (get-output-stream-string stm))
   "testing... 1234"
 Format
   $ (format t "Hello")

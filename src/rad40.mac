@@ -1,14 +1,13 @@
-;#######   Copyright (c) 2021 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com #####
-;#                                                                                                                                #
-;#       See LICENSE for licensing information                                                                                    #
-;##################################################################################################################################
+;;; Copyright (c) 2021-2022 Ufasoft  http://ufasoft.com  mailto:support@ufasoft.com,  Sergey Pavlov  mailto:dev@ufasoft.com
+;;;
+;;; SPDX-License-Identifier: MIT
 
-;;; BkLisp RADIX-40 encoding routines
+.SBTTL	RADIX-40 encoding routines
 
 ;; INPUT: R0: 0, R1: RADIX-40 string
 ;; OUTPUT: ASCII string in TOKBUF & TOKLEN
-.MACRO	.R2STR
-R2STR:	MOV	(R1)+, R2
+.MACRO	.R402A
+R402A:	MOV	(R1)+, R2
 	MOV	#3, R5
 2$:	MOV	R2, R3
 	BIC	#177740, R3
@@ -23,10 +22,10 @@ R2STR:	MOV	(R1)+, R2
 	SOB	R4, 4$
 	BEQ	9$		; end-of-string
 	SOB	R5, 2$
-	BR	R2STR
+	BR	R402A
 9$: 	MOVB	R0, TOKLEN
 ;	RETURN
-R2STR9:
+R402A9:
 .ENDM
 
 ;; INPUT: R1: STRING object
@@ -47,7 +46,7 @@ STR2R:	PUSH	R1
 	MOV	#5, R4
 	BIT	#1740, (R3)
 	BEQ	5$		; second char in triplet
-	MOV	#10., R4
+	ASL	R4		; R4: 10.
 5$:	ASL	R0
 	SOB	R4, 5$
 6$:	ADD	R0, (R3)+

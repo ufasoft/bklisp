@@ -3,7 +3,7 @@
 ;;; SPDX-License-Identifier: MIT
 
 
-;;; Subroutines with 2+ arguments
+.SBTTL	Subroutines with 2+ arguments
 
 
 ASUBR2:
@@ -22,6 +22,20 @@ LAST::	MOV	R1, R5		; second-list lagging by n
 	MOV	2(R5), R5
 2$:	.POP1
 	BR	1$
+
+.IF NE C$MDAR
+;; (ARRAY-DIMENSION array axis-number => dimension
+ARDIM::	.ARDMS			; (ARRAY-DIMENSIONS array)
+.ENDC
+;; (ELT sequence index) => object
+ELT::	.STRP
+	BCS	CHAR
+	.SVECP
+	BCS	SVREF
+	.SWP12
+	.SUBR	NTHCDR
+	BNE	R.CAR
+E.RANG:	TRAP	9.			; index is out of range
 
 
 ;; (LOG number &optional base) => logarithm
@@ -48,19 +62,26 @@ SVREF1:	TO.U16
 	MOV	(R2), R1
 	RETURN
 
-.IF NE C$MDAR
-;; (ARRAY-DIMENSION array axis-number => dimension
-ARDIM::	.ARDMS			; (ARRAY-DIMENSIONS array)
-.ENDC
-;; (ELT sequence index) => object
-ELT::	.STRP
-	BCS	CHAR
-	.SVECP
-	BCS	SVREF
-	.SWP12
-	.SUBR	NTHCDR
-	BNE	R.CAR
-E.RANG:	TRAP	9.			; index is out of range
+
+;; (DIGIT-CHAR-P char &optional (radix 10)) => weight
+DIGCHP::
+	.DF2	V.10
+	.CHRUP		; R1: (CHAR-UPCASE char)
+	ADD	#FIXOFF - V.CHB - '0, R1
+	.TI16B
+	CMP	R1, R0
+	BLO.F				; char < '0
+	CMP	R1, #9.
+	BLOS	1$
+	CMP	R1, #'A - '0
+	BLO.F
+	ADD	#10. + '0 - 'A, R1
+1$:	CMP	R1, R2		; R1: weight as int16
+	BHIS.F			; weight >= radix
+AFIX.R:	ADD	#FIXOFF, R1
+	RETURN
+
+
 
 ;; (1+ number) => successor
 INCR::	TST	(R0)+			; R0 = 2
@@ -100,7 +121,7 @@ CHAR::	SUB	#3, R1
 	TO.U16
 	CMP	R1, R0
 	BHIS	E.RANG
-	ADD	R1, R2
+CHAR1:	ADD	R1, R2
 	MOV	#V.CHB, R1
 	BISB	(R2), R1
 	RETURN
@@ -356,25 +377,6 @@ DIGICH:: .DF2	V.10
 1$:	ADD	#V.C.0, R1
 	RETURN
 
-;; (DIGIT-CHAR-P char &optional (radix 10)) => weight
-DIGCHP::
-	.DF2	V.10
-	.CHRUP		; R1: (CHAR-UPCASE char)
-	ADD	#FIXOFF - V.CHB - '0, R1
-	.TI16B
-	CMP	R1, R0
-	BLO.F				; char < '0
-	CMP	R1, #9.
-	BLOS	1$
-	CMP	R1, #'A - '0
-	BLO.F
-	ADD	#10. + '0 - 'A, R1
-1$:	CMP	R1, R2		; R1: weight as int16
-	BHIS.F			; weight >= radix
-	ADD	#FIXOFF, R1
-	RETURN
-
-
 
 ;; (UNREAD-CHAR character &optional input-stream) => nil
 UNR.CH::
@@ -383,13 +385,21 @@ UNR.CH::
 	TO.STM
 	MOV	R1, R4
 	INC	R4
-	MOV	(R4)+, R1
-	.STRP
-	BCS	1$		; string-input-stream
 .IF NE C$RT11
-	MOV	R2, (PC)+
-UNRCH:	.WORD	0
-	BR	9$
+	.TYPEP	U.FILE
+	BCC	4$		; not FILE-STREAM
+	TST	(R4)+
+	MOV	(R4), R1
+	.SUBR	DECR
+	MOV	R1, (R4)
+	BR	UNRCH9
+.ENDC	; C$RT11
+4$:	MOV	(R4)+, R1
+	.STRP
+	BCS	UNRCH1		; string-input-stream
+.IF EQ C$LINE
+	MOV	R2, UNRCH
+	BR	UNRCH9
 .IFF
 ;!!!TODO
 	MOV	#INCUR, R4
@@ -397,12 +407,10 @@ UNRCH:	.WORD	0
 	CMP	(R4), #$BUF + 1
 	BLO.E
 ;!!!R	MOVB	R2, -(R3)
-.ENDC	; C$RT11
-1$:	DEC	(R4)		; --curPos
-9$:	CLR	R1
+.ENDC	; C$LINE
+UNRCH1:	DEC	(R4)		; --curPos
+UNRCH9:	CLR	R1
 	RETURN
-
-
 
 ;; (REDUCE function list) => result
 REDUCE::
@@ -452,14 +460,6 @@ REMPROP::
 	RE.T
 
 
-;; Put word into memory
-;; (POKE address int16) => int16
-POKE::	MOV	R1, R3
-	.TI16B
-	MOV	R2, (R1)
-	BR	R.M31B
-
-
 ; Sort (R3), (R4) by Predicate IN R2
 SORT34: MOV	R2, R0
 	MOV	(R3), R1
@@ -499,23 +499,6 @@ SORT::	MOV	R1, R3
 	.SORT34
 	BR	2$
 
-;; (RASSOC item alist) => entry
-RASSOC::
-	TST	(R0)+		; R0 = 2 (Offset to CDR)
-;; (ASSOC item alist) => entry
-;; ASSUME R0 == 0
-ASSOC::	MOV	R2, R5		; R5: alist
-	MOV	R1, R2		; R2: item
-1$:	.POP5
-        BEQ.F
-        T.CONS
-        MOV	R1, R3		; R3: entry
-        ADD	R0, R1
-        MOV	(R1), R1	; R1: (CAR/CDR entry)
-        .EQL
-        BCC	1$		; Test failed
-R.M31B:	BR	R.M31
-
 
 
 ;; (REM number divisor) => reminder
@@ -543,6 +526,152 @@ RANDOM::
 	.BASN
 	.WORD	DCP23, $RAN, $DMUL, B.III, RBAS.5 		; SCALE
 
+.IF NE C$RT11
+
+;; (RENAME-FILE filespec new-name) => new-name
+RENAMF::
+	PUSH	R2		; Save new-name
+	.SUBR	PROBEF		; (PROBE-FILE pathspec)
+	BEQ.E
+	.R50FN
+	MOV	#$BUFOUT, R3
+	CMP	(R0)+, (R0)+	; R0: 4
+1$:	.WORD	012363,	-10.	; MOV	(R3)+, -10.(R3)		; Copy old-name into AREAT
+	SOB	R0, 1$
+	MOV	(SP), R1
+	.R50FN
+	MOV	#$BUFOUT+8., R3
+	MOV	#8., R0
+2$:	.WORD	014363,	8.	; MOV	-(R3), 8.(R3)		; Copy old-name into AREAT
+	SOB	R0, 2$
+	.SYS	S$RENA		; .RENAME #AREA, #TESTCH, #$BUFOUT
+	BCC	8$
+	JMP	EIO1
+8$:	POP	R1		; R1: new-name
+	RETURN
+
+.ENDC ; C$RT11
+
+.IF NE C$RU
+SWRUS:	BIS	#200, KOI7
+	BR	GETCH1
+SWLAT:	CLR	KOI7
+	BR	GETCH1
+.ENDC ; C$RU
+
+.IF EQ C$LINE
+
+GETCH:	MOV	(PC)+, R1
+UNRCH:	.WORD	0
+	BNE	GETCH9
+GETCH1:	.TTYIN
+	MOV	#V.CHB, R1
+	BISB	R0, R1
+.IF NE C$RU
+	.CCASE
+3$:	.WORD	3
+	.SBYTE	3, <GETCH1-3$/2>	; CTRL/C
+	.SBYTE	$K.RUS, <SWRUS-3$/2>
+	.SBYTE	$K.LAT, <SWLAT-3$/2>
+
+	BIS	(PC)+, R1
+KOI7:	.WORD	0		; KOI-7 mode mask: 200 or 0
+.IFF
+	CMPB	R1, #3		; CTRL/C
+	BEQ	GETCH1
+.ENDC ; C$RU
+
+GETCH9:	CLR	UNRCH
+.IFF
+GETLIN: CALL	$IVEIL
+	MOVB	#C.NL, STDIN+6		; checked by FRESH-LINE
+GETLI1:	MOV	#$BUF, (PC)+
+INCUR:	.WORD	$BUF
+	MOV	R1, INEND
+GETCH1:
+GETCH:  MOV	#INCUR, R0
+	CMP	(R0), (PC)+
+INEND:	.WORD	$BUF
+	BHIS	GETLIN
+	MOV	#V.CHB, R1
+	BISB	@(R0)+, R1	; Read char into R1
+	INC	-(R0)
+	.IF NE C$RT11
+		.IF NE C$RU
+	.CCASE
+3$:	.WORD	3
+	.SBYTE	3, <GETCH1-3$/2>	; CTRL/C
+	.SBYTE	$K.RUS, <SWRUS-3$/2>
+	.SBYTE	$K.LAT, <SWLAT-3$/2>
+
+	BIS	(PC)+, R1
+KOI7:	.WORD	0		; KOI-7 mode mask: 200 or 0
+		.IFF
+	CMPB	R1, #3		; CTRL/C
+	BEQ	GETCH1
+
+		.ENDC ; C$RU
+	.ENDC ; C$RT11
+
+.ENDC	; C$LINE
+	RETURN
+
+;; (READ-CHAR input-stream T)
+R.CHRT::
+	INC	R0
+;; (READ-CHAR input-stream NIL NIL)
+R.CHR0::
+	MOV	R2, R1
+	MOV	R0, R2
+R.CHR1:	CLR	R5
+;;                                         R2      &rest R5
+;; (READ-CHAR &optional input-stream eof-error-p eof-value) => char
+R.CHAR::
+	TO.STM
+	MOV	R1, R4
+	INC	R4
+.IF NE C$FILE
+	.TYPEP	U.FILE
+	BCC	1$
+	TST	(R4)+		; R4: &position
+	MOV	(R4)+, R1	; R1: position as Object
+	TST	(R4)+		; R4: &channel
+	TO.U16
+	BIT	#777, R1
+	BNE	4$
+	MOV	#S$REA * 256., R3
+	CALL	REAWRI
+	BCS	R.EOF
+4$:	MOV	R1, R2
+	INC	R1   		; ++filepos
+	F.U16
+	MOV	R1, -4(R4)	; save new filepos
+	BIC	#^C777, R2	; R2: offset in buffer
+	ADD	R2, R4		; R4: pointer to next char - 2
+	MOV	#V.CHB, R1
+	BISB	2(R4), R1
+;	BEQ	R.EOF
+	RETURN
+.ENDC ; C$FILE
+
+1$:	MOV	(R4)+, R1
+	.STRP
+	BCC	GETCH		; STDIN
+	MOV	(R4)+, R3	; R3: cur pos
+	CMP	R3, (R4)	; (R4): upper bound
+	BHIS	R.EOF		; EOF
+	INC	R3
+	MOV	R3, -(R4)	; increment cur pos
+	ADD	R1, R3
+	MOV	#V.CHB, R1
+	BISB	-FIXOFF-3(R3), R1
+	RETURN
+R.EOF:	TST	R2		; eof-error-p
+	BNE.E
+R.EOF1:	MOV	(R5), R1	; R1: eof-value
+	RETURN
+
+
 
 ;; (BUTLAST list &optional (n 1)) => result-list
 BUTLAST::
@@ -559,18 +688,6 @@ LDIFF::	.EQL
 	.SH210
 	BR	CONS
 
-;; (ADJOIN item list) => new-list
-ADJOIN::
-	.MEMBER
-	BCS	R.M21
-;; (CONS object-1 object-2) => cons
-CONS::	MOV	R1, R3
-	.ALL.1
-	MOV	R3, (R1)
-CONS1:	MOV	R2, 2(R1)
-	RETURN
-
-
 ;; (SETF (CDR cons) object) => object
 X.CDR:: PUSH	#R.M21
 ;; (RPLACA cons object) => cons
@@ -585,6 +702,19 @@ RPLACA::
 	T.CONS
 	MOV	R2, (R1)
 	RETURN
+
+
+;; (ADJOIN item list) => new-list
+ADJOIN::
+	.MEMBER
+	BCS	R.M21
+;; (CONS object-1 object-2) => cons
+CONS::	MOV	R1, R3
+	.ALL.1
+	MOV	R3, (R1)
+CONS1:	MOV	R2, 2(R1)
+	RETURN
+
 
 .IF NE C$FULL
 TENTH::	INC	R0
@@ -613,6 +743,34 @@ NTHCDR::
 	RETURN
 
 
+
+;; Put word into memory
+;; (POKE address int16) => int16
+POKE::	MOV	R1, R3
+	.TI16B
+	MOV	R2, (R1)
+	BR	R.M31B
+
+
+
+;; (RASSOC item alist) => entry
+RASSOC::
+	TST	(R0)+		; R0 = 2 (Offset to CDR)
+;; (ASSOC item alist) => entry
+;; ASSUME R0 == 0
+ASSOC::	MOV	R2, R5		; R5: alist
+	MOV	R1, R2		; R2: item
+1$:	.POP5
+        BEQ.F
+        T.CONS
+        MOV	R1, R3		; R3: entry
+        ADD	R0, R1
+        MOV	(R1), R1	; R1: (CAR/CDR entry)
+        .EQL
+        BCC	1$		; Test failed
+R.M31B:	BR	R.M31
+
+
 ;; (MEMBER item list) => tail
 MEMBER::
 	MOV	R2, R5		; R5: list
@@ -625,58 +783,6 @@ MEMBER::
 R.M31:	MOV	R3, R1
 	RETURN
 
-.IF NE C$RT11
-GETCH:	MOV	UNRCH, R1
-	CLR	UNRCH
-	TST	R1
-	BNE	9$
-M.IN::	.TTYIN	R1
-.IFF
-GETLIN: CALL	$IVEIL
-GETLI1:	MOV	#$BUF, (PC)+
-INCUR:	.WORD	$BUF
-	MOV	R1, INEND
-GETCH:  MOV	#INCUR, R0
-	CMP	(R0), (PC)+
-INEND:	.WORD	$BUF
-	BHIS	GETLIN
-	MOV	#V.CHB, R1
-	BISB	@(R0)+, R1	; READ CHAR INTO R1
-	INC	-(R0)
-.ENDC	; C$RT11
-9$:	RETURN
-
-
-;; (READ-CHAR input-stream T)
-R.CHRT::
-	INC	R0
-;; (READ-CHAR input-stream NIL NIL)
-R.CHR0::
-	MOV	R2, R1
-	MOV	R0, R2
-R.CHR1:	CLR	R5
-;;                                         R2      &rest R5
-;; (READ-CHAR &optional input-stream eof-error-p eof-value) => char
-R.CHAR::
-	TO.STM
-	MOV	R1, R4
-	INC	R4
-	MOV	(R4)+, R1
-	.STRP
-	BCC	GETCH		; STDIN
-	MOV	(R4)+, R3	; R3: cur pos
-	CMP	R3, (R4)	; (R4): upper bound
-	BHIS	R.EOF		; EOF
-	INC	R3
-	MOV	R3, -(R4)	; increment cur pos
-	ADD	R1, R3
-	MOV	#V.CHB, R1
-	BISB	-FIXOFF-3(R3), R1
-	RETURN
-R.EOF:	TST	R2		; eof-error-p
-	BNE.E
-R.EOF1:	MOV	(R5), R1	; R1: eof-value
-	RETURN
 
 ;; (SETF (SYMBOL-FUNCTION symbol) new-value)
 X.SYFU::

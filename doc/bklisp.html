@@ -1,16 +1,21 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 
 <html lang="ru">
 <head>
-	<title>LISP для БК-0010.01 и БК-0011М</title>
+	<title>LISP для БК-0010.01, БК-0011М и RT-11</title>
 	<meta charset="UTF-8">
-  	<meta name="description" content="Ufasoft BkLisp - LISP для БК-0010.01. Справочник.">
-	<meta name="keywords" content="Lisp, Common Lisp, BkLisp, Ufasoft, БК-0010, БК-0010.01">
+	<meta name="description" content="Ufasoft BkLisp - LISP для БК-0010.01, БК-0011М и RT-11. Справочник.">
+	<meta name="keywords" content="Lisp, Common Lisp, BkLisp, Ufasoft, БК-0010, БК-0010.01, БК-0011, БК-0011М, PDP-11, RT-11">
 	<meta name="author" content="Sergey Pavlov">
 
     <style>
     	.clhs {
     		float: right;
+    	}
+
+    	.rt11 {
+    		float: right;
+    		margin-right: 10px;
     	}
 
     	.index {
@@ -33,17 +38,21 @@
 
 <article>
 
-<h1>Ufasoft BkLisp - LISP для БК-0010.01 и БК-0011М<br>
+<h1>Ufasoft BkLisp - LISP для БК-0010.01, БК-0011М и RT-11<br>
 Справочник
 </h1>
-<i>Версия 2022</i>
+<i>Версия 2022.7</i>
 
-<p>Минимальный интерпретатор языка программирования LISP для микро-компьютера <a href="https://ru.wikipedia.org/wiki/БК_(семейство_компьютеров)">БК-0010.01</a>
+<p>Минимальный интерпретатор языка программирования LISP для микро-компьютеров <a href="https://ru.wikipedia.org/wiki/БК_(семейство_компьютеров)">БК-0010.01 и БК-0011М</a>
 архитектуры <a href="https://ru.wikipedia.org/wiki/PDP-11">PDP-11</a>, на процессоре <a href="https://ru.wikipedia.org/wiki/К1801ВМ1">К1801ВМ1</a>.
+
+<p>Есть вариант сборки под операционную систему <a href="https://ru.wikipedia.org/wiki/RT-11">RT-11</a> для оригинальных PDP-11 и компьютеров <a
+href="https://ru.wikipedia.org/wiki/Диалоговый_вычислительный_комплекс">ДВК</a>.
 
 <h2>Оглавление</h2>
 <a href="#base-chapter">Базовые объекты</a>
 <br/><a href="#lists-chapter">Списки</a>
+<br/><a href="#multiple-values">Множественные значения</a>
 <br/><a href="#sets">Множества</a>
 <br/><a href="#sequences-chapter">Последовательности</a>
 <br/><a href="#array-chapter">Массивы</a>
@@ -52,6 +61,7 @@
 <br/><a href="#numbers-chapter">Числа</a>
 <br/><a href="#input">Ввод</a>
 <br/><a href="#output">Вывод</a>
+<br/><a href="#file">Файлы</a>
 <br/><a href="#time-chapter">Время</a>
 <br/><a href="#random-chapter">Генератор случайных чисел</a>
 <br/><a href="#functions-chapter">Работа с функциями</a>
@@ -61,12 +71,16 @@
 
 
 <h2>Предыстория</h2>
-<p>В 1984 из многочисленных реализаций LISP создали общий язык <b>Common Lisp</b>, стандартизованный ANSI в 1994 г.</br>
+<p><b>1999</b> <a href="http://ufasoft.com/lisp">Ufasoft Common Lisp</a>. Ядро на C++, использующее .lisp файлы CLISP. Портирован в том числе на Windows Mobile.
+
+<p><b>1987</b> Появился CLISP - самая портабельная реализация с ядром на Си.
+
+<p><b>1984</b> Из многочисленных реализаций LISP создали общий язык <b>Common Lisp</b>, стандартизованный ANSI в 1994 г.</br>
 Этот стандарт опубликован как <a href="http://clhs.lisp.se/">Common Lisp HyperSpec (CLHS)</a>, составитель Кент Питман.
 
-<p>В 1972 г. Ричард Столлман впервые реализовал интерпретатор LISP на PDP-11. Впоследствии он развился в <a href="http://www.softwarepreservation.org/projects/LISP/other#MIT_PDP_11_LISP_">LISP11</a> для различных ОС фирмы DEC.
+<p><b>1972</b> Ричард Столлман впервые реализовал интерпретатор LISP на PDP-11. Впоследствии он развился в <a href="http://www.softwarepreservation.org/projects/LISP/other#MIT_PDP_11_LISP_">LISP11</a> для различных ОС фирмы DEC.
 
-<p>В 1958 г. Джон Маккарти сформулировал первый вариант языка LISP (от <b>LIS</b>t <b>P</b>rocessing).
+<p><b>1958</b> Джон Маккарти сформулировал первый вариант языка LISP (от <b>LIS</b>t <b>P</b>rocessing).
 
 <h2>BkLisp</h2>
 
@@ -88,7 +102,6 @@
 <h3>Развитие Проекта</h3>
 <p>Наращивать функциональность на оригинальной платформе БК-0010.01 невозможно, не принося в жертву память, а значит сужая множество программ, способных запуститься.
 Остаётся путь портирования на другие платформы.
-<p>Самое очевидное направление: версия для ОС <b>RT-11</b>.
 <p>Из-за схожей системы команд, возможно портировать на процессор <b>m68k</b>.
 
 <p>BkLisp - некоммерческий проект.
@@ -100,7 +113,7 @@
 
 <h3>Отклонения от Common Lisp</h3>
 <ul>
-    <li>Сравнение букв Кириллицы производится в кодировке <a href="https://ru.wikipedia.org/wiki/БК_(семейство_компьютеров)#Кодировка">КОИ-8-БК</a>, сортировка работает не в алфавитном порядке.</li>
+	<li>Сравнение букв Кириллицы производится в кодировке <a href="https://ru.wikipedia.org/wiki/БК_(семейство_компьютеров)#Кодировка">КОИ-8-БК</a>, сортировка работает не в алфавитном порядке.</li>
 	<li>Десятичные дроби форматируются подпрограммой из БЕЙСИК, например <b>0.5</b> представляется в виде <b>.5</b> </li>
 	<li>Длина строк ограничена 255 characters.</li>
 	<li>Длина идентификаторов и чисел ограничена 31 characters.</li>
@@ -113,7 +126,7 @@
 	<li>Глубина стека <b>256</b> байт. Это позволяет сделать до 14 вложенных вызовов.</li>
 	<li>Сборщик мусора использует часть видеопамяти статусной строки во время работы. Поэтому её содержимое портится.</li>
 	<li>Клавиша ВС повторяет последнюю введённую строку, как в БЕЙСИК.</li>
-	<li>Клавиша СТОП прерывает выполнение и переводит интерпретатор в начальное состояние (цикл REPL). Значения глобальных переменных и функций при этом сохраняются.</li>
+	<li>Клавиша СТОП (двойной <b>CTRL/C</b> в RT-11)  прерывает выполнение и переводит интерпретатор в начальное состояние (цикл REPL). Значения глобальных переменных и функций при этом сохраняются.</li>
     <li>С помощью вызова <code>(<a href="#extroom">extroom</a>)</code> можно переключиться в режим расширенной памяти (+12 KiB). Вернуться из него нельзя, даже выводя код
     214<sub>8</sub>.
     <li>Ещё немного памяти можно высвободить, исключая неиспользуемые символы из пространства имён, например
@@ -123,10 +136,16 @@
 	</pre>
 </ul>
 
+<h3>Дополнения к фозмоностям COMMON LISP</h3>
+<ul>
+	<li>Функция <a href="#save">SAVE</a> - Возможность создавать автономные исполнимые файлы: <b>.SAV</b> для RT-11 и <b>.BIN</b> для БК.</li>
+	<li>Переменная <a href="#*args*">*ARGS*</a> - Передача аргументов командной строки в RT-11.</li>
+	<li>Функции <a href="#peek">PEEK</a>, <a href="#poke">POKE</a> - Прямой досту к памяти.</li>
+</ul>
+
 <h3>Что НЕ реализовано</h3>
 <p>Функциональность Common Lisp, которой нет в BkLisp:</p>
 <ul>
-	<li>Множественные результаты функций <b>(VALUES a b ...)</b></li>
 	<li><b>&amp;key</b> аргументы у функций</li>
 	<li>Рациональные числа</li>
 	<li>Комплексные числа</li>
@@ -136,7 +155,7 @@
 	<li>Conditions</li>
 	<li>Pretty Printing</li>
 	<li>Readtable</li>
-	<li>Файлы и Filenames</li>
+	<li>Filenames</li>
 	<li>Структуры</li>
 	<li>Хеш-таблицы</li>
 	<li>Макросы</li>
@@ -145,7 +164,7 @@
 	<li>Сложное форматирование чисел, римская система счисления</li>
 </ul>
 
-<p>При портировании BkLisp на платформы с большим количеством ОЗУ (ДВК, УКНЦ) часть этой функциональности может быть реализована.
+<p>При портировании BkLisp на платформы с большим количеством ОЗУ часть этой функциональности может быть реализована.
 
 <h2>Справочник</h2>
 
@@ -165,6 +184,7 @@
 	<li><b>sequence</b> - список, простой вектор или строка.
 	<li><b>STDIN</b> - стандартный ввод, клавиатура.
 	<li><b>STDOUT</b> - стандартный вывод, экран.
+	<li><b id="universal-time">Универсальное время</b> - количество секунд с момента 1 Января 1900 года.<a class="clhs" href="http://clhs.lisp.se/Body/25_adb.htm">CLHS</a>
 	<li><b>whitespace</b> - обобщённые пробелы: #\SPACE, #\TAB, #\NEWLINE, #\RETURN.
 </ul>
 
@@ -649,6 +669,66 @@ lst                        - (1 "two" 3)
 Если находит - возвращает хвост списка, начинающийся с этого элемента, иначе возвращает NIL.
 <p>Эту функцию можно отнести к семейству <a href="#sets">Множества</a>, реализует операцию &isin;.
 
+<hr/><h3 id="multiple-values">Множественные значения</h3>
+<p>Обычно функция возвращает одно значение. Но может вернуть несколько, в том числе ноль значений.
+<p>Первое из значений считается основным. Если функция не возвращает значений, а вызывающий код использует результат, то основное значение NIL.
+<p><strong>&#9888;</strong> Этот раздел действителен только для сборки BkLisp под <b>RT-11</b>.
+
+<hr/><h4 id="multiple-value-list">Оператор MULTIPLE-VALUE-LIST</h4>
+<b>multiple-value-list</b> form → list
+<a class="clhs" href="http://clhs.lisp.se/Body/m_mult_1.htm">CLHS</a>
+<span class="rt11">RT-11</span>
+<p>Возвращает список множественных результатов вычисления <i>form</i>.
+<h5>Примеры</h5>
+<pre>
+(multiple-value-list (progn (values 1 2)))  →  (1 2)
+</pre>
+
+<hr/><h4 id="multiple-values-limit">Константа MULTIPLE-VALUES-LIMIT</h4>
+<b>multiple-values-liit</b> → 20
+<a class="clhs" href="http://clhs.lisp.se/Body/v_multip.htm">CLHS</a>
+<span class="rt11">RT-11</span>
+<p>Верхняя исключающая граница количества результатов функции.
+
+<hr/><h4 id="nth-value">Оператор NTH-VALUE</h4>
+<b>nth-value</b> n form → object
+<a class="clhs" href="http://clhs.lisp.se/Body/m_nth_va.htm">CLHS</a>
+<span class="rt11">RT-11</span>
+<p>Возвращает <i>n</i>-й по счёту (начиная с 0) результат вычисления <i>form</i>, или NIL если результатов меньше или равно <i>n</i>.
+<h5>Примеры</h5>
+<pre>
+(nth-value 1 (values 'a 'b))  →  B
+</pre>
+<h5>Эквивалент</h5>
+<code>(nth-value n form)</code> ≡ <code>(nth n (multiple-value-list form))</code>
+
+<hr/><h4 id="values">Функция VALUES</h4>
+<b>values</b> &rest object → object*
+<a class="clhs" href="http://clhs.lisp.se/Body/f_values.htm">CLHS</a>
+<span class="rt11">RT-11</span>
+<p>Возвращает объекты <i>object</i> как множественные значения.
+<h5>Примеры</h5>
+<pre>
+(values)        →
+(values 1 2 3)  →  1, 2, 3  ;; в REPL напечатает:   1 ;
+                                                    2 ;
+                                                    3
+</pre>
+
+<hr/><h4 id="values-list">Функция VALUES-LIST</h4>
+<b>values-list</b> list → element*
+<a class="clhs" href="http://clhs.lisp.se/Body/f_vals_l.htm">CLHS</a>
+<span class="rt11">RT-11</span>
+<p>Возвращает элементы <i>list</i> как множественные значения.
+<h5>Примеры</h5>
+<pre>
+(values-list nil)       →
+(values-list '(1 2 3))  →  1, 2, 3
+</pre>
+<h5>Эквивалент</h5>
+<code>(values-list list)</code> ≡ <code>(apply #'values list)</code>
+
+
 <hr/><h3 id="sets">Множества</h3>
 <p>Множества представляются списками. Элементы сравниваются функцией <b><a href="#eql">eql</a></b>. Пустое множество &empty; представляется <b>nil</b>.
 
@@ -745,6 +825,15 @@ lst                        - (1 "two" 3)
 (array-dimensions "Hello")  →  (5)
 </pre>
 
+<hr/><h4 id="array-in-bounds-p">Функция ARRAY-IN-BOUNDS-P</h4>
+<b>array-in-bounds-p</b> array &rest subscripts → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_ar_in_.htm">CLHS</a>
+<p>Возвращает истину, если все индексы <i>subscripts</i> находятся в рамках границ массива.
+<h5>Примеры</h5>
+<pre>
+(array-in-bounds-p (make-array '(7 11)) 6 10)  →  T
+(array-in-bounds-p (make-array '(7 11)) 0 -1)  →  NIL
+</pre>
 
 <hr/><h4 id="array-rank">Функция ARRAY-RANK</h4>
 <b>array-rank</b> array → rank
@@ -1850,6 +1939,7 @@ NULL, SYMBOL, FLOAT, INTEGER, VECTOR, CONS, STRING, CHARACTER, SYSTEM-FUNCTION, 
 <h4 id="*standard-input*">Переменная *STANDARD-INPUT*</h4>
 <p>Содержит поток ввода по умолчанию. Начальное значение - ввод из командной строки.
 
+
 <hr/><h4 id="inkey">Функция INKEY</h4>
 <p><b>inkey</b> → char-p
 <a class="clhs">Нестандартная</a>
@@ -2186,9 +2276,121 @@ href="#terpri">terpri</a>), и возвращает <i>string</i>.
 </pre>
 
 
+<hr/>
+<h3 id="file">Файлы</h3>
+<p>Функции для работы с файловой системой. Доступны только в версии для RT-11.
+<p>Ограничение: максимум <b>8</b> открытых файлов.
+<p>Имена файлов имеют вид <b>[dev:]nnnnnn.ext</b>. Имя файла <i>nnnnnn</i> максимум 6 characters, расширение <i>ext</i> максимум 3 characters. Можно использовать
+латинские буквы, цифры и <b>$</b>.
+
+<p>При открытии файла выделяется буфер объект размером 524 байт, что может быть невозможно в условиях фрагментированной кучи.
+
+<h4 id="delete-file">Функция DELETE-FILE</h4>
+<b>delete-file</b> filespec → T
+<a class="clhs" href="http://clhs.lisp.se/Body/f_del_fi.htm">CLHS</a>
+<span class="rt11">RT-11</span>
+<p>Удаляет файл <i>filespec</i>.
+<h5>Примеры</h5>
+<pre>
+(delete-file "test1.tmp")         →  T
+(delete-file (open "test2.tmp"))  →  T
+</pre>
+
+<hr/><h4 id="close">Функция CLOSE</h4>
+<b>close</b> stream → result
+<a class="clhs" href="http://clhs.lisp.se/Body/f_close.htm">CLHS</a>
+<p>Закрывает поток и возвращаеет <b>T</b> если <i>stream</i> был успешно закрыт.
+<h5>Примеры</h5>
+<pre>
+(close (make-string-input-stream "abc"))  →  T
+</pre>
+
+<hr/><h4 id="file-position">Функция FILE-POSITION</h4>
+<b>file-position</b> stream → position
+<a class="clhs" href="http://clhs.lisp.se/Body/f_file_p.htm">CLHS</a>
+<span class="rt11">RT-11</span>
+<p>Возвращает текущую позицию в потоке <i>stream</i> или NIL если позиция не известна.
+<h5>Примеры</h5>
+<pre>
+(let ((stm (open "a.txt")))
+    (read-char stm)
+    (read-char stm)
+    (file position stm))		  →  2
+</pre>
+
+<hr/><h4 id="open">Функция OPEN</h4>
+<b>open</b> filespec → file-stream
+<a class="clhs" href="http://clhs.lisp.se/Body/f_open.htm">CLHS</a>
+<span class="rt11">RT-11</span>
+<p>Открывает файл с именем<i>filespec</i> и возвращает файловый поток.
+<p>После работы поток должен быть закрыт вызовом <a href="#close">close</a>.
+<h5>Примеры</h5>
+<pre>
+(open "a.txt")  →  #&lt;FILE-STREAM "a.txt">
+</pre>
+
+<hr/><h4 id="open-stream-p">Функция OPEN-STREAM-P</h4>
+<b>open-stream-p</b> stream → generalized-boolean
+<a class="clhs" href="http://clhs.lisp.se/Body/f_open_s.htm">CLHS</a>
+<p>Возвращает истину если <i>stream</i> - открытый поток.
+<h5>Примеры</h5>
+<pre>
+(open-stream-p (make-string-input-stream "abc"))  →  T
+</pre>
+
+<hr/><h4 id="probe-file">Функция PROBE-FILE</h4>
+<b>probe-file</b> filespec  → filename
+<a class="clhs" href="http://clhs.lisp.se/Body/f_probe_.htm">CLHS</a>
+<span class="rt11">RT-11</span>
+<p>Проверяет существование файла <i>filespec</i>. Если файл найден возвращает его имя, в противном случае NIL.
+<h5>Примеры</h5>
+<pre>
+(probe-file "test1.tmp")  →  NIL
+</pre>
+
+<hr/><h4 id="rename-file">Функция RENAME-FILE</h4>
+<b>rename-file</b>  filespec new-name  → new-name
+<a class="clhs" href="http://clhs.lisp.se/Body/f_rn_fil.htm">CLHS</a>
+<span class="rt11">RT-11</span>
+<p>Переименовывает файла <i>filespec</i> в <i>new-name</i> и возвращает новое имя.
+<h5>Примеры</h5>
+<pre>
+(rename-file "a.txt" "b.dat")  →  "b.dat"
+</pre>
+
 
 <hr/><h3 id="time-chapter">Время</h3>
 <p>Для работы со временем используется аппаратный таймер, на некоторых экземплярах БК-0010.01 он неисправен.
+<p>В RT-11 используются системные вызовы.
+
+<hr/><h4 id="decode-universal-time">Функция DECODE-UNIVERSAL-TIME</h4>
+<b>decode-universal-time</b> universal-time → second, minute, hour, day, month, year, day-of-week, NIL, 0
+<a class="clhs" href="http://clhs.lisp.se/Body/f_dec_un.htm">CLHS</a>
+<span class="rt11">RT-11</span>
+<p>Преобразует <a href="#universal-time">Универсальное время</a> в Земные единицы даты и времени суток: секунды, минуты, час, день, месяц, год, день недели (0 - Понедельник).
+<p>Последние два результата: признак летнего времени и часовой пояс. В ОС RT-11 они не учитываются.
+<h5>Примеры</h5>
+<pre>
+(decode-universal-time 3869434921)  →  1 ;
+                                       2 ;
+                                       3 ;
+                                       14 ;
+                                       8 ;
+                                       2022 ;
+                                       6 ;           Воскресенье
+                                       NIL ;
+                                       0 ;
+</pre>
+
+<hr/><h4 id="encode-universal-time">Функция ENCODE-UNIVERSAL-TIME</h4>
+<b>encode-universal-time</b> second minute hour day month year → integer
+<a class="clhs" href="http://clhs.lisp.se/Body/f_encode.htm">CLHS</a>
+<span class="rt11">RT-11</span>
+<p>Возвращает <a href="#universal-time">Универсальное время</a> для времени, заданного в <i>second</i>, <i>minute</i>, <i>hour</i>, <i>day</i>, <i>month</i>, <i>year</i>.
+<h5>Примеры</h5>
+<pre>
+(encode-universal-time 1 2 3 14 8 2022)  →  3869434921
+</pre>
 
 <hr/><h4 id="get-internal-real-time">Функция GET-INTERNAL-REAL-TIME</h4>
 <b>get-internal-real-time</b>  →  internal-time
@@ -2200,6 +2402,36 @@ href="#terpri">terpri</a>), и возвращает <i>string</i>.
 <pre>
 (get-internal-real-time)  →  123
 (get-internal-real-time)  →  255
+</pre>
+
+<hr/><h4 id="get-decoded-time">Функция GET-DECODED-TIME</h4>
+<b>get-decoded-time</b>  →  second, minute, hour, day, month, year, day-of-week, NIL, 0
+<a class="clhs" href="http://clhs.lisp.se/Body/f_get_un.htm">CLHS</a>
+<span class="rt11">RT-11</span>
+<p>Возвращает текущее время в Земных единицах даты и времени суток.
+<h5>Эквивалент</h5>
+<code>(get-decoded-time) ≡ (decode-universal-time (get-universal-time))</code>
+<h5>Примеры</h5>
+<pre>
+(get-decoded-time)  →  7 ;
+                       24 ;
+                       4 ;
+                       14 ;
+                       8 ;
+                       2022 ;
+                       6 ;
+                       NIL ;
+                       0 ;
+</pre>
+
+<hr/><h4 id="get-universal-time">Функция GET-UNIVERSAL-TIME</h4>
+<b>get-universal-time</b>  →  integer
+<a class="clhs" href="http://clhs.lisp.se/Body/f_get_un.htm">CLHS</a>
+<span class="rt11">RT-11</span>
+<p>Возвращает текущее время как <a href="#universal-time">Универсальное время</a>.
+<h5>Примеры</h5>
+<pre>
+(get-universal-time)  →  3868930565
 </pre>
 
 <hr/><h4 id="internal-time-units-per-second">Переменная INTERNAL-TIME-UNITS-PER-SECOND</h4>
@@ -2294,29 +2526,43 @@ href="#terpri">terpri</a>), и возвращает <i>string</i>.
 <b>extroom</b> → unknown
 <p>Переключает в режим расширенной памяти если уже не в нём и вызывает <a href="#room">room</a>.
 
+<hr/><h4 id="*args*">Переменная *ARGS*</h4>
+<p><b>*args*</b> → список аргументов командной строки
+<a class="clhs">нестандартная</a>
+<span class="rt11">RT-11</span>
+<p>При загрузке BkLisp разбивает командную строку на части, разделённые пробеласми, и сохраняет в <b>*args*</b>.
+
+<h5>Примеры</h5>
+<pre>
+(defun main () (print *args*))	  →  MAIN
+(save "hello.sav" 'main)          →  T
+(quit)
+
+.RUN HELLO new year 2023			             →  ("new" "year" "2023")
+</pre>
+
 <hr/><h4 id="save">Функция SAVE</h4>
 <p><b>save</b> filename &optional main-function → generalized-boolean
 <a class="clhs">нестандартная</a>
 <p>Сохраняет образ памяти BkLisp в файл с именем <i>filename</i>.
-<p>Этот образ можно закрузить из монитора БК командой <b>M</b> <i>filename</i> и продолжить работу. Функции и глобальные переменные будут иметь те же значения,  что при
+<p>Этот образ можно загрузить из монитора БК командой <b>M</b> <i>filename</i> и продолжить работу. Функции и глобальные переменные будут иметь те же значения,  что при
 сохранении.
-<p>Если задан аргумент <i>main-function</i> типа символ, то при загрузке автоматически выполняется функция с этим именем.
+<p>Если задан аргумент <i>main-function</i> типа символ, то при загрузке автоматически выполняется функция с этим именем, после чего программа завершается.
+<p>В RT-11 создаётся стандартный выполнимый .SAV-файл.
+
 <h5>Примеры</h5>
 <pre>
-(defun hello ()
+(defun main ()
   (princ "Здравствуй, Мир!")
-  (tagbody
-    1
-    (if (inkey) (quit))      ; ожидание нажатия любой клавиши
-    (go 1)))               →  HELLO
+  (read-char))                    ; ожидание нажатия ENTER
+                                  →  MAIN
 
-(save "hello")             →  T
+(save "hello.sav" 'main)          →  T
 (quit)
 
 ? M
-ИМЯ? hello                 →  Здравствуй, Мир!
+ИМЯ? hello.sav                →  Здравствуй, Мир!
 </pre>
-
 
 <hr/><h3>Интерактивный цикл Чтение-Вычисление-Печать <abbr title="Read-Eval-Print-Loop">REPL</abbr></h3>
 
@@ -2756,8 +3002,13 @@ clause ::= (test-form form*)
 <p id="error-14"><b>ОШИБКА 14</b> - Неопределённая ошибка.
 <p id="error-15"><b>ОШИБКА 15</b> - Попытка создать строку длиннее 255 characters.
 <p id="error-16"><b>ОШИБКА 16</b> - Недопустимая размерность массива
-<p id="error-18"><b>ОШИБКА 18</b> - Неопределённая функция.
+<p id="error-18"><b>ОШИБКА 18</b> <i>function-name</i> - Неопределённая функция.
 <p id="error-19"><b>ОШИБКА 19</b> - Ошибка Ввода/Вывода (файловой операции).
+<br>Канал занят<span class="rt11">RT-11</span>
+<p id="error-20"><b>ОШИБКА 20</b> - Файл не найден или аппаратная ошибка <span class="rt11">RT-11</span>
+<p id="error-21"><b>ОШИБКА 21</b> - Канал не открыт (при чтении) <span class="rt11">RT-11</span>
+<p id="error-22"><b>ОШИБКА 22</b> - Файл защищён (при удалении или переименовании)  <span class="rt11">RT-11</span>
+
 <p id="error-25"><b>ОШИБКА 25</b> - Переполнение буфера ввода. Попытка ввести строку длиннее 255 characters.
 
 
@@ -2769,6 +3020,10 @@ clause ::= (test-form form*)
 	<tr><td>Paul Graham</td> <td>1993</td>	<td><a href="http://www.paulgraham.com/onlisp.html">On Lisp</a></td>  <td>Для углубленного изучения языка</td></tr>
 	<tr><td>Guy L. Steel Jr.</td>	<td>1990</td>	<td><a href="http://www.cs.cmu.edu/afs/cs.cmu.edu/project/ai-repository/ai/html/cltl/clm/node1.html#SECTION00100000000000000000">Common Lisp the Language, 2nd Edition</a></td> <td>Этот текст лёг в основу стандарта</td></tr>
 	<tr><td>Hasemer</td>	<td>1984</td>	<td><a href="https://www.amazon.com/Looking-Lisp-Micro-computer-books/dp/0201120801">Looking at Lisp</a></td> <td>Описаны реализации LISP для микрокомпьютеров 1980-х годов, подходит для изучения BkLisp</td></tr>
+  <tr><td>David S. Touretzky</td> <td>1984</td> <td><a href="https://archive.org/details/lispgentleintrod00tour">LISP: A Gentle Introduction to Symbolic Computation</a></td> <td>Одна из самых рекомендуемых книг для начинающих</td></tr>
+
+
+
 </table>
 
 </article>
@@ -2783,6 +3038,7 @@ clause ::= (test-form form*)
 <a href="#***">* переменная</a>
 <a href="#***">**</a>
 <a href="#***">***</a>
+<a href="#*args*">*ARGS*</a>
 <a href="#*gensym-counter*">*GENSYM-COUNTER*</a>
 <a href="#*print-base*">*PRINT-BASE*</a>
 <a href="#*print-escape*">*PRINT-ESCAPE*</a>
@@ -2817,6 +3073,7 @@ clause ::= (test-form form*)
 <a href="#array-type">ARRAY</a>
 <a href="#array-dimension">ARRAY-DIMENSION</a>
 <a href="#array-dimensions">ARRAY-DIMENSIONS</a>
+<a href="#array-in-bounds-p">ARRAY-IN-BOUNDS-P</a>
 <a href="#array-rank">ARRAY-RANK</a>
 <a href="#array-row-major-index">ARRAY-ROW-MAJOR-INDEX</a>
 <a href="#array-total-size">ARRAY-TOTAL-SIZE</a>
@@ -2846,6 +3103,7 @@ clause ::= (test-form form*)
 <a href="#char-ne">CHAR/=</a>
 <a href="#character">CHARACTER</a>
 <a href="#characterp">CHARACTERP</a>
+<a href="#close">CLOSE</a>
 <a href="#code-char">CODE-CHAR</a>
 <a href="#cond">COND</a>
 <a href="#cons">CONS</a>
@@ -2857,9 +3115,11 @@ clause ::= (test-form form*)
 <a href="#cos">COS</a>
 <a href="#cosh">COSH</a>
 <a href="#decf">DECF</a>
+<a href="#decode-universal-time">DECODE-UNIVERSAL-TIME</a>
 <a href="#defparameter">DEFPARAMETER</a>
 <a href="#defun">DEFUN</a>
 <a href="#defvar">DEFVAR</a>
+<a href="#delete-file">DELETE-FILE</a>
 <a href="#digit-char">DIGIT-CHAR</a>
 <a href="#digit-char-p">DIGIT-CHAR-P</a>
 <a href="#do">DO</a>
@@ -2872,6 +3132,7 @@ clause ::= (test-form form*)
 <a href="#eql">EQL</a>
 <a href="#equal">EQUAL</a>
 <a href="#equalp">EQUALP</a>
+<a href="#encode-universal-time">ENCODE-UNIVERSAL-TIME</a>
 <a href="#error">ERROR</a>
 <a href="#exp">EXP</a>
 <a href="#expt">EXPT</a>
@@ -2880,6 +3141,7 @@ clause ::= (test-form form*)
 <a href="#evenp">EVENP</a>
 <a href="#fboundp">FBOUNDP</a>
 <a href="#fdefinition">FDEFINITION</a>
+<a href="#file-position">FILE-POSITION</a>
 <a href="#fill">FILL</a>
 <a href="#find-symbol">FIND-SYMBOL</a>
 <a href="#first">FIRST</a>
@@ -2896,6 +3158,8 @@ clause ::= (test-form form*)
 <a href="#get">GET</a>
 <a href="#get-internal-real-time">GET-INTERNAL-REAL-TIME</a>
 <a href="#get-output-stream-string">GET-OUTPUT-STREAM-STRING</a>
+<a href="#get-decoded-time">GET-DECODED-TIME</a>
+<a href="#get-universal-time">GET-UNIVERSAL-TIME</a>
 <a href="#getf">GETF</a>
 <a href="#go">GO</a>
 <a href="#graphic-char-p">GRAPHIC-CHAR-P</a>
@@ -2953,6 +3217,8 @@ clause ::= (test-form form*)
 <a href="#member">MEMBER</a>
 <a href="#min">MIN</a>
 <a href="#minusp">MINUSP</a>
+<a href="#multiple-value-list">MULTIPLE-VALUE-LIST</a>
+<a href="#multiple-values-limit">MULTIPLE-VALUES-LIMIT</a>
 <a href="#name-char">NAME-CHAR</a>
 <a href="#nconc">NCONC</a>
 <a href="#nil">NIL</a>
@@ -2962,9 +3228,12 @@ clause ::= (test-form form*)
 <a href="#nstring-upcase">NSTRING-UPCASE</a>
 <a href="#nth">NTH</a>
 <a href="#nthcdr">NTHCDR</a>
+<a href="#nth-value">NTH-VALUE</a>
 <a href="#null">NULL</a>
 <a href="#numberp">NUMBERP</a>
 <a href="#oddp">ODDP</a>
+<a href="#open">OPEN</a>
+<a href="#open-stream-p">OPEN-STREAM-P</a>
 <a href="#or">OR</a>
 <a href="#pairlis">PAIRLIS</a>
 <a href="#peek">PEEK</a>
@@ -2976,6 +3245,7 @@ clause ::= (test-form form*)
 <a href="#prin1">PRIN1</a>
 <a href="#princ">PRINC</a>
 <a href="#print">PRINT</a>
+<a href="#probe-file">PROBE-FILE</a>
 <a href="#prog1">PROG1</a>
 <a href="#prog2">PROG2</a>
 <a href="#progn">PROGN</a>
@@ -2993,6 +3263,7 @@ clause ::= (test-form form*)
 <a href="#reduce">REDUCE</a>
 <a href="#rem">REM</a>
 <a href="#remprop">REMPROP</a>
+<a href="#rename-file">RENAME-FILE</a>
 <a href="#rest">REST</a>
 <a href="#return">RETURN</a>
 <a href="#return-from">RETURN-FROM</a>
@@ -3047,6 +3318,8 @@ clause ::= (test-form form*)
 <a href="#union">UNION</a>
 <a href="#unless">UNLESS</a>
 <a href="#unread-char">UNREAD-CHAR</a>
+<a href="#values">VALUES</a>
+<a href="#values-list">VALUES-LIST</a>
 <a href="#vector">VECTOR</a>
 <a href="#vectorp">VECTORP</a>
 <a href="#when">WHEN</a>
@@ -3056,7 +3329,6 @@ clause ::= (test-form form*)
 <a href="#write-string">WRITE-STRING</a>
 <a href="#y-or-n-p">Y-OR-N-P</a>
 <a href="#zerop">ZEROP</a>
-
 
 
 </div>

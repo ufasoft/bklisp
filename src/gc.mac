@@ -4,18 +4,21 @@
 
 ;;; Mark-and-Sweep Garbage Collector
 
+.SBTTL	Garbage Collector
 
+.MACRO	.MTEST
+	CALL	(R3)		; CALL TSTMSK
+.ENDM
 
-MASKTB:	.BYTE	1, 2, 4, 10, 20, 40, 100, 200
 
 ; IN: R0 = pointer to heap CELL
 ; OUT: R0 = R0 + 4
 ; Clobber: R1, R4, R5
 M.BIT::	MOV	R0, R1
-	CALL	TSTMSK
+	.MTEST
 	MOV	R1, R0
 	BISB	R4, (R5)	; Else mark
-	RTI
+R.RTI:	RTI
 
 
 .MACRO	.MBIT
@@ -23,35 +26,38 @@ M.BIT::	MOV	R0, R1
 .ENDM
 
 
-;; Makr & Push Object to process later
+;; Mark & Push Object to process later
 ;; R0: &Object + 2
-M.PUSH:	MOV	-(R0), R1
+;; OUTPUT R0: R0-2
+M.PUSH::
+	MOV	-(R0), R1
 	CALL	HEAPP
-	BCC	R.GC		; Non-heap object
-	CALL	TSTMSK
-	BNE	R.GC		; Already marked
+	BCC	R.RTI		; Non-heap object
+	.MTEST
+	BNE	R.RTI		; Already marked
 	BISB	R4, (R5)
-	MOV	(SP), R5	; R5: return address
-	MOV	(R0), (SP)	; Push object
-	JMP	(R5)
+	MOV	(R0), 2(SP)	; Push object
+	RETURN
 
+MASKTB:	.BYTE	1, 2, 4, 10, 20, 40, 100, 200
+
+.MACRO	.MPUSH
+	BPT
+.ENDM
 
 ; IN: R1 - pointer to heap object
 ; RETURNS:  R5: Pointer into GCBM, R4: bitmask; ZF=0 if the object is marked, R1 += 4
 TSTMSK: MOV	R1, R5
-.IF NE C$BK10
-	ASR	R5			; Assume EHEAP <= 32K
-.IFF
-	CLC
-	ROR	R5
-.ENDC ; C$BK10
-        ASR	R5
-        MOV	R5, R4
-        BIC	#177770, R4     	; Get 3 lowest significant bits
-        MOVB	MASKTB(R4), R4
+	CLR	R4			; and set CF=0
+	ROR	R5			; Assume CF=0 (does matter when EHEAP > 32K)
         ASR	R5
         ASR	R5
+        ROL	R4
+        ASR	R5
+        ROL	R4
         ASR	R5              	; Get remaining bits = index in Bitmap
+        ROL	R4           		; R4: lowest significant bits
+        MOVB	MASKTB(R4), R4
 	ADD	(PC)+, R5		; R5: address in GC bitmap
 I.BMOF:	.WORD	0			;SELF-MODIFYING CODE
 	BIT	(R1)+, (R1)+		; R1 += 4;
@@ -61,11 +67,14 @@ R.GC:	RETURN
 .IF NE C$BK10
 	GCBMSZ	= HIMEME - HEAP / 32.		; max GC bitmap size
 .IFF
-	GCBMSZ:	.WORD	0
+	GCBMSZ::	.WORD	0
 .ENDC	; C$RT11
 
-GC:	POP	GCRET
+GC:
 .IF NE C$BK10
+	MOV	(SP), (PC)+
+GCRET::	.WORD	0		; Return address @GCRET at Stack may be changed by I.STOP
+
 	PUSH	$KBCTL
 	BIS	#$KBDI, $KBCTL		; Disable Keyboard interrupt to use Status Line as GC bitmap
 	MOV	@#$BAZVP, R1		; Find continuous space of 512. bytes in status line for GC bitmap temporary space
@@ -78,7 +87,10 @@ GC:	POP	GCRET
 	ASL	R2			; R2: (GC bitmap size) / 2: <256. words for full-screen mode, 296. words for ExtMem mode
 .IFF
 	MOV	GCBMSZ, R2
-	MOV	EHEAP, R1
+	MOV	(PC)+, R1
+EHEAP::
+.IIF NE C$RT11	.WORD	0
+.IIF NE C$BK11	.WORD	HIMEME
 	ADD	R2, R1
 	ASR	R2
 .ENDC ; C$BK10
@@ -87,18 +99,22 @@ GC:	POP	GCRET
 	SUB	#HEAP/32., R1
 	MOV	R1, I.BMOF		;SELF-MODIFYING CODE
 
+	MOV	#TSTMSK, R3
 ;; Mark all free blocks to avoid following false-positive pointer in heap
-M.HEAP:	MOV	FREEL, R2	; FIRST BLOCK
-	BR	3$
+M.HEAP:	MOV	FREEL, R2	; First block
+	BEQ	3$
 1$:	MOV	R2, R0
-	MOV	(R2)+, R3	; BLOCK SIZE (IN CELLS)
+	PUSH	R2		; (SP): block address
+	ADD	(R2)+, (SP)	; (SP): end of block
 2$:	.MBIT
-	SOB	R3, 2$
+	CMP	R0, (SP)
+	BLO	2$
+	TST	(SP)+
 	MOV	(R2), R2
-3$:	BNE	1$
+	BNE	1$
+3$:
 
 ;; Mark all ROOTS
-	MOV	#M.PUSH, R3
 	MOV	#E.ROOT, R0
 M.ROOT:	CALL	MARK
 	CMP	R0, #ROOTS
@@ -107,67 +123,70 @@ M.ROOT:	CALL	MARK
 1$:	CALL	MARK
 	CMP	R0, SP
 	BHI	1$
+
 SWEEP:
 .IIF NE C$BK11	MOV	#10000, $SYREG	; Disable STOP key
-
-	MOV	#FREEL, R3	; R3 = First Free Block
+	MOV	#FREEL, R0	; R0: First Free Block
 	MOV	#HEAP, R1
-	MOV	(R3), R2	; R2 = Next free block
-	BNE	1$
-	MOV	EHEAP, R2	; Upper bound of Heap
-	DEC	R2
-	TST	-(R3)
-2$:	TST	(R3)+
-1$:	CMP	R1, R2
-	BHI	9$		; No more free blocks
-	BNE	5$
-	TST	(R2)+
-	MOV	R2, R3		; R3, R2 = &NEXT
-	BR	7$
-5$:	CALL	TSTMSK		; MARKED SEQUENCE
-	BNE	1$		; CONTINUE MARKED AREA
-	MOV	(R3), -(R1)	; FOUND FREE BLOCK
-	CLR	-(R1)		; Init block Size, will be incremented in free block passing (8$)
-	MOV	R1, (R3)	; LINK IT INTO LIST
-	MOV	R1, R3		; R3 = &NEXT
-	BR	8$
-3$:	ADD	(R2)+, (R3)+	; Merge free blocks
-7$:	MOV	(R2), R2	; R2 = Next free block
-	MOV	R2, (R3)
-	BNE	6$
-	MOV	EHEAP, R2	; UPPER BOUND OF HEAP
-	DEC	R2
-6$:	MOV	-(R3), R1	; R1: Size of the block
-	ASL	R1
-	ASL	R1
-	ADD	R3, R1		; R1: NEXT CELL AFTER FREE BLOCK
-8$:	CMP	R1, R2		; R3: address of current free block
-	BHI	9$
-	BEQ	3$		; Merge free blocks
-	CALL	TSTMSK
-	BNE	2$		; End of Free sequence
-	INC	(R3)		; Extend current Free block
-	BR	8$
-9$:
-.IIF NE C$BK10	POP	$KBCTL	; Restore keyboard interrupts
-.IIF NE C$BK11	CLR	$SYREG	; Enable STOP key
 
-	JMP	@(PC)+		; End of list
-GCRET:	.WORD	0		; Address may be changed by I.STOP
+	CALL	1$
+7$:	CMP	R1, R2
+	BHI	9$		; No more free blocks
+	BEQ	3$
+	.MTEST			; Marked sequence
+	BNE	7$		; Continue marked area
+	TST	(R0)+		; R0: &NEXT+2
+	MOV	(R0), -(R1)	; Found free block
+	CLR	-(R1)		; Init block Size
+	MOV	R1, (R0)	; Link it into list
+	MOV	R1, R0
+6$:	CMP	R1, R2		; R0: &CurFreeBlock
+	BHI	9$
+	BEQ	4$		; Merge free blocks
+	.MTEST
+	BNE	7$
+	ADD	#4, (R0)	; -2(R0): size of free block; R0: &CurFreeBlock + 2
+	BR	6$
+
+3$:	MOV	R2, R0		; R0, R2 = &NEXT
+	BR	5$
+4$:	ADD	(R2), (R0)	; Merge free blocks
+5$:	MOV	R0, R1
+	ADD	(R0)+, R1	; R1: Next cell after free bloCk
+	MOV	2(R2), (R0)	; (R0) = Next free block
+	PUSH	#6$
+1$:	MOV	(R0), R2	; R2 = Next free block
+	BNE	2$
+	MOV	EHEAP, R2	; Upper bound of Heap
+	DEC	R2		; R2: Upper bound of Heap - 1
+2$:	TST	-(R0)		; R0: &block
+.IIF NE	C$RT11 9$:
+	RETURN
+
+
+.IF EQ	C$RT11
+9$:				; End of list
+	.IIF NE C$BK10	POP	$KBCTL	; Restore keyboard interrupts
+	.IIF NE C$BK10	CLR	GCRET
+	.IIF NE C$BK11	CLR	$SYREG	; Enable STOP key
+	RETURN
+.ENDC
+
+
 
 
 ;; Process Root in R0
 MARK:	PUSH	R0
 	MOV	SP, MARKSP
-	CALL	(R3)
+	.MPUSH
 	MOV	R0, @MARKSP	; Decremented
 MARKL:  CMP	SP, (PC)+	; SP == MARKSP?
-MARKSP:	.WORD	0		; SP AT ENTRY TO MARK
-	POP	R0		; NEXT ITEM OFF STACK.
+MARKSP:	.WORD	0		; SP at entry to mark
+	POP	R0		; Next item of stack
 	BHIS	R.GC
-	CLR	R2
 	MOV	R0, R1
-	ASR	R1
+	CLR	R2
+	ROR	R1		; rely on CF==0
 	BCS	1$
 	ASR	R1
 	BCS	M.DBL
@@ -183,22 +202,30 @@ M.SVLS:
 	CMP	R2, #FIXEND
 	BLO	M.VEC
 	CLR	R2
-1$:	INC	R0
+1$:	TST	(R0)+		; R0 += 2
 	.MBIT			; Mark 2nd Cell of Symbol OR LAMBDA
 	BIT	#1, -10(R0)
 	BNE	2$		; LAMBDA or STREAM
 	TST	-(R0)		; R0 -= 2 for SYMBOLs
 	BR	3$
-2$:	CALL	(R3)		; FUNCTION or LAMBDA BODY
-3$:	CALL	(R3)		; NEXT SYMBOL, FUNCTION OR LAMBDA BODY
-	CALL	(R3)		; FUNCTION or LAMBDA BODY
-	CALL	(R3)		; PLIST
+2$:	.MPUSH			; FUNCTION or LAMBDA BODY
+3$:	.MPUSH			; NEXT SYMBOL, FUNCTION OR LAMBDA BODY
+	.MPUSH			; FUNCTION or LAMBDA BODY
+	.MPUSH			; PLIST
 
-	BIT	#1, (R0)
+.IF NE C$FILE
+	CMP	(R0), #V.FILE
+	BNE	4$		; SYMBOL, LAMBDA or non-FILE-STREAM
+	ADD	#10, R0
+	MOV	#512./4 + 1, R2	; Extended FILE-STREAM struct + 512-byte sector buffer
+	BR	M.BYTS
+.ENDC ; C$FILE
+
+4$:	BIT	#1, (R0)+
 	BNE	MARKL		; LAMBDA or STREAM
-	TST	6(R0)
-	BEQ	4$
-	ADD	#6, R0
+5$:	BIT	(R0)+, (R0)+	; R0 += 4
+	TST	(R0)
+	BEQ	7$		; Symbol name is ASCII
 .IF NE C$RAD40
 6$:	TST	(R0)+
 	BPL	MARKL		; end of RADIX-40 string
@@ -211,10 +238,11 @@ M.SVLS:
 	.MBIT
 	CMP	-(R0), -(R0)	; R0 -= 4
 	BR	6$
-4$:	ADD	#11., R0	; Mark Symbol-Name
+7$:	ADD	#5, R0		; Mark Symbol-Name
 ;; Mark String
 ;; Assumes R0==0
-M.STR:	TST	-(R0)		; R0 -= 2
+M.STR:
+	DEC2	R0
 	BISB	-(R0), R2	; String length
 ;; Mark Double
 ;; Assumes R0==0
@@ -222,8 +250,8 @@ M.DBL:	TST	(R0)+		; R0 += 2
 	ASR	R2
 	ASR	R2
 	INC	R2
-1$:	.MBIT
-	SOB	R2, 1$
+M.BYTS:	.MBIT
+	SOB	R2, M.BYTS
 	BR	MARKL
 M.VEC:	SUB	#FIXOFF, R2
 	BEQ	MARKL
@@ -233,8 +261,8 @@ M.VEC:	SUB	#FIXOFF, R2
 .ENDC
 M.VEC1:	ADD	R2, R0
 	ADD	R2, R0
-1$:	CALL	(R3)
-	.MBIT			; MARK EVERY 4-BYTE CELL OF THE ARRAY
+1$:	.MPUSH
+	.MBIT			; Mark every 4-byte cell of the array
 	BIT	-(R0), -(R0)	; R0 -= 4
 	SOB	R2, 1$
 	BR	MARKL
