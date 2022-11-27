@@ -1,5 +1,5 @@
-# Lisp для БК-0010.01 и БК-0011М
-LISP interpreter for RT-11 operating system and Soviet PDP-11-based БК-0010.01 и БК-0011М microcomputers,.
+# Lisp for RT-11, БК-0010.01 & БК-0011М
+LISP interpreter for RT-11 operating system and Soviet PDP-11-based БК-0010.01 & БК-0011М microcomputers.
 
 ## How to run
 
