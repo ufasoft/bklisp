@@ -5,7 +5,7 @@ LISP interpreter for RT-11 operating system and Soviet PDP-11-based БК-0010.01
 
 ### RT-11
 ```
-.R LISP.SAV
+.RUN LISP
 ```
 
 ### БК-0010.01
