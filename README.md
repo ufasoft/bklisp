@@ -1,7 +1,12 @@
 # Lisp для БК-0010.01 и БК-0011М
-Минимальный интерпретатор языка программирования LISP для микро-компьютеров БК-0010.01 и БК-0011М архитектуры PDP-11, на процессоре К1801ВМ1.
+LISP interpreter for RT-11 operating system and Soviet PDP-11-based БК-0010.01 и БК-0011М microcomputers,.
 
-## Как запускать
+## How to run
+
+### RT-11
+```
+.R LISP.SAV
+```
 
 ### БК-0010.01
 ```
@@ -19,5 +24,5 @@ MO
 ```
 
 
-## Справочник
+## Reference
 https://ufasoft.com/bklisp/bklisp.html
