@@ -5,9 +5,9 @@
 ;;; RT-11 definitions
 
 .IF DF C$1801
-	.INCLUDE	/k1801.inc/
+	.INCLUDE /k1801.inc/
 .IFF
-	.INCLUDE	/pdp11.inc/
+	.INCLUDE /pdp11.inc/
 .ENDC
 
 .MCALL	.CLOSE, .DATE, .DELETE, .ENTER, .EXIT, .FETCH, .GFDAT, .GTIM

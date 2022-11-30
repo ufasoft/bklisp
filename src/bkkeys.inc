@@ -5,7 +5,7 @@
 ;;; BK-0010.01 Keyboard codes
 
 $K.LE	= 10	; Left key
-$K.NL	= 12	; Left key
+$K.NL	= 12	; NewLine key
 $K.TAB	= 15
 $K.RUS	= 16
 $K.LAT	= 17

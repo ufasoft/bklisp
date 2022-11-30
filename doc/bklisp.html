@@ -2,7 +2,7 @@
 
 <html lang="ru">
 <head>
-	<title>LISP для БК-0010.01, БК-0011М и RT-11</title>
+	<title>LISP для RT-11, БК-0010.01, БК-0011М</title>
 	<meta charset="UTF-8">
 	<meta name="description" content="Ufasoft BkLisp - LISP для БК-0010.01, БК-0011М и RT-11. Справочник.">
 	<meta name="keywords" content="Lisp, Common Lisp, BkLisp, Ufasoft, БК-0010, БК-0010.01, БК-0011, БК-0011М, PDP-11, RT-11">
@@ -38,10 +38,10 @@
 
 <article>
 
-<h1>Ufasoft BkLisp - LISP для БК-0010.01, БК-0011М и RT-11<br>
+<h1>Ufasoft BkLisp - LISP для RT-11, БК-0010.01, БК-0011М<br>
 Справочник
 </h1>
-<i>Версия 2022.7</i>
+<i>Версия 2022.12</i>
 
 <p>Минимальный интерпретатор языка программирования LISP для микро-компьютеров <a href="https://ru.wikipedia.org/wiki/БК_(семейство_компьютеров)">БК-0010.01 и БК-0011М</a>
 архитектуры <a href="https://ru.wikipedia.org/wiki/PDP-11">PDP-11</a>, на процессоре <a href="https://ru.wikipedia.org/wiki/К1801ВМ1">К1801ВМ1</a>.
@@ -277,6 +277,10 @@ href="https://ru.wikipedia.org/wiki/Диалоговый_вычислитель�
 
 <h4 id="stream-type">Поток - STREAM</h4>
 <p>Поток ввода или вывода.
+
+<h4 id="file-stream-type">Файл - FILE-STREAM</h4>
+<span class="rt11">RT-11</span>
+<p>Поток для чтения файла на диске.
 
 <h4 id="function-type">Функция - FUNCTION</h4>
 <p>Пользовательская функция или LAMBDA-выражение.
@@ -2224,7 +2228,7 @@ NULL, SYMBOL, FLOAT, INTEGER, VECTOR, CONS, STRING, CHARACTER, SYSTEM-FUNCTION, 
 
 <hr/><h4 id="write-char">Функция WRITE-CHAR</h4>
 <p><b>write-char</b> character  &optional output-stream → character
-<a class="clhs" href="http://www.lispworks.com/documentation/HyperSpec/Body/f_wr_cha.htm">CLHS</a>
+<a class="clhs" href="http://clhs.lisp.se/Body/f_wr_cha.htm">CLHS</a>
 <p>Выводит <i>character</i> в <i>output-stream</i> (по-умолчанию <a href="#*standard-output*">*standard-output*</a>) и возвращает его.
 <p>Эта функция базовая, к ней обращаются почти все остальные функции вывода.
 <h5>Примеры</h5>
@@ -2554,14 +2558,17 @@ href="#terpri">terpri</a>), и возвращает <i>string</i>.
 <pre>
 (defun main ()
   (princ "Здравствуй, Мир!")
-  (read-char))                    ; ожидание нажатия ENTER
+  (read-char))                                             ; ожидание нажатия ENTER
                                   →  MAIN
 
-(save "hello.sav" 'main)          →  T
+(save "hello.sav" 'main)          →  T                     ; для RT-11
+(save "hello.bin" 'main)          →  T                     ; для БК
 (quit)
 
-? M
-ИМЯ? hello.sav                →  Здравствуй, Мир!
+.RUN HELLO                        →  Здравствуй, Мир!      ; для RT-11
+
+-? M
+-ИМЯ? hello.bin                   →  Здравствуй, Мир!      ; для БК
 </pre>
 
 <hr/><h3>Интерактивный цикл Чтение-Вычисление-Печать <abbr title="Read-Eval-Print-Loop">REPL</abbr></h3>

@@ -4,8 +4,8 @@
 
 .SBTTL	Symbol definitions
 
-.INCLUDE	/config.inc/
-.IIF EQ C$AMAL	.INCLUDE	/macros.inc/
+.INCLUDE /config.inc/
+.IIF EQ C$AMAL	.INCLUDE /macros.inc/
 
 .GLOBL FIXEND
 
@@ -135,6 +135,7 @@
 .ENDM
 
 .IF NE C$BK11			; system area in 042600
+.ASECT
 	. = 42604
 	.WORD	4000		; Start address
 

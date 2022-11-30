@@ -13,7 +13,7 @@ R2.OFF	= 4
 R0.OFF	= 6
 PC.OFF	= 10
 R5.OFF	= 12
-ST.OFF	= 14	; FIRST WORK BEFORE STACK FRAME ;   NUMBER OF SAVED BYTES IN STACK FRAME
+ST.OFF	= 14	; First Work Before Stack Frame ;   Number Of Saved Bytes In Stack Frame
 
 
 ;;----------Order does matter. Used in PRESUB
@@ -65,7 +65,8 @@ TCASE$:	.WORD	TCASE.
 ;CCASE$:	.WORD	CCASE.
 SUBR$:	.WORD	SUBR.
 SYVAL$:	.WORD	SYVAL.
-.IIF NE C$RT11	SYS$:	.WORD	SYS.
+.IIF EQ C$BK10, FPUM1$:	.WORD	FPUM1.
+.IIF NE C$RT11,	SYS$:	.WORD	SYS.
 
 
 .IF NE C$RT11
@@ -207,11 +208,12 @@ COPY4:	CALL	(PC)
 	BR	PRESUB
 
 ;;-- 8 words
-;; INSERT R3/2 WORDS INTO STACK
+;; Insert R3/2 Words into Stack
+;; Returns: R5: beginning of free Stack area
 INSER.:	MOV	SP, R2
 	SUB	R3, SP
 	MOV	SP, R5
-	MOV	#ST.OFF/2 + 1, R3	; SIZE OF STACK FRAME
+	MOV	#ST.OFF/2 + 1, R3	; Size of Stack Frame
 1$:	MOV	(R2)+, (R5)+
 	SOB	R3, 1$
 RET.1:	RETURN
@@ -751,25 +753,37 @@ MALLOC:	ADD	#3, R5
 	BEQ	RE.LIS		; RETURN
 	CMP	R5, (R1)+
 	BHI	1$
-	BNE	2$
+	BNE	MALLO2
 	MOV	(R1), (R3)	; Exclude Cell from free list
-.IIF EQ C$RT11, 2$:
+.IIF EQ C$RT11, MALLO2:
 3$:	MOV	-(R1), (SP)	; Use return address as temp var (SP): size in bytes
-4$:	SUB	R5, (R1)	; trim free block
+MALLO4:	SUB	R5, (R1)	; trim free block
 	ADD	(SP)+, R1	; Skip return address; R1: address behind allocated memory
 5$:	CLRB	-(R1)		; Initialize cells
 	SOB	R5, 5$
-	BR	E.RTI		; R1: allocated memory
+E.RTI9:	BR	E.RTI		; R1: allocated memory
 .IF NE C$RT11								; On RT-11 allocate begnning with lower addresses for .SAV trimming in SAVE
-2$:	ADD	R1, R5
+MALLO2:	ADD	R1, R5
 	MOV	(R1), (R5)	; (R5): pointer to next Free Block
 	MOV	-(R1), -(R5)	; size in bytes of ree block
 	MOV	R5, (R3)	; adjust pointer to this free block
 	SUB	R1, R5		; R5: allocation size
 	ADD	R5, R1		; R1: pointer to new free block
 	CLR	(SP)
-	BR	4$
+	BR	MALLO4
 .ENDC ; C$RT11
+
+.IF EQ C$BK10
+;; 4 times  FPUSH -(R1)
+FPUM1.:
+	MOV	#8., R3
+	MOV	R3, R0
+	CALL	INSER.
+	ADD	R0, R5
+1$:	MOVB	-(R1), -(R5)
+	SOB	R0, 1$
+	BR	E.RTI9
+.ENDC ; C$BK10
 
 
 ;; .LISTA

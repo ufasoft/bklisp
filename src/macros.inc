@@ -5,10 +5,10 @@
 ;; Macro definitions for frequent procedures
 
 
-.INCLUDE	/defcfg.inc/
-.IIF NE C$RT11	.INCLUDE	/rt11.inc/
-.IIF NE C$BK10	.INCLUDE	/bk1001.inc/
-.IIF NE C$BK11	.INCLUDE	/bk11.inc/
+.INCLUDE /defcfg.inc/
+.IIF NE C$RT11	.INCLUDE /rt11.inc/
+.IIF NE C$BK10	.INCLUDE /bk1001.inc/
+.IIF NE C$BK11	.INCLUDE /bk11.inc/
 
 C.EXTM	= 214
 
@@ -768,6 +768,13 @@ V.1900	= FIXOFF + 1900.
 
 .IIF NE C$BK10 EHEAP	= $ANVP
 
+.IF EQ C$BK10
+	;; 4 times  FPUSH  -(R1)
+	.MACRO	.FPUM1
+		.TJL	FPUM1$
+	.ENDM
+.ENDC ; C$BK10
+
 .IF NE C$RT11
 	TESTCH	= 0		; must be 0 for .SYS macro
 
@@ -777,5 +784,4 @@ V.1900	= FIXOFF + 1900.
 		.TJL	SYS$
 		.WORD	n * 256.
 	.ENDM
-
-.ENDC	; C$RT11
+.ENDC ; C$RT11

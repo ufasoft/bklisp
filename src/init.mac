@@ -4,7 +4,7 @@
 
 ;;; Initialization code, discarded after starting
 
-.INCLUDE	/k1801.inc/
+.INCLUDE /k1801.inc/
 
 .SBTTL	Init module
 
@@ -224,7 +224,7 @@ INIT4:
 
 	MOV	(R1), R1	; R1: command-line
 	.PRED	LOAD
-	JMP	QUIT
+	.PRED	QUIT
 5$:
 .IFF
 	MOV	#ASTKUP, SP
@@ -234,26 +234,29 @@ INIT4:
 	JMP	RESET
 ;	JMP	LOADER
 
+.IF NE C$RT11
 ;; Init error message to be russian
 IRUERR:	MOV	#RU.ERR, R1
 	MOV	#$ERROR, R2
 2$:	MOVB	(R1)+, (R2)+
 	BNE	2$
 	RETURN
+.ENDC ; C$RT11
 
 
 MODE64:	.ASCII	<033><061><C.CR><C.NL>		; 64 columns/line
-STATUS:	.ASCII	"BkLisp 2022 ufasoft.com/bklisp"
+STATUS:	.ASCII	"BkLisp 2022.12 ufasoft.com/bklisp"
 .IF NE C$RT11
 	.ASCII	/ /
 .IFF
-	ESTATU: .ASCII	<C.CR><C.NL>
+	.IIF NE C$BK10 ESTATU: .ASCII	<C.CR><C.NL>
+	.IIF EQ C$BK10	.ASCII	/ /
 .ENDC ; C$RT11
-GREET:	.ASCII	"Lisp for "
-.IIF NE C$RT11	.ASCII	"RT-11"
-.IIF NE C$BK10	.ASCII	<C.CY.B><C.CY.K>"-0010.01"
-.IIF NE C$BK11	.ASCII	<C.CY.B><C.CY.K>"-0011["<C.CY.M>"]"
-	.ASCIZ	" (c) Sergey Pavlov dev@ufasoft.com"<C.CR>
+.IIF NE C$BK10,	GREET:	.ASCII	"Lisp for "
+.IIF NE C$RT11,	.ASCII	"RT-11"
+.IIF NE C$BK10,	.ASCII	<C.CY.B><C.CY.K>"-0010.01"
+.IIF NE C$BK11,	.ASCII	<C.CY.B><C.CY.K>"-0011["<C.CY.M>"]"
+	.ASCIZ	" (c) Sergey Pavlov"<C.CR>
 INCMPT:	.ASCIZ	<C.CR><C.NL>/ERROR!/<C.CR><C.NL>/Incompatible System detected/
 BK11ME:
 .IIF NE C$BK10		.ASCIZ	<C.CR>/For /<C.CY.B><C.CY.K>/-0011[/<C.CY.M>/] run bklisp.11m/

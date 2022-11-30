@@ -397,7 +397,7 @@ UNR.CH::
 4$:	MOV	(R4)+, R1
 	.STRP
 	BCS	UNRCH1		; string-input-stream
-.IF EQ C$LINE
+.IF EQ C$GTLI ! <C$RT11 - 1>			; RT-11 with .GTLIN-less mode
 	MOV	R2, UNRCH
 	BR	UNRCH9
 .IFF
@@ -407,7 +407,7 @@ UNR.CH::
 	CMP	(R4), #$BUF + 1
 	BLO.E
 ;!!!R	MOVB	R2, -(R3)
-.ENDC	; C$LINE
+.ENDC	; C$GTLI
 UNRCH1:	DEC	(R4)		; --curPos
 UNRCH9:	CLR	R1
 	RETURN
@@ -437,7 +437,7 @@ R.M01:	MOV	R0, R1
 	RETURN
 
 
-.INCLUDE	/print.mac/
+.INCLUDE /print.mac/
 
 
 ;; (FILL sequence item) => sequence
@@ -559,7 +559,7 @@ SWLAT:	CLR	KOI7
 	BR	GETCH1
 .ENDC ; C$RU
 
-.IF EQ C$LINE
+.IF EQ C$GTLI ! <C$RT11 - 1>			; RT-11 with .GTLIN-less mode
 
 GETCH:	MOV	(PC)+, R1
 UNRCH:	.WORD	0
@@ -613,7 +613,7 @@ KOI7:	.WORD	0		; KOI-7 mode mask: 200 or 0
 		.ENDC ; C$RU
 	.ENDC ; C$RT11
 
-.ENDC	; C$LINE
+.ENDC	; C$GTLI
 	RETURN
 
 ;; (READ-CHAR input-stream T)

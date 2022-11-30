@@ -29,8 +29,7 @@ VALUES::
 ;; (QUIT) => exit into operating system
 QUIT::
 M.QUIT::
-.IIF NE C$RT11	CLR	R0	; to avoid CSI
-;.IIF NE C$RT11	MOV	#1, R0
+;.IIF NE C$RT11	CLR	R0	; to avoid CSI
 	.EXIT
 
 
@@ -286,9 +285,9 @@ MKSOS::	CALL	MKSTR2		; (MAKE-STRING 255)
 				; SUB	#5, R1; RETURN
 
 
-.INCLUDE	/subr1.mac/
-.INCLUDE	/subr2.mac/
-.INCLUDE	/subr3.mac/
+.INCLUDE /subr1.mac/
+.INCLUDE /subr2.mac/
+.INCLUDE /subr3.mac/
 
 
 ;;;---------------------------------------------------------------------------------
