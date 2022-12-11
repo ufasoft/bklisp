@@ -24,6 +24,11 @@ LOAD
   T
   $ (sum 1 2)
   3
+SOFTWARE
+  $ (software-type)
+  "RT-11"
+  $ (software-version)
+  \d.\d	   (re)
 End
 
   

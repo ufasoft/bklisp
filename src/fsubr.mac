@@ -29,7 +29,7 @@ PSETQ::	.POP5
 SETQ1:	MOV	R0, (R4)
 ;; (SETQ {pair}*) => result
 SETQ::	.POP5
-	BEQ	R.M01A
+	BEQ	SETF1		; MOV R0, R1; RETURN
 	MOV	R1, R4		; R4: variable
 	.POP5
 	.EVAL1
@@ -56,35 +56,6 @@ OR1:	.POP5
 	BEQ	OR1
 9$:	RETURN
 
-
-;; (SETF {pair}*) => result*
-SETF::	.POP5
-	BEQ	R.M01A
-	MOV	SP, R3
- 	.SYMP
-	BCS	3$		; (SETF fun args)
-	.POP1
-	.SWP01			; R1: symbol, R0: value
-	MOV	#V.SETF, R2
-	.SUBR	GET
-	BEQ.E
-	PUSH	#V.FUNCALL, R1
-	.SWP01
-6$:	.POP1
-	BEQ	4$
-	PUSH	R0
-	BR	6$
-3$:	PUSH	#V.SETQ, R1
-4$:	.POP5
-	BEQ.E
-	PUSH	R1
-	SUB	SP, R3
-	ASR	R3
-	MOV	R3, R0
-	.LISTN
-	.EVAL1
-	MOV	R1, R0
-	BR	SETF
 
 
 ;; (ROTATEF place*) => nil
@@ -147,6 +118,98 @@ PROGN1:	.POP5
 	BR	PROGN1
 
 
+.IF NE C$FULL
+
+;; (TRACE function-name*) => trace-result
+TRACE::
+	TST	R5
+	BEQ	TRACE5
+TRACE1:	.POP5
+TRACE2:	BEQ	R.M01A		; MOV R0, R1; RETURN
+	T.SYM
+	MOV	R1, R3
+	MOV	#TRACLS, R4
+	MOV	(R4), R2
+	.SUBR	ASSOC
+	BNE	TRACE1		; already traced
+	MOV	R3, R1		; R1: Symbol sym
+	.PUSH0			; (R0): sym
+	MOV	1(R1), R2	; R2: fun
+	MOV	(R4), R3	; R3: TRACLS
+	.SUBR	ACONS		; (ACONS sym (SYMBOL-FUNCTION sym) TRACLS)
+	MOV	R1, (R4)+	; R4: &L.TRAC
+	MOV	(R4), R3	; R3: L.TRAC
+	MOV	R2, R1
+	MOV	#V.C.A, R2
+	.SUBR	SUBST
+	MOV	R1, R3
+	MOV	#V.C.B, R2
+	MOV	(R0), R1	; R1: sym
+	.SUBR	SUBST
+	.EVAL1			; R1: #'(LAMBDA (&REST VALUES) (T*R VALUES fun sym))
+	MOV	(R0), R4	; R4: sym
+	MOV	R1, 1(R4)	; (SETF (SYMBOL-FUNCTION 'sym) (LAMBDA ...))
+	BR	TRACE1
+TRACE5:	MOV	TRACLS, R5
+6$:	.POP5
+	BEQ	R.M01A
+	MOV	(R1), R1
+	.PUSH0
+	BR	6$
+
+;; (UNTRACE function-name*) => untrace-result
+UNTRACE::
+	TST	R5
+	BNE	1$
+	.SUBR	TRACE		; Untrace all functions
+	MOV	R1, R5
+1$:	.POP5
+	BEQ	R.M01A
+	MOV	TRACLS, R2
+	.SUBR	ASSOC
+	BEQ	1$
+	MOV	(R1)+, R3
+	MOV	(R1), 1(R3)
+	DEC2	R1
+	MOV	TRACLS, R2
+	.SUBR	REMOVE
+	MOV	R1, TRACLS
+	MOV	R3, R1
+	.PUSH0
+	BR	1$
+
+.ENDC ; NE C$FULL
+
+
+SETF3:	PUSH	#V.SETQ, R1
+SETF4:	.POP5
+	BEQ.E
+	PUSH	R1
+	SUB	SP, R3
+	ASR	R3
+	MOV	R3, R0
+	.LISTN
+	.EVAL1
+	MOV	R1, R0
+;; (SETF {pair}*) => result*
+SETF::	.POP5
+SETF1:	BEQ	R.M01A		; MOV R0, R1; RETURN
+	MOV	SP, R3
+ 	.SYMP
+	BCS	SETF3		; (SETF fun args)
+	.POP1
+	.SWP01			; R1: symbol, R0: value
+	MOV	#V.SETF, R2
+	.SUBR	GET
+	BEQ.E
+	PUSH	#V.FUNCALL, R1
+	.SWP01
+6$:	.POP1
+	BEQ	SETF4
+	PUSH	R0
+	BR	6$
+
+
 
 ;-------------------------------------------
 FSUBR1:
@@ -193,6 +256,16 @@ BLENV:	PUSH	R1
 	POP	R1
 	RETURN
 
+;; (WHEN test-form form*) => result
+WHEN::	DEC	R0
+;; (UNLESS test-form form*) => result
+UNLESS::
+	.EVAL1
+	ADD	R0, R1
+	BHI	RENIL1
+PROGNA:	BR	PROGN
+
+
 ;; (BLOCK name form*) => result
 BLOCK::	MOV	R1, R2
 	CALL	BLENV
@@ -228,16 +301,6 @@ LAMBDA::
 	MOV	LEXENV, (R1)
 R1M5.R:	SUB	#5, R1
 	RETURN
-
-
-;; (WHEN test-form form*) => result
-WHEN::	DEC	R0
-;; (UNLESS test-form form*) => result
-UNLESS::
-	.EVAL1
-	ADD	R0, R1
-	BHI	RENIL1
-PROGNA:	BR	PROGN
 
 
 ;; (LET ({var | (var [init-form])}*) form*) => result
@@ -594,9 +657,41 @@ R.INCF:	MOV	R1, (R4)
 	RETURN
 
 
-
-
-
 FSUBR3:
+
+.IF NE C$FULL
+
+;; (T*R args fun sym)
+TRACER::
+	.EVAL1
+	MOV	R1, R5		; R5: args
+	PUSH	R2		; (SP): fun
+	MOV	#INDENT, R4
+	INCB	(R4)
+	MOVB	(R4), R0	; R1: new indent
+	MOV	#A.TRCA+3, 7$+2
+	CALL	5$
+	POP	R1		; R1: fun
+	.SUBR	FUNCALL		; (FUNCALL fun args...)
+	MOV	R1, R5		; R5: result
+	MOVB	(R4), R0	; R0: indent
+	DECB	(R4)		; unindent
+	MOV	#A.TRCR+3, 7$+2
+5$:	CLR	R1
+	CLR	R2		; R2: stream
+	.FRESHL
+6$:	.P.CHR	C.SP
+	SOB	R0, 6$
+	MOV	R3, R1		; R1: sym
+	CALL	PRINT1		; .PRIN1;  .P.CHR C.SP
+7$:	.P.STR	A.TRCA		; Self-modifying
+	MOV	R5, R1		; R1: args or result
+	.PRIN1
+	.P.CHR	C.NL
+	RETURN
+
+.ENDC ; NE C$FULL
+
+
 
 E.FSUBR:

@@ -1,5 +1,5 @@
 Prompt
-  Lisp (.+)ufasoft.com (re)
+  Lisp (re)
   Bytes free (re)
 Addition
   $ (+ 1 2 3)
@@ -39,6 +39,11 @@ Symbol
   3
   $ (symbol-function 'sin)
   #<SYSTEM-FUNCTION SIN>
+Symbol name
+  $ 'lisp-implementation-version
+  LISP-IMPLEMENTATION-VERSION
+  $ (symbol-name 'LISP-IMPLEMENTATION-VERSION)
+  "LISP-IMPLEMENTATION-VERSION"  
 FDEFINITION
   $ (fdefinition 'tan)
   #<SYSTEM-FUNCTION TAN>

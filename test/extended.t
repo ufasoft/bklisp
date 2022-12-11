@@ -2,7 +2,7 @@ Prompt
   Lisp (.+)ufasoft.com (re)
   Bytes free (re)
 ARRAY-RANK-LIMIT
-  $ array-RANK-limit
+  $ array-rank-limit
   \d+			 	(re)
 ARRAY-DIMENSION-LIMIT
   $ array-dimension-limit
@@ -16,15 +16,41 @@ VALUES
   1 ;
   5 ;
   4
-TIME
-  $ (get-universal-time)
-  38\d{8}			(re)
-  $ (encode-universal-time 1 2 3 14 8 2022)
-  3869434921
-  $ (multiple-value-list (decode-universal-time 3869434921))
-  (1 2 3 14 8 2022 6 NIL 0)
-  $ (multiple-value-list (get-decoded-time))
-  (\d\d? \d\d? \d\d? \d\d? \d\d? 20\d\d \d NIL 0)						(re)
+CAADR
+  $ (setq tree '(a (b x) c d e))
+  (A (B X) C D E)
+  $ (caadr tree)
+  B
+FLOAT functions
+  $ (float-radix 1.2)
+  2
+SCALE-FLOAT
+  $ (scale-float 1.0 1)
+  2
+  $ (scale-float 10.01 -2)
+  2.5025
+  $ (scale-float 23.0 0)
+  23
+TRACE / UNTRACE
+  $ (defun fact (x) (if (<= x 1) 1 (* x (fact (1- x)))))
+  FACT
+  $ (trace fact sin)
+  (SIN FACT)
+  $ (fact 3)
+   FACT <- (3)
+    FACT <- (2)
+     FACT <- (1)
+     FACT -> 1
+    FACT -> 2
+   FACT -> 6
+  6
+  $ (untrace FACT)
+  (FACT)
+  $ (trace)
+  (SIN)
+  $ (fact 4)
+  24
+  
 End
 
   

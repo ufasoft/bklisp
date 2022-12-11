@@ -62,7 +62,6 @@ SVREF1:	TO.U16
 	MOV	(R2), R1
 	RETURN
 
-
 ;; (DIGIT-CHAR-P char &optional (radix 10)) => weight
 DIGCHP::
 	.DF2	V.10
@@ -80,6 +79,19 @@ DIGCHP::
 	BHIS.F			; weight >= radix
 AFIX.R:	ADD	#FIXOFF, R1
 	RETURN
+
+
+;; (CHAR string index) => character
+CHAR::	SUB	#3, R1
+	BISB	(R1)+, R0
+	.SWP12
+	TO.U16
+	CMP	R1, R0
+	BHIS	E.RANG
+	MOV	R2, R3
+CHAR8:	ADD	R1, R3
+	JMP	RS.CH8		; MOV #V.CHB, R1;  BISB (R3)+, R1
+
 
 
 
@@ -113,18 +125,420 @@ RMAR::	.VECP
 .ENDC	; C$MDAR
 
 
+CH.EQ:	CMPB	R3, R4
+	B.ZF
 
-;; (CHAR string index) => character
-CHAR::	SUB	#3, R1
-	BISB	(R1)+, R0
+CH.NE:	CMPB	R3, R4
+	B.NZF
+
+
+;; (STRING/= string1 string2) => bool
+STRNE::	.STREQ
+	B.NCF
+
+;; (ASH integer count) => shifted-integer
+ASH::	.TI16B
+	TST	R2
+	BEQ	9$
+	BLT	7$
+1$:	ASL	R1
+	SOB	R2, 1$
+	BR	9$
+7$:	NEG	R2
+8$:	ASR	R1
+	SOB	R2, 8$
+9$:	FI16.R
+
+EQ.NUM:	.BASN
+	.WORD	DPUR12, $DCMP, NOT
+
+;; (SUBSETP list-1 list-2) => bool
+;;!!! INEFFICIENT BUT TERSE IMPLEMENTATION, MAKES UNNECESSARY ALLOCATIONS
+SUBSETP::
+	.SUBR	SETDIF		; (NULL (SET-DIFFERENCE list-1 list-2))
+	B.ZF
+
+;; (INTERSECTION list-1 list-2) => result-list
+INTERSECTION::
+	MOV	#103001, INTDI2		; OPCODE: BCC INTDI3
+	BR	INTDIF
+
+;; (LOGNAND integer-1 integer-2) => result-integer
+LOGNAND::
+	.TI16B
+	COM	R2
+	BR	LOGOC3
+
+;; (LOGANDC2 integer-1 integer-2) => result-integer
+LOGAC2::
 	.SWP12
+;; (LOGANDC1 integer-1 integer-2) => result-integer
+LOGAC1::
+	PUSH	#LOGNOT
+;; (LOGORC2 integer-1 integer-2) => result-integer
+LOGOC2::
+	.SWP12
+;; (LOGORC1 integer-1 integer-2) => result-integer
+LOGOC1::
+	.TI16B
+LOGOC3: BIC	R2, R1
+	BR	LOGNO1
+
+;; (LOGNOT integer) => result-integer
+LOGNOT::
+	TO.I16
+	BR	LOGNO1
+
+;; (LOGNOR integer-1 integer-2) => result-integer
+LOGNOR:: .TI16B
+	BIS	R2, R1
+LOGNO1:	COM	R1
+	FI16.R
+
+;; (LOGTEST integer-1 integer-2) => bool
+LOGTEST::
+	.TI16B
+	BIT	R2, R1
+	B.NZF
+
+
+;; (UNION list-1 list-2) => result-list
+UNION::	MOV	R2, R0			; IMPLEMENTATION:  (NCONC (SET-DIFFERENCE list-1 list-2) list-2)
+;; (SET-DIFFERENCE list-1 list-2) => result-list
+SETDIF::
+	MOV	#103401, INTDI2		; OPCODE: BCS INTDI3
+;; INTERSECTION/SET-DIFFERENCE
+INTDIF::
+	MOV	R1, R5
+INTDI3:	.POP5
+	BEQ	R.M01		; MOV R0, R1
+INTDI1:	.MEMBER
+INTDI2:	BCS	INTDI3
+	.PUSH0			; PUSH R1 INTO R0 LIST
+	BR	INTDI3
+
+
+
+
+
+;; (READ-CHAR input-stream T)
+R.CHRT::
+	INC	R0
+;; (READ-CHAR input-stream NIL NIL)
+R.CHR0::
+	MOV	R2, R1
+	MOV	R0, R2
+R.CHR1:	CLR	R5
+;;                                         R2      &rest R5
+;; (READ-CHAR &optional input-stream eof-error-p eof-value) => char
+R.CHAR::
+	TO.STM
+	MOV	R1, R4
+	INC	R4
+.IF NE C$FILE
+	.TYPEP	U.FILE
+	BCC	1$
+	TST	(R4)+		; R4: &position
+	MOV	(R4)+, R1	; R1: position as Object
+	TST	(R4)+		; R4: &channel
 	TO.U16
-	CMP	R1, R0
-	BHIS	E.RANG
-CHAR1:	ADD	R1, R2
+	BIT	#777, R1
+	BNE	4$
+	MOV	#S$REA * 256., R3
+	CALL	REAWRI
+	BCS	R.EOF
+4$:	MOV	R1, R2
+	INC	R1   		; ++filepos
+	F.U16
+	MOV	R1, -4(R4)	; save new filepos
+	BIC	#^C777, R2	; R2: offset in buffer
+	ADD	R2, R4		; R4: pointer to next char - 2
 	MOV	#V.CHB, R1
-	BISB	(R2), R1
+	BISB	2(R4), R1
+;	BEQ	R.EOF
 	RETURN
+.ENDC ; C$FILE
+
+1$:	MOV	(R4)+, R1
+	.STRP
+	BCC	GETCH		; STDIN
+	MOV	(R4)+, R3	; R3: cur pos
+	CMP	R3, (R4)	; (R4): upper bound
+	BHIS	R.EOF		; EOF
+	INC	R3
+	MOV	R3, -(R4)	; increment cur pos
+	ADD	#-FIXOFF-3, R3
+	BR	CHAR8		; ADD R1, R3;  MOV #V.CHB, R1;  BISB (R3)+, R1
+R.EOF:	TST	R2		; eof-error-p
+	BNE.E
+R.EOF1:	MOV	(R5), R1	; R1: eof-value
+RCHAR9:	RETURN
+
+
+
+;; (FILL sequence item) => sequence
+FILL::	MOV	R2, R3		; R3: item
+	MOV	R1, R0
+	.LENGTH
+	.SH210			; R1: sequence, R2: (LENGTH sequence)
+1$:	DEC	R2
+	CMP	R2, #V.0
+	BLO	RCHAR9		; RETURN
+	.PRED	X.ELT
+	BR	1$
+
+;; (REDUCE function list) => result
+REDUCE::
+	TO.FUN
+	MOV	R1, R4		; SAVE function in R4
+	MOV	R2, R5
+	.POP5
+	BNE	1$		; NON-EMPTY LIST OF ARGS
+	MOV	R4, R1		; function
+	JMP	FUNCALL		; (FUNCALL function)
+2$:	CLR	R2
+	.CONS
+	.SH210
+	.CONS          		; R1: LIST OF 2 ARGS
+	MOV	R5, R3
+	MOV	R1, R5
+	MOV	R4, R1
+	.FUNCALL		; (FUNCALL a b)
+	MOV	R3, R5
+1$:	MOV	R1, R0		; ACCUMULATE RESULT IN R0
+	.POP5
+	BNE	2$		; MANY ARG
+R.M01:	MOV	R0, R1
+	RETURN
+
+
+;; (SORT sequence predicate) => sorted-sequence
+SORT::	MOV	R1, R3
+	.LENGTH
+	MOV	R1, R5		; R5: length
+	MOV	R3, R1
+	.SVECP
+	BCC	4$      	; Sort List
+	SUB	#FIXOFF + 1, R5	; Sort Vector
+	BLOS	9$
+6$:	TST	(R3)+
+	MOV	R3, R4
+	PUSH	R5
+7$:	TST	(R4)+
+	.SORT34
+	SOB	R5, 7$
+	POP	R5
+	SOB	R5, 6$
+9$:	RETURN
+3$:	MOV	2(R3), R3
+	BEQ	9$
+4$:	MOV	R3, R4
+2$:	MOV	2(R4), R4
+	BEQ	3$
+	.SORT34
+	BR	2$
+
+
+
+
+.IF NE C$RT11
+
+;; (RENAME-FILE filespec new-name) => new-name
+RENAMF::
+	PUSH	R2		; Save new-name
+	.SUBR	PROBEF		; (PROBE-FILE pathspec)
+	BEQ.E
+	.R50FN
+	MOV	#$BUFOUT, R3
+	CMP	(R0)+, (R0)+	; R0: 4
+1$:	.WORD	012363,	-10.	; MOV	(R3)+, -10.(R3)		; Copy old-name into AREAT
+	SOB	R0, 1$
+	MOV	(SP), R1
+	.R50FN
+	MOV	#$BUFOUT+8., R3
+	MOV	#8., R0
+2$:	.WORD	014363,	8.	; MOV	-(R3), 8.(R3)		; Copy old-name into AREAT
+	SOB	R0, 2$
+	.SYS	S$RENA		; .RENAME #AREA, #TESTCH, #$BUFOUT
+	BCC	8$
+	JMP	EIO1
+8$:	POP	R1		; R1: new-name
+	RETURN
+
+.ENDC ; C$RT11
+
+
+.IF NE C$RU
+SWRUS:	BIS	#200, KOI7
+	BR	GETCH1
+SWLAT:	CLR	KOI7
+	BR	GETCH1
+.ENDC ; C$RU
+
+.IF EQ C$GTLI ! <C$RT11 - 1>			; RT-11 with .GTLIN-less mode
+
+GETCH:	MOV	(PC)+, R1
+UNRCH:	.WORD	0
+	BNE	GETCH9
+GETCH1:	.TTYIN
+	MOV	#V.CHB, R1
+	BISB	R0, R1
+.IF NE C$RU
+	.CCASE
+3$:	.WORD	3
+	.SBYTE	3, <GETCH1-3$/2>	; CTRL/C
+	.SBYTE	$K.RUS, <SWRUS-3$/2>
+	.SBYTE	$K.LAT, <SWLAT-3$/2>
+
+	BIS	(PC)+, R1
+KOI7:	.WORD	0		; KOI-7 mode mask: 200 or 0
+.IFF
+	CMPB	R1, #3		; CTRL/C
+	BEQ	GETCH1
+.ENDC ; C$RU
+
+GETCH9:	CLR	UNRCH
+.IFF
+GETLIN: CALL	$IVEIL
+	MOVB	#C.NL, STDIN+6		; checked by FRESH-LINE
+GETLI1:	MOV	#$BUF, (PC)+
+INCUR:	.WORD	$BUF
+	MOV	R1, INEND
+GETCH1:
+GETCH:  MOV	#INCUR, R0
+	CMP	(R0), (PC)+
+INEND:	.WORD	$BUF
+	BHIS	GETLIN
+	MOV	#V.CHB, R1
+	BISB	@(R0)+, R1	; Read char into R1
+	INC	-(R0)
+	.IF NE C$RT11
+		.IF NE C$RU
+	.CCASE
+3$:	.WORD	3
+	.SBYTE	3, <GETCH1-3$/2>	; CTRL/C
+	.SBYTE	$K.RUS, <SWRUS-3$/2>
+	.SBYTE	$K.LAT, <SWLAT-3$/2>
+
+	BIS	(PC)+, R1
+KOI7:	.WORD	0		; KOI-7 mode mask: 200 or 0
+		.IFF
+	CMPB	R1, #3		; CTRL/C
+	BEQ	GETCH1
+
+		.ENDC ; C$RU
+	.ENDC ; C$RT11
+
+.ENDC	; C$GTLI
+	RETURN
+
+;; (COERCE object result-type) => result
+COERCE::
+	CMP	R2, #V.LIST
+	BNE.E
+	.LISTP
+	BCS	DIGIC9		; RETURN
+	.VECP
+	BCC.E
+	MOV	R1, R2		; Coerce Vector to List
+	.LENGTH
+	TO.U16
+	MOV	R1, R3		; vector length
+R.M01B:	BEQ	R.M01
+	INC	R2
+	ASL	R1
+	INC	R2
+	ADD	R1, R2
+2$:	MOV	-(R2), R1
+	.PUSH0
+	SOB	R3, 2$
+	BR	R.M01		; MOV R0, R1; RETURN
+
+;; (REM number divisor) => reminder
+REM::	.TI16B
+	CALL	$DAL
+	MOV	R3, R1
+	FI16.R
+
+;; (EXPT base-number power-number) => result
+EXPT::	.BASN
+	.WORD	DPUR12, DSWAP, $LOG, $DMUL, $EXP, RBAS.5
+
+
+;; (UNREAD-CHAR character &optional input-stream) => nil
+UNR.CH::
+;!!!R	T.CHR
+	.SWP12
+	TO.STM
+	MOV	R1, R4
+	INC	R4
+.IF NE C$RT11
+	.TYPEP	U.FILE
+	BCC	4$		; not FILE-STREAM
+	TST	(R4)+
+	MOV	(R4), R1
+	.SUBR	DECR
+	MOV	R1, (R4)
+	BR	UNRCH9
+.ENDC	; C$RT11
+4$:	MOV	(R4)+, R1
+	.STRP
+	BCS	UNRCH1		; string-input-stream
+.IF EQ C$GTLI ! <C$RT11 - 1>			; RT-11 with .GTLIN-less mode
+	MOV	R2, UNRCH
+	BR	UNRCH9
+.IFF
+;!!!TODO
+	MOV	#INCUR, R4
+;!!!R	MOV	(R4), R3
+	CMP	(R4), #$BUF + 1
+	BLO.E
+;!!!R	MOVB	R2, -(R3)
+.ENDC	; C$GTLI
+UNRCH1:	DEC	(R4)		; --curPos
+UNRCH9:	CLR	R1
+	RETURN
+
+
+;; (RANDOM limit &optional random-state) => random-number
+RANDOM::
+	PU.FL
+	PU.FL 			; Positive to get random
+	MOV	R2, R1
+	CMP	R1, R4		; compare with V.U
+	BNE	1$
+	.SYVAL	V.RNDS		; *RANDOM-STATE*
+1$:	MOV	(R1)+, R2
+	TST	-(R2)
+	MOV	R2, A.RDNS
+	MOV	#$III, R3
+	CALL	COPY4
+	MOV	(R1)+, R2
+	TST	-(R2)
+	MOV	R2, B.RDNS
+	.BASN
+	.WORD	DCP23, $RAN, $DMUL, B.III, RBAS.5 		; SCALE
+
+
+
+;; (REMPROP symbol indicator) => bool
+REMPROP::
+	CALL	PLSPLC
+	BEQ.F
+	MOV	(R5), (R4)	; remove found indicator & value
+	RE.T
+
+; Sort (R3), (R4) by Predicate IN R2
+SORT34: MOV	R2, R0
+	MOV	(R3), R1
+	MOV	(R4), R2
+	.PRED	CALL3		; (FUNCALL R0 R1 R2)
+	BCS	1$		; R1 < R2
+	MOV	(R3), R1      	; swap @(R3), (R4)
+	MOV	(R4), (R3)
+	MOV	R1, (R4)
+1$:	RETURN
+
 
 
 ;; (TAILP object list) => bool
@@ -135,6 +549,19 @@ TAILP::	.SWP12
 	BCC.F
 	.POP1
 	BR	1$
+
+
+;; (DIGIT-CHAR weight &optional (radix 10)) => char
+DIGICH:: .DF2	V.10
+	.TI16B
+	CMP	R1, R2
+	BHIS.F
+	CMP	R1, #10.
+	BLO	1$
+	ADD	#V.C.A - 10. - V.C.0, R1
+1$:	ADD	#V.C.0, R1
+DIGIC9:	RETURN
+
 
 
 
@@ -229,19 +656,19 @@ EQUALP::
 	MOV	R1, R3
 	MOV	R2, R4
        .TCASE
-1$:    .BYTE   <2$ - 1$> / 2		; NULL
-       .BYTE   <2$ - 1$> / 2		; FIXNUM
-       .BYTE   <EQLPCH - 1$> / 2	; CHARACTER
-       .BYTE   <EQLP.C - 1$> / 2	; CONS
-       .BYTE   <2$ - 1$> / 2		; SYMBOL
-       .BYTE   <2$ - 1$> / 2		; FLOAT
-       .BYTE   <2$ - 1$> / 2		; STREAM
-       .BYTE   <3$ - 1$> / 2		; STRING
-       .BYTE   <4$ - 1$> / 2		; SIMPLE VECTOR
-       .BYTE   <2$ - 1$> / 2		; SYSTEM FUNCTION
-       .BYTE   <2$ - 1$> / 2		; LAMBDA FUNCTION
-       .BYTE   <2$ - 1$> / 2		; SPECIAL OPERATOR
-.IIF NE C$MDAR .BYTE   <5$ - 1$> / 2	; ARRAY
+1$:    .SBYTE   <2$-1$/2>		; NULL
+       .SBYTE   <2$-1$/2>		; FIXNUM
+       .SBYTE   <EQLPCH-1$/2>		; CHARACTER
+       .SBYTE   <EQLP.C-1$/2>		; CONS
+       .SBYTE   <2$-1$/2>		; SYMBOL
+       .SBYTE   <2$-1$/2>		; FLOAT
+       .SBYTE   <2$-1$/2>		; STREAM
+       .SBYTE   <3$-1$/2>		; STRING
+       .SBYTE   <4$-1$/2>		; SIMPLE VECTOR
+       .SBYTE   <2$-1$/2>		; SYSTEM FUNCTION
+       .SBYTE   <2$-1$/2>		; LAMBDA FUNCTION
+       .SBYTE   <2$-1$/2>		; SPECIAL OPERATOR
+.IIF NE C$MDAR,	.SBYTE   <5$-1$/2>	; ARRAY
        .EVEN
 2$:    RE.NIL
 
@@ -265,412 +692,24 @@ EQUALP::
 	SOB	R5, 3$
 	RE.T
 
-
-CH.EQ:	CMPB	R3, R4
-	B.ZF
-
-CH.NE:	CMPB	R3, R4
-	B.NZF
-
-
-
-;; (STRING/= string1 string2) => bool
-STRNE::	.STREQ
-	B.NCF
-
-;; (ASH integer count) => shifted-integer
-ASH::	.TI16B
-	TST	R2
-	BEQ	9$
-	BLT	7$
-1$:	ASL	R1
-	SOB	R2, 1$
-	BR	9$
-7$:	NEG	R2
-8$:	ASR	R1
-	SOB	R2, 8$
-9$:	FI16.R
-
-EQ.NUM:	.BASN
-	.WORD	DPUR12, $DCMP, NOT
-
-;; (SUBSETP list-1 list-2) => bool
-;;!!! INEFFICIENT BUT TERSE IMPLEMENTATION, MAKES UNNECESSARY ALLOCATIONS
-SUBSETP::
-	.SUBR	SETDIF		; (NULL (SET-DIFFERENCE list-1 list-2))
-	B.ZF
-
-;; (INTERSECTION list-1 list-2) => result-list
-INTERSECTION::
-	MOV	#103001, INTDI2		; OPCODE: BCC INTDI3
-	BR	INTDIF
-
-;; (UNION list-1 list-2) => result-list
-UNION::	MOV	R2, R0			; IMPLEMENTATION:  (NCONC (SET-DIFFERENCE list-1 list-2) list-2)
-;; (SET-DIFFERENCE list-1 list-2) => result-list
-SETDIF::
-	MOV	#103401, INTDI2		; OPCODE: BCS INTDI3
-;; INTERSECTION/SET-DIFFERENCE
-INTDIF::
-	MOV	R1, R5
-INTDI3:	.POP5
-	BEQ	R.M01
-INTDI1:	.MEMBER
-INTDI2:	BCS	INTDI3
-	.PUSH0			; PUSH R1 INTO R0 LIST
-	BR	INTDI3
-
-
-;; (LOGNAND integer-1 integer-2) => result-integer
-LOGNAND::
-	.TI16B
-	COM	R2
-	BR	LOGOC3
-
-;; (LOGANDC2 integer-1 integer-2) => result-integer
-LOGAC2::
-	.SWP12
-;; (LOGANDC1 integer-1 integer-2) => result-integer
-LOGAC1::
-	PUSH	#LOGNOT
-;; (LOGORC2 integer-1 integer-2) => result-integer
-LOGOC2::
-	.SWP12
-;; (LOGORC1 integer-1 integer-2) => result-integer
-LOGOC1::
-	.TI16B
-LOGOC3: BIC	R2, R1
-	BR	LOGNO1
-
-;; (LOGNOT integer) => result-integer
-LOGNOT::
-	TO.I16
-	BR	LOGNO1
-
-;; (LOGNOR integer-1 integer-2) => result-integer
-LOGNOR:: .TI16B
-	BIS	R2, R1
-LOGNO1:	COM	R1
-	FI16.R
-
-;; (LOGTEST integer-1 integer-2) => bool
-LOGTEST::
-	.TI16B
-	BIT	R2, R1
-	B.NZF
-
-
-
-;; (EXPT base-number power-number) => result
-EXPT::	.BASN
-	.WORD	DPUR12, DSWAP, $LOG, $DMUL, $EXP, RBAS.5
-
-
-;; (DIGIT-CHAR weight &optional (radix 10)) => char
-DIGICH:: .DF2	V.10
-	.TI16B
-	CMP	R1, R2
-	BHIS.F
-	CMP	R1, #10.
-	BLO	1$
-	ADD	#V.C.A - 10. - V.C.0, R1
-1$:	ADD	#V.C.0, R1
-	RETURN
-
-
-;; (UNREAD-CHAR character &optional input-stream) => nil
-UNR.CH::
-;!!!R	T.CHR
-	.SWP12
-	TO.STM
-	MOV	R1, R4
-	INC	R4
-.IF NE C$RT11
-	.TYPEP	U.FILE
-	BCC	4$		; not FILE-STREAM
-	TST	(R4)+
-	MOV	(R4), R1
-	.SUBR	DECR
-	MOV	R1, (R4)
-	BR	UNRCH9
-.ENDC	; C$RT11
-4$:	MOV	(R4)+, R1
-	.STRP
-	BCS	UNRCH1		; string-input-stream
-.IF EQ C$GTLI ! <C$RT11 - 1>			; RT-11 with .GTLIN-less mode
-	MOV	R2, UNRCH
-	BR	UNRCH9
-.IFF
-;!!!TODO
-	MOV	#INCUR, R4
-;!!!R	MOV	(R4), R3
-	CMP	(R4), #$BUF + 1
-	BLO.E
-;!!!R	MOVB	R2, -(R3)
-.ENDC	; C$GTLI
-UNRCH1:	DEC	(R4)		; --curPos
-UNRCH9:	CLR	R1
-	RETURN
-
-;; (REDUCE function list) => result
-REDUCE::
-	TO.FUN
-	MOV	R1, R4		; SAVE function in R4
-	MOV	R2, R5
-	.POP5
-	BNE	1$		; NON-EMPTY LIST OF ARGS
-	MOV	R4, R1		; function
-	JMP	FUNCALL		; (FUNCALL function)
-2$:	CLR	R2
-	.CONS
-	.SH210
-	.CONS          		; R1: LIST OF 2 ARGS
-	MOV	R5, R3
-	MOV	R1, R5
-	MOV	R4, R1
-	.FUNCALL		; (FUNCALL a b)
-	MOV	R3, R5
-1$:	MOV	R1, R0		; ACCUMULATE RESULT IN R0
-	.POP5
-	BNE	2$		; MANY ARG
-R.M01:	MOV	R0, R1
-	RETURN
-
-
 .INCLUDE /print.mac/
 
-
-;; (FILL sequence item) => sequence
-FILL::	MOV	R2, R3		; R3: item
-	MOV	R1, R0
-	.LENGTH
-	.SH210			; R1: sequence, R2: (LENGTH sequence)
-1$:	DEC	R2
-     	CMP	R2, #V.0
-	BLO	R.SORT
-	.PRED	X.ELT
-	BR	1$
-
-
-;; (REMPROP symbol indicator) => bool
-REMPROP::
-	CALL	PLSPLC
-	BEQ.F
-	MOV	(R5), (R4)	; remove found indicator & value
-	RE.T
-
-
-; Sort (R3), (R4) by Predicate IN R2
-SORT34: MOV	R2, R0
-	MOV	(R3), R1
-	MOV	(R4), R2
-	.PRED	CALL3		; (FUNCALL R0 R1 R2)
-	BCS	1$		; R1 < R2
-	MOV	(R3), R1      	; swap @(R3), (R4)
-	MOV	(R4), (R3)
-	MOV	R1, (R4)
-1$:
-R.SORT:	RETURN
-
-
-;; (SORT sequence predicate) => sorted-sequence
-SORT::	MOV	R1, R3
-	.LENGTH
-	MOV	R1, R5		; R5: length
-	MOV	R3, R1
-	.SVECP
-	BCC	4$      	; Sort List
-	SUB	#FIXOFF + 1, R5	; Sort Vector
-	BLOS	9$
-6$:	TST	(R3)+
-	MOV	R3, R4
-	PUSH	R5
-7$:	TST	(R4)+
-	.SORT34
-	SOB	R5, 7$
-	POP	R5
-	SOB	R5, 6$
-9$:	RETURN
-3$:	MOV	2(R3), R3
-	BEQ	9$
-4$:	MOV	R3, R4
-2$:	MOV	2(R4), R4
-	BEQ	3$
-	.SORT34
-	BR	2$
-
-
-
-;; (REM number divisor) => reminder
-REM::	.TI16B
-	CALL	$DAL
-	MOV	R3, R1
-	FI16.R
-
-;; (RANDOM limit &optional random-state) => random-number
-RANDOM::
+;; (SCALE-FLOAT float integer) => scaled-float
+SCALEF::
 	PU.FL
-	PU.FL 			; Positive to get random
 	MOV	R2, R1
-	CMP	R1, R4		; compare with V.U
-	BNE	1$
-	.SYVAL	V.RNDS		; *RANDOM-STATE*
-1$:	MOV	(R1)+, R2
-	TST	-(R2)
-	MOV	R2, A.RDNS
-	MOV	#$III, R3
-	CALL	COPY4
-	MOV	(R1)+, R2
-	TST	-(R2)
-	MOV	R2, B.RDNS
-	.BASN
-	.WORD	DCP23, $RAN, $DMUL, B.III, RBAS.5 		; SCALE
-
-.IF NE C$RT11
-
-;; (RENAME-FILE filespec new-name) => new-name
-RENAMF::
-	PUSH	R2		; Save new-name
-	.SUBR	PROBEF		; (PROBE-FILE pathspec)
-	BEQ.E
-	.R50FN
-	MOV	#$BUFOUT, R3
-	CMP	(R0)+, (R0)+	; R0: 4
-1$:	.WORD	012363,	-10.	; MOV	(R3)+, -10.(R3)		; Copy old-name into AREAT
-	SOB	R0, 1$
-	MOV	(SP), R1
-	.R50FN
-	MOV	#$BUFOUT+8., R3
-	MOV	#8., R0
-2$:	.WORD	014363,	8.	; MOV	-(R3), 8.(R3)		; Copy old-name into AREAT
-	SOB	R0, 2$
-	.SYS	S$RENA		; .RENAME #AREA, #TESTCH, #$BUFOUT
-	BCC	8$
-	JMP	EIO1
-8$:	POP	R1		; R1: new-name
-	RETURN
-
-.ENDC ; C$RT11
-
-.IF NE C$RU
-SWRUS:	BIS	#200, KOI7
-	BR	GETCH1
-SWLAT:	CLR	KOI7
-	BR	GETCH1
-.ENDC ; C$RU
-
-.IF EQ C$GTLI ! <C$RT11 - 1>			; RT-11 with .GTLIN-less mode
-
-GETCH:	MOV	(PC)+, R1
-UNRCH:	.WORD	0
-	BNE	GETCH9
-GETCH1:	.TTYIN
-	MOV	#V.CHB, R1
-	BISB	R0, R1
-.IF NE C$RU
-	.CCASE
-3$:	.WORD	3
-	.SBYTE	3, <GETCH1-3$/2>	; CTRL/C
-	.SBYTE	$K.RUS, <SWRUS-3$/2>
-	.SBYTE	$K.LAT, <SWLAT-3$/2>
-
-	BIS	(PC)+, R1
-KOI7:	.WORD	0		; KOI-7 mode mask: 200 or 0
-.IFF
-	CMPB	R1, #3		; CTRL/C
-	BEQ	GETCH1
-.ENDC ; C$RU
-
-GETCH9:	CLR	UNRCH
-.IFF
-GETLIN: CALL	$IVEIL
-	MOVB	#C.NL, STDIN+6		; checked by FRESH-LINE
-GETLI1:	MOV	#$BUF, (PC)+
-INCUR:	.WORD	$BUF
-	MOV	R1, INEND
-GETCH1:
-GETCH:  MOV	#INCUR, R0
-	CMP	(R0), (PC)+
-INEND:	.WORD	$BUF
-	BHIS	GETLIN
-	MOV	#V.CHB, R1
-	BISB	@(R0)+, R1	; Read char into R1
-	INC	-(R0)
-	.IF NE C$RT11
-		.IF NE C$RU
-	.CCASE
-3$:	.WORD	3
-	.SBYTE	3, <GETCH1-3$/2>	; CTRL/C
-	.SBYTE	$K.RUS, <SWRUS-3$/2>
-	.SBYTE	$K.LAT, <SWLAT-3$/2>
-
-	BIS	(PC)+, R1
-KOI7:	.WORD	0		; KOI-7 mode mask: 200 or 0
-		.IFF
-	CMPB	R1, #3		; CTRL/C
-	BEQ	GETCH1
-
-		.ENDC ; C$RU
-	.ENDC ; C$RT11
-
-.ENDC	; C$GTLI
-	RETURN
-
-;; (READ-CHAR input-stream T)
-R.CHRT::
-	INC	R0
-;; (READ-CHAR input-stream NIL NIL)
-R.CHR0::
-	MOV	R2, R1
-	MOV	R0, R2
-R.CHR1:	CLR	R5
-;;                                         R2      &rest R5
-;; (READ-CHAR &optional input-stream eof-error-p eof-value) => char
-R.CHAR::
-	TO.STM
-	MOV	R1, R4
-	INC	R4
-.IF NE C$FILE
-	.TYPEP	U.FILE
-	BCC	1$
-	TST	(R4)+		; R4: &position
-	MOV	(R4)+, R1	; R1: position as Object
-	TST	(R4)+		; R4: &channel
-	TO.U16
-	BIT	#777, R1
-	BNE	4$
-	MOV	#S$REA * 256., R3
-	CALL	REAWRI
-	BCS	R.EOF
-4$:	MOV	R1, R2
-	INC	R1   		; ++filepos
-	F.U16
-	MOV	R1, -4(R4)	; save new filepos
-	BIC	#^C777, R2	; R2: offset in buffer
-	ADD	R2, R4		; R4: pointer to next char - 2
-	MOV	#V.CHB, R1
-	BISB	2(R4), R1
-;	BEQ	R.EOF
-	RETURN
-.ENDC ; C$FILE
-
-1$:	MOV	(R4)+, R1
-	.STRP
-	BCC	GETCH		; STDIN
-	MOV	(R4)+, R3	; R3: cur pos
-	CMP	R3, (R4)	; (R4): upper bound
-	BHIS	R.EOF		; EOF
-	INC	R3
-	MOV	R3, -(R4)	; increment cur pos
-	ADD	R1, R3
-	MOV	#V.CHB, R1
-	BISB	-FIXOFF-3(R3), R1
-	RETURN
-R.EOF:	TST	R2		; eof-error-p
-	BNE.E
-R.EOF1:	MOV	(R5), R1	; R1: eof-value
-	RETURN
-
+	TO.I16
+	MOV	(SP), R2
+	ASL	R2
+	CLRB	R2
+	SWAB	R2		; R3: exponent
+	ADD	R2, R1		; R1: new exponent
+	SWAB	R1		; CF: 0
+	BNE.E			; resulting exponent is out of range
+	ROR	R1
+	BIC	#77600, (SP)	; Replace exponent in Stack
+	BIS	R1, (SP)
+	POFL.R
 
 
 ;; (BUTLAST list &optional (n 1)) => result-list
@@ -726,7 +765,7 @@ SEVENTH::
 SIXTH::	INC	R0
 FIFTH::	INC	R0
 FOURTH::INC	R0
-.ENDC
+.ENDC ; C$FULL
 ;; (THIRD list) => object
 THIRD::
 	ADD	#V.2, R0
@@ -749,7 +788,7 @@ NTHCDR::
 POKE::	MOV	R1, R3
 	.TI16B
 	MOV	R2, (R1)
-	BR	R.M31B
+	BR	R.M31B		; MOV R3, R1
 
 
 
@@ -782,6 +821,25 @@ MEMBER::
 	BCC	1$
 R.M31:	MOV	R3, R1
 	RETURN
+
+;; (REMOVE item seq) => result-seq
+REMOVE::
+	.SWP12			; R2: item
+	.LISTP
+	BCS	3$		; seq is List
+	MOV	R2, R3		; R3: item
+	MOV	#V.LIST, R2
+	.SUBR	COERCE		; R1: (COERCE seq 'list)
+	MOV	R3, R2		; R2: item
+	PUSH	#VECTO1		; (APPLY #'VECTOR (REMOVE item (COERCE seq 'list)))
+3$:	MOV	R1, R5
+1$:	.POP5
+	BEQ	2$
+	.EQL
+	BCS	1$
+	.PUSH0
+	BR	1$
+2$:	JMP	R.NREV		; .NREV0; RETURN
 
 
 ;; (SETF (SYMBOL-FUNCTION symbol) new-value)

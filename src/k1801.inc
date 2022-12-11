@@ -4,8 +4,7 @@
 
 ;;; K1801VM1/2/3 CPU definitions
 
-.INCLUDE	/pdp11.inc/
-
+.INCLUDE /pdp11.inc/
 
 
 $TMFMX	= 24		; Enable Timer on maximal frequency

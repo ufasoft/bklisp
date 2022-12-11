@@ -5,8 +5,10 @@
 ;;; Default Configuration definitions for BkLisp
 
 
-.INCLUDE /config.inc/
+; .INCLUDE /config.inc/
 
+.MCALL	.CFG
+.CFG
 
 .LIST	ME		; Macro expansions
 .ENABL	AMA		; address mode 37
@@ -34,7 +36,7 @@
 .IIF NDF C$VM1,		C$VM1	= C$BK10 ! C$BK11	; Define to enable unaligned word access
 .IIF NDF C$1801,	C$1801	= C$VM1			; K1801 family
 
-.IIF NDF C$FULL, 	C$FULL 	= C$RT11 		; More features of Full Common Lisp
+.IIF NDF C$FULL, 	C$FULL 	= C$RT11 ! C$BK11	; More features of Full Common Lisp
 .IIF NDF C$MVAL,	C$MVAL	= C$FULL		; Multiple values
 .IIF NDF C$MACR,	C$MACR	= 0			; Macros
 .IIF NDF C$MDAR,	C$MDAR 	= 1			; Multi-dimensional arrays
@@ -45,6 +47,9 @@
 
 .IIF NDF C$GTLI,	C$GTLI	= C$RT11		; Use .GTLIN in RT-11
 .IIF NDF C$RU,		C$RU	= C$RT11		; Russian 15IE display features
+
+TINYFP=1						; for smaller code size
+
 
 
 VALLIM = 20.			; MULTIPLE-VALUES-LIMIT

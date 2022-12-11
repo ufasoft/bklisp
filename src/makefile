@@ -15,27 +15,33 @@ MAINSOURCES = bklisp.mac defcfg.inc bk1001.inc bk11.inc bkkeys.inc macros.inc pd
 
 SOURCES	= $(MAINSOURCES) symdef.mac
 
-all: bklisp.SAV bklisp.10 bklisp.11m
+all: bklisp.sav bklisp.10 bklisp.11m
 
-bklisp.SAV: $(SOURCES)
-	echo C.RT11=1 >config.inc
-	$(MACRO11) /LIST:bklisp.lst bklisp.mac
+lisp.sav: $(SOURCES) rt11.mlb
+	$(MACRO11) /LIST:bklisp.lst bklisp.mac+rt11.mlb/LIB
 	pclink11 /EXECUTE:$@ bklisp.OBJ
 	rm bklisp.OBJ
 
-bklisp.10: $(SOURCES)
-	echo C.BK10=1 >config.inc
-	$(MACRO11) /LIST:bk10.lst bklisp.mac
-	pclink11 /EXECUTE:bk10.SAV bklisp.OBJ
-	dd if=bk10.SAV of=$@ bs=1 skip=492
-#	rm bklisp.OBJ bk10.SAV
+lisp.0010.bin: $(SOURCES) bk10.mlb
+	$(MACRO11) /LIST:bk10.lst bklisp.mac+bk10.mlb/LIB
+	pclink11 /EXECUTE:bk10.sav bklisp.OBJ
+	bash -c "tail -c +495 bk10.sav | head -c $$((4 + `od -An --skip-bytes=496 -N2 -d bk10.sav`)) >$@"
+#	rm bklisp.OBJ bk10.sav
 
-bklisp.11m: $(SOURCES)
-	echo C.BK11=1 >config.inc
-	$(MACRO11) /LIST:bk11.lst bklisp.mac
-	pclink11 /EXECUTE:bk11.SAV bklisp.OBJ
-	dd if=bk11.SAV of=$@ bs=1 skip=2044
-#	rm bklisp.OBJ bk11.SAV
+lisp.11m: $(SOURCES) bk11.mlb
+	$(MACRO11) /LIST:bk11.lst bklisp.mac+bk11.mlb/LIB
+	pclink11 /EXECUTE:bk11.sav bklisp.OBJ
+	dd if=bk11.sav of=$@ bs=1 skip=2044
+#	rm bklisp.OBJ bk11.sav
+
+rt11.mlb: rt11.cfg
+	RT11 LIBRARY/MACRO/CREATE rt11 rt11.cfg
+
+bk11.mlb: bk11.cfg
+	RT11 LIBRARY/MACRO/CREATE bk11 bk11.cfg
+
+bk10.mlb: bk10.cfg
+	RT11 LIBRARY/MACRO/CREATE bk10 bk10.cfg
 
 clean:
-	-rm *.bin *.LST *.OBJ *.SAV
+	-rm *.bin *.11m *.LST *.OBJ *.sav

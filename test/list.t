@@ -1,5 +1,5 @@
 Prompt
-  Lisp (.+)ufasoft.com (re)
+  Lisp (re)
   Bytes free (re)
 List
   $ (null nil)
@@ -82,8 +82,18 @@ List
   NIL
   $ (member 'b '(a b c))
   (B C)
+MEMBER
   $ (member 'z '(a b c))
   NIL
+REMOVE
+  $ (remove 'b '(a b c))
+  (A C)
+  $ (remove 'b #(a b c))
+  #(A C)
+COERCE
+  $ (coerce #(a b c) 'list)
+  (A B C)
+ADJOIN
   $ (adjoin 2 '(3 4 5))
   (2 3 4 5)
   $ (adjoin 4 '(3 4 5))

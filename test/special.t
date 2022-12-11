@@ -1,5 +1,5 @@
 Prompt
-  Lisp (.+)ufasoft.com (re)
+  Lisp (re)
   Bytes free (re)
 Control Flow
   $ (funcall '+ 1 2 3)

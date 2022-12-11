@@ -1,5 +1,5 @@
 Prompt
-  Lisp (.+)ufasoft.com (re)
+  Lisp (re)
   Bytes free (re)
 I/O variables
   $ *print-base*

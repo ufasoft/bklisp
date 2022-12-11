@@ -5,8 +5,8 @@
 ;;; BK-0010.01 Specific Addresses and macros
 
 
-.INCLUDE	/k1801.inc/
-.INCLUDE	/bkkeys.inc/
+.INCLUDE /k1801.inc/
+.INCLUDE /bkkeys.inc/
 
 
 $EXTM	= 42		; Extended memory mode byte; Values: 0, 377 allow to switch on/off, any other value disables to switch off
@@ -34,7 +34,7 @@ $FONT	= 112036	; Beginning with char-code 020
 
 $MDMAG	= 116076
 
-$WSTOP	= 120226
+$WSTOP	= 120226	; BREAK/STOP message
 $WNL	= 120233
 $IVEIL	= 121052
 $MONIT	= 124302

@@ -65,7 +65,7 @@ I.BMOF:	.WORD	0			;SELF-MODIFYING CODE
 R.GC:	RETURN
 
 .IF NE C$BK10
-	GCBMSZ	= HIMEME - HEAP / 32.		; max GC bitmap size
+;	GCBMSZ	= HIMEME - HEAP / 32.		; max GC bitmap size
 .IFF
 	GCBMSZ::	.WORD	0
 .ENDC	; C$RT11
@@ -78,9 +78,9 @@ GCRET::	.WORD	0		; Return address @GCRET at Stack may be changed by I.STOP
 	PUSH	$KBCTL
 	BIS	#$KBDI, $KBCTL		; Disable Keyboard interrupt to use Status Line as GC bitmap
 	MOV	@#$BAZVP, R1		; Find continuous space of 512. bytes in status line for GC bitmap temporary space
-1$:	SUB	#GCBMSZ, R1
+1$:	SUB	#HIMEME - HEAP / 32., R1
 	BCS	1$
-	ADD	#GCBMSZ, R1
+	ADD	#HIMEME - HEAP / 32., R1
 	ADD	@#$ANVP, R1		; R1: address of GC bitmap
 	MOVB	@#$ANVP+1, R2
 	ASL	R2
@@ -233,12 +233,14 @@ M.SVLS:
 6$:	CMP	(R0)+, #50*50
 	BLO	MARKL		; end of RADIX-50 string
 .ENDC
-	BIT	#3, R0
+	BIT	#2, R0
 	BNE	6$
 	.MBIT
 	CMP	-(R0), -(R0)	; R0 -= 4
 	BR	6$
-7$:	ADD	#5, R0		; Mark Symbol-Name
+7$:
+.IIF EQ C$VM1,	ADD	#5, R0		; Mark Symbol-Name
+.IIF NE C$VM1,	ADD	#4, R0		; Mark Symbol-Name
 ;; Mark String
 ;; Assumes R0==0
 M.STR:

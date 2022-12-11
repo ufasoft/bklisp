@@ -26,11 +26,19 @@ SY.PREV=0
 
 .ASECT
 
-.GLOBL	START2, GCRET
+.GLOBL	START2
 .GLOBL	A.END, A.PREV, HEAPFR, S.ISTM, STDIN
 .GLOBL	V.BIFU, V.ERR, V.FLT, V.FREQ, V.FUN, V.FUNC, V.GCNT, V.GO, V.BLOCK, V.IF, V.UNLESS, V.INT, V.LAMB, V.LAST, V.LET
 .GLOBL	V.LETA, V.LIST, V.NULL, V.OPT, V.PBAS, V.PESC, V.PPP, V.PRAD, V.PROG, V.QUOT, V.REST, V.RNDS, V.FILE, V.S, V.SETF, V.SETQ
 .GLOBL	V.SPEC, V.SPOP, V.STDI, V.STM, V.STR, V.CONS, V.SYM, V.SYVA, V.T, V.TAGB, V.CHAR, V.VEC, V.PSETQ, V.QUIT
+
+.IF NE C$FULL
+	.GLOBL	V.TRC, L.TRAC
+.ENDC
+
+.IF NE C$BK10
+	.GLOBL	GCRET
+.ENDC
 
 .IIF NE C$MVAL,		.GLOBL	 V.D
 .IIF NE C$MDAR, 	.GLOBL	 V.AR
@@ -61,24 +69,23 @@ $BUFOUT::.BLKB	24.		; Output buffer
 
 	. = ASTKUP
 .IFF
-	FILALG	= 512.									; Loader header for BK
-	.IIF NE C$BK10	.	= 754
-	;.IIF	NE C$BK11	.	= ASTKUP - 100. - 24				; Reserve 100. bytes as space for init code
+	.IIF NE C$BK10	.	= 756
+	;.IIF	NE C$BK11	.	= ASTKUP - 100. - 24	; Reserve 100. bytes as space for init code
 
 	.IF NE C$BK11
 . = 360
 $BUFOUT::.BLKB	24.		; Output buffer
 
 		.  = ASTKUP - 4
-		.WORD	ASTKUP								; Loader header: Start address
+		.WORD	ASTKUP					; Loader header: Start address
 	.IFF
 		.WORD	RETADR
 	.ENDC ; C$BK11
 
-	.WORD	<A.END + FILALG - 1 / FILALG * FILALG - RETADR>			; Loader header: Image size
+	.WORD	A.END - RETADR					; Loader header: Image size
 
-RETADR:	BR	START								; in case if autorun does not work (loaded on BK-0011)
-	.WORD	1000, 1000, 1000, 1000, 1000, 1000, 1000			; return addresses for auto-run, don't use label becase this code is relocatable
+RETADR:	BR	START						; in case if autorun does not work (loaded on BK-0011)
+	.WORD	START, START, START, START, START, START	; return addresses for auto-run, don't use label becase this code is relocatable
 START:
 	.IF NE C$BK11
 	;; Move code above stack space
@@ -92,11 +99,11 @@ START:
 
 START3:	JMP	@#START2
 
-;.IIF EQ C$BK10	.INCLUDE	/init.mac/
+;.IIF EQ C$BK10	.INCLUDE /init.mac/
 
 .IIF NE C$BK10	.	= ASTKUP
 
-.INCLUDE	/gc.mac/	; Put GC code before SUBRs to give more space for FIXNUM values
+.INCLUDE /gc.mac/	; Put GC code before SUBRs to give more space for FIXNUM values
 
 
 
@@ -118,29 +125,22 @@ M.PRN::	EMT	20
 .ENDC ; C$RT11
 
 RESET::
-.IF NE C$BK10
+
+
+.IF EQ C$GTLI ! <C$RT11 - 1>	; RT-11 with .GTLIN-less mode
 	CLR	INCUR		; flush input
 	CLR	INEND		; flush input
 .ENDC ; C$BK10
 
-	CLR	(PC)+
-CATCH:	.WORD	0		; Stack pointer to catch errors
-REPL:   CLR	LEXENV
-	CLR	DYNENV
-	CLR	ERDATA
-	CLR	R2		; *STANDARD-INPUT*, used also in .CONS
-	.P.CHR	C.NL
-.IF NE C$GTLI
-	.IF NE C$RT11
-		MOV	#LPROM, PROMPT
-	.IFF
-		.P.CHR	'>, C.SP
-	.ENDC ; C$RT11
-
+REPL:   MOV	#C.ROOT-A.ROOT, R2
+1$:	CLRB	A.ROOT-1(R2)	; Clear LEXENV, DYNENV, ERDATA, INDENT
+	SOB	R2, 1$		; R2: 0  is *STANDARD-INPUT*, used also in .CONS
+.IF NE C$GTLI & C$RT11
+	MOV	#LPROM, PROMPT
 .IFF
+	.P.CHR	C.NL
 	.P.CHR	'>, C.SP
-.ENDC ; C$GTLI
-
+.ENDC ; C$GTLI & C$RT11
 
 	.$READ
 	MOV	R1, R2
@@ -196,12 +196,14 @@ LOADER::
 	CLR	(R1)+
 	CLR	(R1)+			; Init NIL
 .IF NE C$RT11
+	MOV	#14, R1
 	CMP	(R1)+, (R1)+
 .IFF
 	MOV	#I.STOP, (R1)+		; Init STOP key vector 4
 	CLR	(R1)+
+	MOV	#I.PCHR, 10
+	CLR	(R1)+
 .ENDC	;  C$RT11
-	CMP	(R1)+, (R1)+		; R1: 14
 	MOV	#M.PUSH, (R1)+		; vector 14
 	MOV	#340, (R1)+
  	MOV	#M.BIT, (R1)+		; vector  20
@@ -221,15 +223,15 @@ LOADER::
 
 	.TRPSET	#AREA, #TRPLOC
 	.SCCA	#AREA, #SCCA
+	MOV	#I.PCHR, 10	; vector 10. Assign after .TRPSET to override
+	.PRED	PARSCL		; Parse Command Line
 .IFF
-	.IIF EQ C$RT11	MOV	#I.TRAP, @#34
+	MOV	#I.TRAP, @#34
 	;	CLR	@#36
 
 	MOV	#ASTKUP, SP
 .ENDC	; C$RT11
-	MOV	#I.PCHR, 10	; vector 10. Assign after .TRPSET to override
 
-.IIF NE C$RT11	.PRED	PARSCL		; Parse Command Line
 	MOV	(PC)+, R1
 A.MAIN:	.WORD	0
 	BEQ	RESET
@@ -238,6 +240,11 @@ A.MAIN:	.WORD	0
 .IIF NE C$RT11,	.PRED	QUIT
 .IIF EQ C$RT11,	.EXIT
 
+;; Negate FLT4 on Stack
+DNEG:	MOV	#100000, R5
+	XOR	R5, (SP)
+	JMP	@(R4)+
+
 
 
 .IF NE C$BK10
@@ -245,21 +252,22 @@ A.MAIN:	.WORD	0
 	.BLKW 4		; USED BY $RAN
 .	= $RNDSAV	; 2070
 	.BLKW 4
-.	= $SAVJMP	; 2134
-	.WORD		0
-.ENDC	; C$BK10
 
-;;-- 90 words
-
-.IF NE C$BK10
 I.STOP::
 	MOV	GCRET, R1
 	BEQ	H.STOP		; GC is not in progress?
        	MOV	#H.STOP, GCRET	; Defer STOP handling to end of GC
        	RTI
+P.ERR:	MOV	#$ERROR, R1
+	MOV	#8., R2
+	EMT	20
+	RETURN
+
+.	= $SAVJMP	; 2134
+	.WORD		0
 .ENDC	; C$BK10
 
-
+;;-- 90 words
 
 ;; Throw error if R1 is not function name: SYMBOL os (SETF SYMBOL)
 ;; Returns  true if R1 - symbol
@@ -311,11 +319,6 @@ BNARG2:	.CONS
 ;;; FORTH Stack operations
 
 
-;; Negate FLT4 on Stack
-DNEG:	MOV	#100000, R5
-	XOR	R5, (SP)
-	JMP	@(R4)+
-
 
 ;; Push PI/2
 PUPID2:	MOV	#$PIDV2 + 10, R1
@@ -326,15 +329,6 @@ DDUP:	MOV	#10, R1
 DDUP0:	ADD	SP, R1
 DDUP1:	JMP	$PUSH8
 
-;; Stack: x y  =>   x y x
-DTUCK:  MOV	#10, R1
-DTUCKC:	MOV	SP, R2
-	SUB	#10, SP
-	MOV	SP, R3
-1$:	MOV	(R2)+, (R3)+
-	SOB	R1, 1$
-	MOV	SP, R2
-	BR	DCP23
 
 ;; Swap two FLT4 on Stack
 ;; Implementation:   DTUCK DDROP
@@ -344,6 +338,11 @@ R.R4:	JMP	@(R4)+
 
 ;; Push INTERNAL-TIME-UNITS-PER-SECOND as FLT4
 DPFREQ:	.SYVAL	V.FREQ
+	BR	DPUFL1
+
+;; Push R1, R2 as FLT4; swap(R1, R2)
+DPUR12:	PU.FL
+DPUR2:	.SWP12
 	BR	DPUFL1
 
 ;; Push immediate (R4)+ as FLT4
@@ -381,6 +380,27 @@ DIVRR4:	.WORD	0		; restore R4
 .ENDC ; C$FULL
 
 
+.IF NE C$BK10
+.	= $BUF-2	; 2422
+	.WORD	0	; used by GENSYM
+.	= $BUF
+	.BLKB	400	; used by IVEIL to read line
+
+.	= $BUFOUT	; 3022
+	.BLKB	24.	; used by BASIC $UNPCK
+E.SYS:			; End address of system area
+.ENDC	; C$BK10
+
+;; Stack: x y  =>   x y x
+DTUCK:  MOV	#10, R1
+DTUCKC:	MOV	SP, R2
+	SUB	#10, SP
+	MOV	SP, R3
+1$:	MOV	(R2)+, (R3)+
+	SOB	R1, 1$
+	MOV	SP, R2
+	BR	DCP23
+
 
 ;; Copy $III, $RNDSAV into random-state
 B.III:	MOV	#$III, R2
@@ -392,27 +412,13 @@ B.RDNS:	.WORD	0
 DCP23:	CALL	COPY4
 	JMP	@(R4)+
 
-;; Push R1, R2 as FLT4; swap(R1, R2)
-DPUR12:	PU.FL
-DPUR2:	.SWP12
-	BR	DPUFL1
 
-.IF NE C$BK10
-.	= $BUF-2	; 2422
-	.WORD	0	; used by GENSYM
-.	= $BUF
-	.BLKB	400	; USED BY IVEIL TO READ LINE
-
-.	= $BUFOUT	; 3022
-	.BLKB	24.	; USED BY BASIC $UNPCK
-E.SYS:			; End address of system area
-.ENDC	; C$BK10
 
 .IF NE C$RAD40
-	.INCLUDE	/rad40.mac/
-	.IIF NE C$FILE, .INCLUDE	/rad50.mac/
+	.INCLUDE /rad40.mac/
+	.IIF NE C$FILE, .INCLUDE /rad50.mac/
 .IFF
-	.INCLUDE	/rad50.mac/
+	.INCLUDE /rad50.mac/
 .ENDC
 
 .IF NE C$MDAR
@@ -456,18 +462,6 @@ FILLAR:	PUSH	R0, R1
 
 .ENDC	; C$MDAR
 
-.IF NE C$BK10
-P.ERR:	MOV	#$ERROR, R1
-	MOV	#8., R2
-	EMT	20
-.ENDC ; C$BK10
-
-.IF NE C$BK11
-$ERROR: .ASCII	<C.CY.O><C.CY.W><C.CY.I><C.CY.B><C.CY.K><C.CY.A>/ /<C.BEL><200>		; 'ERROR' in russian
-	.EVEN
-P.ERR:	MOV	#$ERROR, R0
-	.PRINT
-.ENDC ; C$BK11
 
 .IF NE C$RT11
 $ERROR::
@@ -475,8 +469,17 @@ $ERROR::
 	.BYTE	0, 0, 0			; some space for localization
 	.EVEN
 P.ERR:	.PRINT	#$ERROR
-.ENDC ; C$RT11
 	RETURN
+.ENDC ; C$RT11
+
+.IF NE C$BK11
+$ERROR: .ASCII	<C.CY.O><C.CY.W><C.CY.I><C.CY.B><C.CY.K><C.CY.A>/ /<C.BEL><200>		; 'ERROR' in russian
+	.EVEN
+P.ERR:	MOV	#$ERROR, R0
+	.PRINT
+	RETURN
+.ENDC ; C$BK11
+
 
 
 ;; Return: true if char is constituent
@@ -524,21 +527,9 @@ PSNAME: MOV	#15, R4		; #words of param block segment
 .ENDC	; C$BK10
 
 
-
-.IF NE C$RAD40
-	R40TAB:	.ASCII	/*-+12/
-	.IIF NE C$FILE,	R50TAB:	.ASCII	/*-=0123456789/
-.IFF
-	R50TAB:	.ASCII	/*-=0123456789/
-.ENDC
-
-TERM:	.ASCII	<C.SEMI>/()"'`, /
-E.TER:	.EVEN
-
 .IIF EQ C$BK10	.INCLUDE /math.mac/
 
-.IF NE C$GTLI
-	.IF NE C$RT11
+.IF NE C$GTLI & C$RT11
 
 $IVEIL:	MOV	#$BUF, R1
 	.GTLIN	R1, PROMPT
@@ -547,11 +538,25 @@ PROMPT:	.WORD	0
 1$:	TSTB	(R1)+
 	BNE	1$
 	RETURN
-LPROM:	.ASCII	/> /<200>	; prompt
-	.EVEN
+LPROM:	.ASCII	<C.NL>/> /<200>	; prompt
 
-	.ENDC ; C$RT11
-.ENDC ; C$GTLI
+.ENDC ; C$GTLI & C$RT11
+
+.IF NE C$RAD40
+	R40TAB:	.ASCII	/*-+12/
+	.IIF NE C$FILE,	R50TAB:	.ASCII	/*-=0123456789/
+.IFF
+	R50TAB:	.ASCII	/*-=0123456789/
+.ENDC
+
+.IF EQ C$BK10
+	$WSTOP::
+		.ASCII	<C.NL>/BREAK/
+	$WNL::	.ASCIZ	<C.NL>
+.ENDC ; C$BK10
+
+TERM:	.ASCII	<C.SEMI>/()"'`, /
+E.TER:	.EVEN
 
 
 .IF NE C$BK11
@@ -772,24 +777,33 @@ DECDMY:	CLR	R0
 
 .ENDC ; C$RT11
 
-.INCLUDE	/trap.mac/
+.INCLUDE /trap.mac/
 
 FIXEND::
-.INCLUDE	/subr.mac/
-.INCLUDE	/fsubr.mac/
+.INCLUDE /subr.mac/
+.INCLUDE /fsubr.mac/
 
-;;---order does matter, used in PLACE----------
-;BLSSGN:	.ASCII	/BLS0/
-DYNENV:	.WORD 	0		; Dynamic Environment
-;;---------------------------------------------
-
-;; Roots (order does matter)
+;; Roots (order does matter), used in PLACE
 ROOTS:
 REPLLS:	.WORD	A.PREV-4	; Special vars used by REPL
+
+;; vars cleared in RESET
+A.ROOT:
 LEXENV:	.WORD 	0		; Lexical Environment
+DYNENV:	.WORD 	0		; Dynamic Environment
+.IIF NE C$FULL,	INDENT:	.BYTE	0
+.EVEN
 ERDATA:	.WORD 	0		; Error message data
+CATCH:	.WORD	0		; Stack pointer to catch errors
+C.ROOT:
+
 OBLIST:	.WORD 	V.LAST
-PRVTIM:	.WORD	V.0		; Last timestamp returned by (GET-INTERNAL-REAL-TIME)
+PRVTIM:	.WORD	V.0			; Last timestamp returned by (GET-INTERNAL-REAL-TIME)
+.IF NE C$FULL
+;;-- Order does matter, used in TRACE
+TRACLS:	.WORD	0			; A-List of traced symbols and original functions
+	.WORD	L.TRAC			; Macro for tracers
+.ENDC
 .IIF NE C$MVAL,	MVAL:	.WORD	1		; FIXNUM means result in R1, else MVAL is value list
 E.ROOT:
 
@@ -799,7 +813,7 @@ ALGN4
 A.LTYP:	.ASCIP	<Ufasoft BkLisp>
 
 ALGN4
-A.LVER:	.ASCIP	<2022.12>
+A.LVER:	.ASCIP	<2023.0>
 
 ALGN4
 A.MTYP:	.ASCIP	<PDP-11>
@@ -866,10 +880,25 @@ V.STYP	= A.STYP + 3
 V.SVER	= A.SVER + 3
 .ENDC
 
+
+.IF NE C$FULL
+
+ALGN4
+A.TRCA:
+.IIF NE C$RT11, .ASCIP	"<- "
+.IIF EQ C$RT11, .ASCII	<2><C.LE>" "
+
+ALGN4
+A.TRCR:
+ IIF NE C$RT11, .ASCIP	"-> "
+.IIF EQ C$RT11, .ASCII	<2><C.RI>" "
+
+.ENDC ; C$FULL
+
+
 ALGN4
 TOKLEN:	.BYTE	0
 TOKBUF:	.BLKB	MAXTOK
-
 
 
 ALGN4
@@ -901,10 +930,8 @@ C0:	.FLT4	0.15707963267948966188272E1
 	.FLT4	 0.5692134872719023E-7
 	.FLT4	-0.66843217206396E-9
 	.FLT4	 0.587061098171E-11
-SCTAB:	.WORD	8.			; ORDER OF POLYNOMIAL
+SCTAB:	.WORD	8.			; order of polynomial
 
-
-	.GLOBL	$RNDSAV, $III, $BUFOUT, $WSTOP
 
 $III::	.BLKW	4	; Working Area of RND
 $RNDSAV::
@@ -917,7 +944,7 @@ $RNDSAV::
 
 E.CODE:
 .IF DF HEAP
-	.IIF GT E.CODE-HEAP	.ERROR Code and Symbols segments overlap
+	.IIF GT E.CODE-HEAP	.ERROR "Code and Symbols segments overlap"
 .ENDC
 
 ALGN4

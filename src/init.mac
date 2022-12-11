@@ -245,7 +245,7 @@ IRUERR:	MOV	#RU.ERR, R1
 
 
 MODE64:	.ASCII	<033><061><C.CR><C.NL>		; 64 columns/line
-STATUS:	.ASCII	"BkLisp 2022.12 ufasoft.com/bklisp"
+STATUS:	.ASCII	"BkLisp 2023.0 ufasoft.com/bklisp"
 .IF NE C$RT11
 	.ASCII	/ /
 .IFF
@@ -280,3 +280,5 @@ I.RTI:	BIS	#FLAG.C, 2(SP)
 	RTI
 
 .ENDC	; C$RT11
+
+.EVEN

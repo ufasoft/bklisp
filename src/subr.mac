@@ -10,7 +10,7 @@ ASUBR0:
 LIST::	MOV	R5, R1		; R5: &REST
 RE.LIS:	RETURN
 
-.IIF NE C$FULL, .INCLUDE	/calend.mac/
+.IIF NE C$RT11, .INCLUDE /calend.mac/
 
 
 .IF NE C$MVAL
@@ -29,12 +29,10 @@ VALUES::
 ;; (QUIT) => exit into operating system
 QUIT::
 M.QUIT::
-;.IIF NE C$RT11	CLR	R0	; to avoid CSI
 	.EXIT
 
 
-
-
+LOGREC:	COM	R0
 LOGRED:	POP	R1
 LOGR.0:	.POP5
 	BNE	1$
@@ -45,8 +43,7 @@ LOGR.0:	.POP5
 
 ;; (LOGAND &rest integers) => result-integer
 LOGAND::
-	COM	R0
-	JSR	R4, LOGRED
+	JSR	R4, LOGREC
 	COM	R1
 	BIC	R1, R0
 	BR	LOGR.0
@@ -65,8 +62,7 @@ LOGXO1:	XOR	R1, R0
 
 ;; (LOGEQV &rest integers) => result-integer
 LOGEQV::
-	COM	R0
-	JSR	R4, LOGRED
+	JSR	R4, LOGREC
 	COM	R0
 	BR	LOGXO1
 
@@ -105,7 +101,6 @@ VECTOR::
 	MOV	(R5)+, (R2)+	; COPY LIST TO VECTOR
 	MOV	(R5), R5
 	BR	1$
-
 
 
 LISTA1:	PUSH	R1
@@ -147,7 +142,7 @@ GETTIM::
 	MOV	#F32768 + 2, R1		; Add duration of one timer cycle 65536==2*32768
 	.PUSH0
 	.PUSH0
-	MOV	@#$TMCNT, R1		; Re-read CNT because of Race Condition with two volatile vars: FL and CNT, recheck
+	MOV	@#$TMCNT, R1		; Re-read CNT because of Race cond. with two volatile vars: FL and CNT, recheck
 1$:	MOV	#$TMFMN, (R2)		; Reset Timer, R2: $TMCSR
 	NEG	R1
 	F.U16
@@ -272,17 +267,6 @@ R.0:	MOV	R0, R1
 	RETURN
 
 
-;; (MAKE-STRING-OUTPUT-STREAM) => string-stream
-MKSOS::	CALL	MKSTR2		; (MAKE-STRING 255)
-	MOV	R1, R4
-	MOV	#V.0, R2
-	CLR	R3
-	JMP	MKSST1		; .ALL.2
-				; MOV	#V.STM, (R1)+
-				; MOV	R4, (R1)+
-				; MOV	R2, (R1)+
-				; MOV	R3, (R1)
-				; SUB	#5, R1; RETURN
 
 
 .INCLUDE /subr1.mac/

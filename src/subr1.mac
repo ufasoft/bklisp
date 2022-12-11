@@ -229,9 +229,8 @@ FORMAT::
 	BISB	(R1)+, R4	; R4: (LENGTH control-string)
 	BEQ	FORMA4
 	MOV	R1, R3		; R3: points to cur char
-FORMA2:	MOV	#V.CHB, R1
-	BISB	(R3)+, R1	; R1: cur char
-	TST	R0
+FORMA2:	CALL	RS.CH8		; MOV #V.CHB, R1;  BISB (R3)+, R1
+	TST	R0       	; R1: cur char
 	BNE	FORMA7		; char after ~
 	INC	R0		; set ~ flag
 	CMPB	R1, #'~
@@ -319,13 +318,12 @@ R.LCO2:	CMPB	R1, #'#
 R.LCO1:	CALL	(PC)
 ;; #| COMMENT |#
 R.LCOM: .ROCHR
-	BEQ	READ.1
-1$:	CMPB	R1, #'|
+1$:	BEQ	READ.1
+	CMPB	R1, #'|
 	BNE	R.LCO2
 5$:	.R.CHR
 	CMPB	R1, #'#
-	BNE	1$
-	BR	READ.1
+	BR	1$
 
 
 ;; #:symbol-name    Uninterned symbol
@@ -358,8 +356,7 @@ R.1:	RETURN
 
 R.HEX:	CALL	R.TOK
 	CLR	R5
-1$:	MOV	#V.CHB, R1
-	BISB	(R3)+, R1
+1$:     CALL	RS.CH8		; MOV #V.CHB, R1;  BISB (R3)+, R1
 	MOV	#V.16, R2
 	.SUBR	DIGCHP		; (DIGIT-CHAR-P char 16)
 	BEQ.E
@@ -417,20 +414,17 @@ R.OCT1:	MOV	R5, R1
 R.ERR:	.E.SX
 
 
-
 RS.CH:  .R.CHR
 	.CSTP			; is char constituent?
-	BCC	9$
+	BCC	RS.CH9
 	.UNREAD
 	CALL	R.TOK
-	BEQ	1$		; single char #\x
+	BEQ	RS.CH8		; single char #\x
 	.SUBR	NAMECH		; (NAME-CHAR str)
-	BNE	9$
-1$:	MOV	#V.CHB, R1
-	BISB	(R3), R1
-9$:	RETURN
-
-
+	BNE	RS.CH9
+RS.CH8:	MOV	#V.CHB, R1
+	BISB	(R3)+, R1
+RS.CH9:	RETURN
 
 ;; Here R5: &rest (eof-error-p eof-value recursive-p)
 READ.8:	.POP5
@@ -530,6 +524,19 @@ R.SEMI: MOV	#V.C.NL, R1
 	MOV	R3, R4
 	.PEEKC			; (PEEK-CHAR #\NEWLINE stream)
 	BR	READ.1
+
+;; (NAME-CHAR name) => char-p
+NAMECH::
+	MOV	#A.SPAC+3, R2
+	MOV	#4, R3
+1$:	.PRED	STREQU
+	BCS	2$
+	ADD	#8., R2
+	SOB	R3, 1$
+	RE.NIL
+2$:	ASL	R3
+	ADD	#CHNAM1-2, R3
+	BR	RS.CH8		; MOV #V.CHB, R1;  BISB (R3), R1
 
 
 ;; (READ-DELIMITED-LIST char &optional input-stream) => list
@@ -711,11 +718,11 @@ NREVERSE::
 	BEQ.F			; (NREVERSE NIL) => NIL
 	.CONSP
 	BCC	NREV.V
-NREVE4:	MOV	2(R1), R2	; GET LINK TO NEXT CONS
-	MOV	R0, 2(R1)	; REPLACE WITH LINK TO LAST CONS
- 	MOV	R1, R0		; PTR TO THIS CONS TO R0
- 	MOV	R2, R1		; MOVE TO NEXT ELT
-NREVE1:	BNE	NREVE4		; THIS IS CALLED EXTERNALLY
+NREVE4:	MOV	2(R1), R2	; get link to next cons
+	MOV	R0, 2(R1)	; replace with link to last cons
+ 	MOV	R1, R0		; ptr to this cons to r0
+ 	MOV	R2, R1		; move to next elt
+NREVE1:	BNE	NREVE4		; this is called externally
 	BR	R.R0
 
 NREV.V:	.SVECP
@@ -801,7 +808,6 @@ CPLIST::
 	BR	NREVE1
 
 
-
 CDAR::	.CAR
 	BR	CDR
 CDDR::	CALL	(PC)
@@ -873,21 +879,6 @@ MKSYM1:
 	BR	INC1.R			; R1: Symbol
 
 
-;; (NAME-CHAR name) => char-p
-NAMECH::
-	MOV	#A.SPAC+3, R2
-	MOV	#4, R0
-1$:	.PRED	STREQU
-	BCS	NAMEC2
-	ADD	#8., R2
-	SOB	R0, 1$
-R.R0A:	BR	R.R0B			; Return NIL
-NAMEC2:	ASL	R0
-	MOV	#V.CHB, R1
-	BISB	CHNAM1-2(R0), R1
-	RETURN
-
-
 
 ;; (COPY-SEQ sequence) => copied-sequence
 CPSEQ::	.LISTP
@@ -932,7 +923,7 @@ GRACHP::
 ;; (FIND-SYMBOL string) => symbol, state (in CF)
 FINSY::	MOV	#VS.NIL, R2
 	.STREQ		; (STRING= string "NIL")
-	BCS	R.R0A
+	BCS	R.R0B
 ;	BCC	1$
 ;	CLR	R1		; RETURN NIL
 ;	BR	3$
@@ -1393,8 +1384,7 @@ EVAL::	MOV	#LEXENV, R4
 	RETURN
 
 
-.IF NE C$FULL
-
+.IF NE C$RT11
 
 ;; (GET-DECODED-TIME) => second, minute, hour, date, month, year, day-of-week, daylight-p, zone
 GDCTI1:	MOV	R0, R5
@@ -1480,7 +1470,14 @@ DCUTIM::
 	MOV	R0, MVAL
 	MOV	(R0), R1
 	RETURN
-.ENDC	; C$FULL
+.ENDC	; C$RT11
+
+;; (FLOAT-RADIX float) => 2
+FRADIX::
+	.TYPEP	U.FLT
+	BCC.E
+	MOV	#V.2, R1
+	RETURN
 
 
 .IF NE C$FILE
@@ -1691,14 +1688,13 @@ NSTRUP::
 	T.STR
 	MOV	R1, R5
 	DEC2	R1
-	MOV	R1, R4 		; R4: string buf
+	MOV	R1, R3 		; R3: string buf
 	CLR	R0
 	BISB	-(R1), R0	; LEN
 	BEQ	2$
-1$:	MOV	#V.CHB, R1
-	BISB	(R4), R1
+1$:	.SUBR	RS.CH8		; MOV #V.CHB, R1;  BISB (R3), R1
 3$:	.SUBR	CHRDN		; SELF-MODIFYIG PLACE
-	MOVB	R1, (R4)+
+	MOVB	R1, (R3)+
 	SOB	R0, 1$
 2$:
 R.M51:	MOV	R5, R1

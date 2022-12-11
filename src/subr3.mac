@@ -17,8 +17,10 @@ PEEKCH::
 	MOV	R3, R2		; R2: eof-error-p
 4$:	MOV	R5, R1		; R1: input-stream
 	.SUBR	R.CHR1		; (READ-CHAR input-stream eof-error-p NIL)
-	BEQ	R.EOF1		; EOF
-	CMP	R1, R0
+	BNE	5$
+	MOV	(R5), R1		; EOF, same as R.EOF1
+	RETURN
+5$:	CMP	R1, R0
 	BEQ	7$              ; FOUND peek-type
 	TST	R0
 	BEQ	7$		; peek-type == NIL
@@ -136,11 +138,24 @@ X.SVR1:	MOV	R3, (R2)
 
 ;; (SETF (CHAR string index) new-character) => character
 X.CHAR::
+	MOV	R3, R5		; R5: new-character
 	CALL	CHAR
-	MOV	R3, R1
+	MOV	R5, R1
 	T.CHR
-	MOVB	R1, (R2)
+	MOVB	R5, -(R3)
 	RETURN
+
+;; (MAKE-STRING-OUTPUT-STREAM) => string-stream
+MKSOS::	CALL	MKSTR2		; (MAKE-STRING 255)
+	MOV	R1, R4
+	MOV	#V.0, R2
+	CLR	R3
+	BR	MKSST1		; .ALL.2
+				; MOV	#V.STM, (R1)+
+				; MOV	R4, (R1)+
+				; MOV	R2, (R1)+
+				; MOV	R3, (R1)
+				; SUB	#5, R1; RETURN
 
 ;; (MAKE-STRING-INPUT-STREAM string &optional start end) => string-stream
 MKSSTM::
@@ -157,4 +172,4 @@ MKSST1:	.ALL.2
 	MOV	R4, (R1)+
 	MOV	R2, (R1)+
 	MOV	R3, (R1)
-	JMP	R1M5.R		; SUB	#5, R1; RETURN
+	JMP	R1M5.R		; SUB #5, R1; RETURN

@@ -24,6 +24,10 @@ C.CY.O	= 357
 C.CY.V	= 367
 C.CY.W	= 373		; 'Sh'
 
+; BK pseud-graphics
+C.LE	= 261
+C.RI	= 276
+
 ;; Stack overflow
 .MACRO	.E.SO
 	TRAP	1
@@ -466,7 +470,7 @@ B.TYPP	= 340			; Base for .TYPEP
 
 
 ;; Shift
-;; MOV R1, R2; MOV R0, R1
+;; MOV R1, R2;  MOV R0, R1
 .MACRO	.SH210
 	.TJ	SH210.
 .ENDM
@@ -547,12 +551,12 @@ B.TYPP	= 340			; Base for .TYPEP
 	.TJL	PU.FL$
 .ENDM
 
-;; POP Double into object in R1 (INT OR DOUBLE)
+;; POP Double into object in R1 (int or double)
 .MACRO	PO.FL
 	.TJL	PO.FL$
 .ENDM
 
-;; POP DOUBLE INTO OBJECT (INT OR DOUBLE) AND RETURN
+;; Pop Double into object (int or Double) and return
 .MACRO	POFL.R
 	.TJL	RPOFL$
 .ENDM
@@ -751,9 +755,9 @@ V.1900	= FIXOFF + 1900.
 .IF EQ C$AMAL
 	;; Hardcoded for modularization
 	;; Bit.2 of HEAP address must be 0. Used by AND/OR
-	.IIF NE C$BK10,	HEAP	= 022400
-	.IIF NE C$BK11,	HEAP	= 042700	; because of system area in 042600
 	.IIF NE C$RT11,	HEAP	= 042700
+	.IIF NE C$BK11,	HEAP	= 042700	; because of system area in 042600
+	.IIF NE C$BK10,	HEAP	= 022600
 .ENDC ; C$AMAL
 
 .IF NE C$BK10
