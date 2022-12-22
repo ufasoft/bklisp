@@ -37,30 +37,48 @@ ELT::	.STRP
 	BNE	R.CAR
 E.RANG:	TRAP	9.			; index is out of range
 
-
-;; (LOG number &optional base) => logarithm
-LOG::	PU.FL
-	.BASIC	$LOG                       ;!!!TODO OPTIMIZE
-	CMP	R2, R4		; compare with #V.U
-	BEQ	RBAS.5
-	.BASN
-	.WORD	DPUR2, $LOG, $DDIV, RBAS.5
-
-
-
-;; (SVREF simple-vector index) => element
-SVREF::	T.VEC
-	.SWP12
-.IIF EQ C$VM1, DEC	R2
-	MOV	(R2)+, R0	; R0: vector length
-	SUB	#FIXOFF, R0
-SVREF1:	TO.U16
-	CMP	R1, R0
-	BHIS	E.RANG
-	ASL	R1
-	ADD	R1, R2
-	MOV	(R2), R1
+;; (1+ number) => successor
+INCR::	TST	(R0)+			; R0 = 2
+;; (1- number) => predecessor
+DECR::	.BETWE	2, FIXEND-1
+	BCC	1$			; result is not FUXNUM
+	ADD	R0, R1
+	DEC	R1
 	RETURN
+1$:	ADD	#V.0-1, R0
+	MOV	#$DADD, R4
+BAS1:	.SH210
+	MOV	R4, BAS2A
+BAS2:	.BASN
+	.WORD	DPUR12
+BAS2A:	.WORD	$DADD
+DREFLT:	.WORD	RBAS.5
+
+;; (REDUCE function list) => result
+REDUCE::
+	TO.FUN
+	MOV	R1, R4		; SAVE function in R4
+	MOV	R2, R5
+	.POP5
+	BNE	1$		; NON-EMPTY LIST OF ARGS
+	BR	FUNCA1		;  MOV	R4, R1;  (FUNCALL function)
+2$:	CLR	R2
+	.CONS
+	.SH210
+	.CONS          		; R1: LIST OF 2 ARGS
+	MOV	R5, R3
+	MOV	R1, R5
+	MOV	R4, R1
+	.FUNCALL		; (FUNCALL a b)
+	MOV	R3, R5
+1$:	MOV	R1, R0		; ACCUMULATE RESULT IN R0
+	.POP5
+	BNE	2$		; MANY ARG
+R.M01:	MOV	R0, R1
+	RETURN
+
+
+
 
 ;; (DIGIT-CHAR-P char &optional (radix 10)) => weight
 DIGCHP::
@@ -81,32 +99,6 @@ AFIX.R:	ADD	#FIXOFF, R1
 	RETURN
 
 
-;; (CHAR string index) => character
-CHAR::	SUB	#3, R1
-	BISB	(R1)+, R0
-	.SWP12
-	TO.U16
-	CMP	R1, R0
-	BHIS	E.RANG
-	MOV	R2, R3
-CHAR8:	ADD	R1, R3
-	JMP	RS.CH8		; MOV #V.CHB, R1;  BISB (R3)+, R1
-
-
-
-
-;; (1+ number) => successor
-INCR::	TST	(R0)+			; R0 = 2
-;; (1- number) => predecessor
-DECR::	ADD	#V.0-1, R0
-	MOV	R0, R2
-	MOV	#$DADD, R4
-BAS1:	MOV	R4, BAS2A
-BAS2:	.BASN
-	.WORD	DPUR12
-BAS2A:	.WORD	$DADD
-DREFLT:	.WORD	RBAS.5
-
 
 
 .IF NE C$MDAR
@@ -122,7 +114,63 @@ RMAR::	.VECP
 	TST	(R2)+
 	BR	SVREF1
 
-.ENDC	; C$MDAR
+.ENDC ; C$MDAR
+
+
+;; (SVREF simple-vector index) => element
+SVREF::	T.VEC
+	.SWP12
+.IIF EQ C$VM1, DEC	R2
+	MOV	(R2)+, R0	; R0: vector length
+	SUB	#FIXOFF, R0
+SVREF1:	TO.U16
+	CMP	R1, R0
+	BHIS	E.RANG
+	ASL	R1
+	ADD	R1, R2
+	MOV	(R2), R1
+SVREF9:	RETURN
+
+
+;; (CHAR string index) => character
+CHAR::	T.STR
+	SUB	#3, R1
+	BISB	(R1)+, R0
+	.SWP12
+	TO.U16
+	CMP	R1, R0
+	BHIS	E.RANG
+CHAR8:	ADD	R1, R2    		; Use R2 to avoid false GC marking ;  JMP	RS.CH8
+	MOV	#V.CHB, R1
+	BISB	(R2)+, R1
+	RETURN
+
+
+;; (COERCE object result-type) => result
+COERCE::
+	CMP	R2, #V.LIST
+	BNE.E
+	.LISTP
+	BCS	SVREF9		; RETURN
+	.VECP
+	BCC.E
+	MOV	R1, R2		; Coerce Vector to List
+	.LENGTH
+	TO.U16
+	MOV	R1, R3		; vector length
+	BEQ	R.M01
+	INC	R2
+	ASL	R1
+	INC	R2
+	ADD	R1, R2
+2$:	MOV	-(R2), R1
+	.PUSH0
+	SOB	R3, 2$
+R.M01B:	BR	R.M01		; MOV R0, R1; RETURN
+
+
+
+
 
 
 CH.EQ:	CMPB	R3, R4
@@ -151,6 +199,24 @@ ASH::	.TI16B
 
 EQ.NUM:	.BASN
 	.WORD	DPUR12, $DCMP, NOT
+
+;; (UNION list-1 list-2) => result-list
+UNION::	MOV	R2, R0			; IMPLEMENTATION:  (NCONC (SET-DIFFERENCE list-1 list-2) list-2)
+;; (SET-DIFFERENCE list-1 list-2) => result-list
+SETDIF::
+	MOV	#103401, INTDI2		; OPCODE: BCS INTDI3
+;; INTERSECTION/SET-DIFFERENCE
+INTDIF::
+	MOV	R1, R5
+INTDI3:	.POP5
+	BEQ	R.M01B		; MOV R0, R1
+INTDI1:	.MEMBER
+INTDI2:	BCS	INTDI3
+	.PUSH0			; PUSH R1 INTO R0 LIST
+	BR	INTDI3
+
+
+
 
 ;; (SUBSETP list-1 list-2) => bool
 ;;!!! INEFFICIENT BUT TERSE IMPLEMENTATION, MAKES UNNECESSARY ALLOCATIONS
@@ -202,22 +268,6 @@ LOGTEST::
 	B.NZF
 
 
-;; (UNION list-1 list-2) => result-list
-UNION::	MOV	R2, R0			; IMPLEMENTATION:  (NCONC (SET-DIFFERENCE list-1 list-2) list-2)
-;; (SET-DIFFERENCE list-1 list-2) => result-list
-SETDIF::
-	MOV	#103401, INTDI2		; OPCODE: BCS INTDI3
-;; INTERSECTION/SET-DIFFERENCE
-INTDIF::
-	MOV	R1, R5
-INTDI3:	.POP5
-	BEQ	R.M01		; MOV R0, R1
-INTDI1:	.MEMBER
-INTDI2:	BCS	INTDI3
-	.PUSH0			; PUSH R1 INTO R0 LIST
-	BR	INTDI3
-
-
 
 
 
@@ -254,7 +304,7 @@ R.CHAR::
 	BIC	#^C777, R2	; R2: offset in buffer
 	ADD	R2, R4		; R4: pointer to next char - 2
 	MOV	#V.CHB, R1
-	BISB	2(R4), R1
+	BISB	4(R4), R1
 ;	BEQ	R.EOF
 	RETURN
 .ENDC ; C$FILE
@@ -262,13 +312,12 @@ R.CHAR::
 1$:	MOV	(R4)+, R1
 	.STRP
 	BCC	GETCH		; STDIN
-	MOV	(R4)+, R3	; R3: cur pos
-	CMP	R3, (R4)	; (R4): upper bound
-	BHIS	R.EOF		; EOF
-	INC	R3
-	MOV	R3, -(R4)	; increment cur pos
-	ADD	#-FIXOFF-3, R3
-	BR	CHAR8		; ADD R1, R3;  MOV #V.CHB, R1;  BISB (R3)+, R1
+	CMP	(R4)+, (R4)
+	BHIS	R.EOF		; curPos >= upperBound
+	INC	-(R4)		; ++curPos
+	MOV	(R4), R2	; R2: curPos
+	ADD	#-FIXOFF-3, R2
+	BR	CHAR8		; ADD R1, R2;  MOV #V.CHB, R1;  BISB (R2)+, R1
 R.EOF:	TST	R2		; eof-error-p
 	BNE.E
 R.EOF1:	MOV	(R5), R1	; R1: eof-value
@@ -286,30 +335,6 @@ FILL::	MOV	R2, R3		; R3: item
 	BLO	RCHAR9		; RETURN
 	.PRED	X.ELT
 	BR	1$
-
-;; (REDUCE function list) => result
-REDUCE::
-	TO.FUN
-	MOV	R1, R4		; SAVE function in R4
-	MOV	R2, R5
-	.POP5
-	BNE	1$		; NON-EMPTY LIST OF ARGS
-	MOV	R4, R1		; function
-	JMP	FUNCALL		; (FUNCALL function)
-2$:	CLR	R2
-	.CONS
-	.SH210
-	.CONS          		; R1: LIST OF 2 ARGS
-	MOV	R5, R3
-	MOV	R1, R5
-	MOV	R4, R1
-	.FUNCALL		; (FUNCALL a b)
-	MOV	R3, R5
-1$:	MOV	R1, R0		; ACCUMULATE RESULT IN R0
-	.POP5
-	BNE	2$		; MANY ARG
-R.M01:	MOV	R0, R1
-	RETURN
 
 
 ;; (SORT sequence predicate) => sorted-sequence
@@ -432,36 +457,57 @@ KOI7:	.WORD	0		; KOI-7 mode mask: 200 or 0
 .ENDC	; C$GTLI
 	RETURN
 
-;; (COERCE object result-type) => result
-COERCE::
-	CMP	R2, #V.LIST
-	BNE.E
-	.LISTP
-	BCS	DIGIC9		; RETURN
-	.VECP
-	BCC.E
-	MOV	R1, R2		; Coerce Vector to List
-	.LENGTH
-	TO.U16
-	MOV	R1, R3		; vector length
-R.M01B:	BEQ	R.M01
-	INC	R2
-	ASL	R1
-	INC	R2
-	ADD	R1, R2
-2$:	MOV	-(R2), R1
+;; (LOG number &optional base) => logarithm
+LOG::	PU.FL
+	.BASIC	$LOG                       ;!!!TODO OPTIMIZE
+	CMP	R2, R4		; compare with #V.U
+	BEQ	POFLR1		; POFL.R
+	.BASN
+	.WORD	DPUR2, $LOG, $DDIV, RBAS.5
+
+
+;; (ISQRT natural) => natural-root
+ISQRT::
+	.SUBR	SQRT
+.IF NE C$MVAL
+	CALL	FLOOR
+	MOV	SP, MVAL
+	RETURN
+.ENDC ; C$MVAL
+;; (TRUNCATE number &optional divisor) => quotient, remainder
+TRUNCATE::
+	ADD	#$FIX - $INT, R0
+;; (FLOOR number &optional divisor) => quotient, remainder
+FLOOR::
+	ADD	#$INT, R0
+	MOV	R0, 1$
+	.DF2	V.1
+	.BASN
+	.WORD	DPUR12, DOVER, DOVER, $DDIV
+1$:	.WORD	$INT				; Self-modifying
+	.WORD	DTUCK2, $DMUL, $DSUB, 2$
+2$:	PO.FL					; R1: reminder
+.IF NE C$MVAL
 	.PUSH0
-	SOB	R3, 2$
-	BR	R.M01		; MOV R0, R1; RETURN
+	PO.FL
+	.PUSH0
+	MOV	R0, MVAL
+	RETURN
+.IFF
+POFLR1:	POFL.R
+.ENDC ; C$MVAL
+
 
 ;; (REM number divisor) => reminder
-REM::	.TI16B
+REM::
+	.TI16B
 	CALL	$DAL
 	MOV	R3, R1
 	FI16.R
 
 ;; (EXPT base-number power-number) => result
-EXPT::	.BASN
+EXPT::
+	.BASN
 	.WORD	DPUR12, DSWAP, $LOG, $DMUL, $EXP, RBAS.5
 
 
@@ -560,7 +606,7 @@ DIGICH:: .DF2	V.10
 	BLO	1$
 	ADD	#V.C.A - 10. - V.C.0, R1
 1$:	ADD	#V.C.0, R1
-DIGIC9:	RETURN
+	RETURN
 
 
 
@@ -694,6 +740,7 @@ EQUALP::
 
 .INCLUDE /print.mac/
 
+.IF NE C$FULL
 ;; (SCALE-FLOAT float integer) => scaled-float
 SCALEF::
 	PU.FL
@@ -709,8 +756,8 @@ SCALEF::
 	ROR	R1
 	BIC	#77600, (SP)	; Replace exponent in Stack
 	BIS	R1, (SP)
-	POFL.R
-
+POFLR1:	POFL.R
+.ENDC ; C$FULL
 
 ;; (BUTLAST list &optional (n 1)) => result-list
 BUTLAST::

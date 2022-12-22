@@ -216,6 +216,10 @@ Logic
   NIL
   $ (or nil (+ 2 2) nil 5)
   4
+TIME
+  $ (time (+ 1 2))
+  \d+ ms  (re)
+  3
 End
 
   

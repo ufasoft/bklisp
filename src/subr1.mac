@@ -80,24 +80,7 @@ MKLIST::
 	.SH210		; R1: NIL, R2: size as UINT
 1$:	.PUSH0
 	SOB	R2, 1$
-R.0A:	BR	R.0
-
-;; (/ num &rest subtrahends) => reciprocal
-S.DIV::	MOV	#$DDIV, R4
-	INC	R0				; (/ 1 arg)
-	BR	SUBDIV
-;; (- num &rest subtrahends) => difference
-S.SUB::	MOV	#$DSUB, R4
-SUBDIV:	ADD	#V.0, R0			; (- 0 arg)
-	MOV	R5, R2
-	BNE	1$
-	.SH210
-	JMP	BAS1
-1$:	.CONS
-	MOV	R1, R2
-REDUC2:	MOV	R4, BAS2A
-	MOV	#BAS2, R1
-	JMP	REDUCE
+R.0A:	BR	R.0	;  MOV  R0, R1;  RETURN
 
 
 
@@ -129,26 +112,38 @@ MKAR::
 	TO.U16
 	INC	R1
 	PUSH	#1$
-3$:	CMP	R1, #FIXEND/2
-	BLO	6$
-	.E.DIM
-6$:	MOV	R1, R3
+3$:	CMP	R1, #FIXEND-FIXOFF
+	BHIS	E.DIM
+	MOV	R1, R3
 	ADD	#FIXOFF, R3
 	MOV	R1, R5
 	INC	R5
 	ASL	R5
 	.ALLOC
 	MOV	R3, (R1)
-	INC	R1
-	RETURN
+	BR	8$
 
-1$:	MOV	R4, 1(R1)		; dimensions
-.IIF EQ C$VM1,	DEC	R1
-	NEG	(R1)
+1$:	INC	R1
+	MOV	R4, (R1)		; dimensions
+	NEG	-(R1)
 	ADD	#FIXOFF*2, (R1)
-.IIF EQ C$VM1,		INC	R1
-	RETURN
-.ENDC
+8$:	JMP	INC1.R			; INC R1; RETURN
+
+.IFF
+	TO.U16
+	CMP	R1, #FIXEND-FIXOFF
+	BHIS	E.DIM
+	MOV	R1, R3
+	ADD	#FIXOFF, R3
+	MOV	R1, R5
+	INC	R5
+	ASL	R5
+	.ALLOC
+	MOV	R3, (R1)
+	JMP	INC1.R			; INC R1; RETURN
+.ENDC ; C$MDAR
+
+E.DIM:	.E.DIM
 
 .IF NE C$MDAR
 
@@ -166,8 +161,26 @@ R.AR1:	SOB	R3, R.AR2
 .IIF EQ C$VM1,	DEC R2
 	CMP	(R2)+, (R2)+	; R2: points to first element
 	.SWP01			; R0: array, R1: dimensions
+
+	PUSH	#R.0A		;  MOV  R0, R1;  RETURN
+;; Fills array elements
+;; Input: R1: dimenstion, R2: pointer, R5: array as list structure
+FILLAR:	PUSH	R0, R1
+	.POP1			; R0: dimension
+	BEQ	7$
+	SUB	#FIXOFF, R0
+	BEQ	8$
+4$:	TST	R5
+	BEQ.E			; number of elements inconsistent with dimension
+	PUSH	2(R5)
+	MOV	(R5), R5
 	CALL	FILLAR
-	BR	R.0A
+	POP	R5
+	SOB	R0, 4$
+	BR	8$
+7$:	MOV	R5, (R2)+
+8$:	POP	R1, R0
+	RETURN
 
 .ENDC	; C$MDAR
 
@@ -562,7 +575,7 @@ R.DEL1:	PUSH	R0		; (SP): dotted element (initally NIL), R0: list
 	CMP	R1, R4
 	BNE	1$
 	.R.CHR			; (READ-CHAR input-stream)
-	MOV	R0, R2		; BUILT LIST
+	MOV	R0, R2		; R2: built list
 	POP	R0		; R0: dotted element
 	BR	NREV.2		; DOTTED ELEMENT
 
@@ -586,7 +599,6 @@ ARDIMS::
 	BCS	2$
 	T.AR
 	BR	SYFUN1
-	RETURN
 2$:	.LISTP
 	BCS.E
 	.LENGTH
@@ -634,9 +646,10 @@ MKRNDS::
 ;; (ERROR datum) =>
 ERROR::	.PRED	P.ERR
 	CLR	R2
-	.PRIN1
-	JMP	I.ST1A
+	JMP	I.ST1P		; .PRIN1;  MOV #$WNL, R1;  JMP I.STO2
 
+;; (FRESH-LINE NIL)
+FRESHT:	CLR	R1
 ;; (FRESH-LINE &optional output-stream) => bool
 FRESHL::
 	TO.STM
@@ -655,9 +668,9 @@ FRESH9:	MOV	R3, R1		; R1: stream
 	MOV	R3, R0		; R0: return true value
 ;; (TERPRI &optional output-stream) => nil
 TERPRI::
-	MOV	R1, R2
-        .P.CHR	C.NL
-	BR	R.R0
+	.SH210
+TERPR1:	.P.CHR	C.NL
+	RETURN
 
 ;; (COPY-ALIST alist) => new-alist
 CPALIS::
@@ -721,9 +734,10 @@ NREVERSE::
 NREVE4:	MOV	2(R1), R2	; get link to next cons
 	MOV	R0, 2(R1)	; replace with link to last cons
  	MOV	R1, R0		; ptr to this cons to r0
- 	MOV	R2, R1		; move to next elt
+NREVE2:	MOV	R2, R1		; move to next elt
 NREVE1:	BNE	NREVE4		; this is called externally
 	BR	R.R0
+
 
 NREV.V:	.SVECP
         BCC	NREV.S
@@ -760,13 +774,14 @@ NREV.S:	T.STR
 	SOB	R0, 1$
 9$:	RETURN
 
-
 CH2STR:	MOV	R1, R4
 	.ALL.1			; Allocate 1-Char String
 	INCB	(R1)+		; Length = 1
 	MOVB	R4, (R1)+	; Char
 INC1.R:	INC	R1	 	; Convert to String object
 	RETURN
+
+
 
 ;; (STRING x) => string
 STRING::
@@ -807,6 +822,14 @@ CPLIST::
 	.SWP01
 	BR	NREVE1
 
+;; (LIST* &rest objects+) => result
+LISTA::	.SWP01          	; R1: 0
+1$:	MOV	R1, R2
+	.POP5
+	BEQ	NREVE2
+	.SWP01			; R0: last element of objects+
+	.CONS
+	BR	1$
 
 CDAR::	.CAR
 	BR	CDR
@@ -820,6 +843,14 @@ CADR::	.POP1
 	BR	CAR
 
 .IF NE C$FULL
+
+;; (FLOAT-RADIX float) => 2
+FRADIX::
+	.TYPEP	U.FLT
+	BCC.E
+	MOV	#V.2, R1
+	RETURN
+
 CAADR::	.POP1
 	BR	CAAR
 CAAAR::	.CAR
@@ -856,21 +887,21 @@ GENSYM::
 MKSYM::	T.STR
 MKSYM1:
 	CALL	STR2R
+	MOV	#6, R2			; R2: offset of name in symbol object
 	BCS	2$			; RADIX-50/40 failed, fallback to ASCII
 	MOV	R3, R5
-	ADD	#11 - $BUFOUT, R5
+	ADD	#6 - $BUFOUT, R5
 	MOV	#$BUFOUT, R4
 	SUB	R4, R3
-	MOV	#6, R2			; R2: offset of name in symbol object
 	BR	5$
-2$:	SUB	#3, R1			; R1: NAME PTR
+2$:	TST	(R2)+			; R2: 8.  offset of ASCII name in symbol object
+	SUB	#3, R1			; R1: Name PTR
 	CLR	R5
-	BISB	(R1), R5		; R5: NAME LEN
+	BISB	(R1), R5		; R5: Name LEN
 	MOV	R5, R3
 	INC	R3			; R3: STRLEN + 1
-	ADD	#14, R5
+	ADD	#11, R5
 	MOV	R1, R4
-	MOV	#10, R2			; R2: offset of name in symbol object
 5$:					; R5: SYMBOL object length in bytes
 	.ALLOC
 	ADD	R1, R2
@@ -1015,7 +1046,8 @@ STRP::	.TYP	U.STR
 
 .IF NE C$MDAR
 ;; (ARRAYP object) => bool
-ARP::	.VECP
+ARRAYP::
+	.VECP
 	BCS.T
 	.TYP	U.AR
 .ENDC
@@ -1280,16 +1312,11 @@ ALLDIF::
 	BR	1$
 
 
-;; (ISQRT natural) => natural-root
-ISQRT::	.SUBR	SQRT
-	BR	FLOOR
 SIGNUM::
 	TST	(R0)+
 .IIF NE C$BK10,	CMP	(R0)+, (R0)+	; R0 += 4.  the $AMATH on BK-0010 contains 2 more items
 ABS::	TST	(R0)+
-TRUNCA::
-	TST	(R0)+
-FLOOR::	CMP	(R0)+, (R0)+
+	ADD	#6, R0
 EXP::	TST	(R0)+
 ATAN::	TST	(R0)+
 TAN::	TST	(R0)+
@@ -1374,14 +1401,6 @@ SAVE::	MOV	#$AURET, R3
 
 .ENDC	; C$BK10
 
-;; (EVAL form) => result
-;; Evaluate form in R1 in null-environment
-EVAL::	MOV	#LEXENV, R4
-	PUSH	(R4)
-	CLR	(R4)
-	.EVAL1
-	POP	(R4)
-	RETURN
 
 
 .IF NE C$RT11
@@ -1472,12 +1491,6 @@ DCUTIM::
 	RETURN
 .ENDC	; C$RT11
 
-;; (FLOAT-RADIX float) => 2
-FRADIX::
-	.TYPEP	U.FLT
-	BCC.E
-	MOV	#V.2, R1
-	RETURN
 
 
 .IF NE C$FILE
@@ -1524,6 +1537,7 @@ CLOSE8:	MOV	#0, (R1)	; Clear string or filename keeping CF value unaffected
 CLOSE9:	B.NCF
 
 
+
 .IF NE C$MDAR
 
 ;; (ARRAY-TOTAL-SIZE array) => size
@@ -1560,6 +1574,28 @@ LSTLEN::
 LSTLE1:	MOV	R4, R1
 	RETURN
 
+;; (WRITE object) => object
+WRITE::	CLR	R2		; R2: *STANDARD-OUTPUT* designator
+	.$WRITE
+R.9:	RETURN
+
+;; (FDEFINITION function-name) => definition
+FDEFINITION::
+	MOV	R1, R2
+	.SUBR	FBOUNDP
+	BNE	R.9
+	MOV	R2, ERDATA
+	.E.FUN
+
+;; (EVAL form) => result
+;; Evaluate form in R1 in null-environment
+EVAL::	MOV	#LEXENV, R4
+	PUSH	(R4)
+	CLR	(R4)
+	.EVAL1
+	BR	POLEX2		; POP LEXENV;  RETURN
+
+
 
 LENGT1:	.STRP
 	BCC	VECLEN
@@ -1575,6 +1611,15 @@ SYVAL::	BEQ	SYVAL2		; NIL
 SYVAL1:	BEQ.E
 	MOV	(R4), R1
 SYVAL2:	RETURN
+
+
+
+;; (FLOAT number) => float
+FLOAT::	.FLTP
+	BCS	SYVAL2		; RETURN
+FLOAT1:	PU.FL
+RBAS.5: POFL.R
+
 
 
 
@@ -1617,6 +1662,15 @@ EVAL1:
 	BCC	SYVAL2		; return
 	.PLACE
 	BR	SYVAL1
+
+;; (FUNCALL R0 R1 R2)
+CALL3:	PUSH	R1, R2
+	TST	(R0)+			; R0: 2
+	.LISTN
+	MOV	R1, R5
+	MOV	R0.OFF+4(SP), R1
+	BR	FUNCALL
+
 
 VECLEN:	T.VEC
 	BR	VECLE1
@@ -1671,8 +1725,8 @@ INTERP:	POP	R3		; R3: lambda-function
 	BEQ	11$		; Return last evaluated value
 	.P5EVL
 	BR	10$
-11$:	POP	LEXENV		;!!!? Restore lexical environment
-RE.FND:	RETURN
+11$:
+POLEX2:	JMP	PO.LEX		;  POP LEXENV;  RETURN		;!!!? Restore lexical environment
 
 ;; (STRING-UPCASE string) => cased-string
 STRUP::	TST	(R0)+
@@ -1701,20 +1755,12 @@ R.M51:	MOV	R5, R1
 	RETURN
 
 
-
-
-;; (SYMBOL-PLIST symbol) => plist
-SYPLS::	T.SYM
-VECLE1:
-.IIF EQ C$VM1,	DEC	R1
-R.CAR:	MOV	(R1), R1
-	RETURN
-
 ;; (APPLY fun &rest args+) => result
-APPLY::	MOV	R1, R2
+APPLY::	MOV	R1, R4
+	.POP5			; R1: first arg
 	CALL	LISTA		; LIST*
 	MOV	R1, R5
-	MOV	R2, R1
+FUNCA1:	MOV	R4, R1
 ;; (FUNCALL fun &rest args) => result
 FUNCALL::
 	TO.FUN
@@ -1734,6 +1780,14 @@ APPLY$:	MOV	(SP), R3
  	SOB	R0, 1$
 	POP	R4, R3, R2, R1	; Pop mandatory and &optional args, R0=0, ZF=(R1==0)
 	RETURN			; Invoke SUBR; Contract: R0: 0, R1..R4: ARGS, R5: &REST
+
+
+;; (SYMBOL-PLIST symbol) => plist
+SYPLS::	T.SYM
+VECLE1:
+.IIF EQ C$VM1,	DEC	R1
+R.CAR:	MOV	(R1), R1
+	RETURN
 
 
 .IF NE C$MDAR
@@ -1779,30 +1833,17 @@ AREF::	MOV	R1, R2		; R2: array
 .ENDC	; C$MDAR
 
 
-;;-- 11. words
-;; (FUNCALL R0 R1 R2)
-CALL3:	PUSH	R1, R2
-	TST	(R0)+			; R0: 2
-	.LISTN
-	MOV	R1, R5
-	MOV	R0.OFF+4(SP), R1
-	BR	FUNCALL
-
-;; (FLOAT number) => float
-FLOAT::	.FLTP
-	BCS	RE.FND
-FLOAT1:	PU.FL
-RBAS.5: POFL.R
-
-;; (FDEFINITION function-name) => definition
-FDEFINITION::
+;; (/ num &rest subtrahends) => reciprocal
+S.DIV::	MOV	#$DDIV, R4
+	INC	R0				; (/ 1 arg)
+	BR	SUBDIV
+;; (- num &rest subtrahends) => difference
+S.SUB::	MOV	#$DSUB, R4
+SUBDIV:	ADD	#V.0, R0			; (- 0 arg)
+	MOV	R5, R2
+	BEQ	BAS1
+	.CONS
 	MOV	R1, R2
-	.SUBR	FBOUNDP
-	BNE	R.9
-	MOV	R2, ERDATA
-	.E.FUN
-
-;; (WRITE object) => object
-WRITE::	CLR	R2		; R2: *STANDARD-OUTPUT* designator
-	.$WRITE
-R.9:	RETURN
+REDUC2:	MOV	R4, BAS2A
+	MOV	#BAS2, R1
+	BR	REDUCE

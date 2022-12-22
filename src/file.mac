@@ -29,8 +29,9 @@ CHBMAP:	.WORD	0		; bitmap of open channels
 	POP	(R1)+		; filename
 	MOV	#V.0, (R1)+	; initial position
 	CLR	(R1)+		; last char
-	MOV	R2, (R1)	; channel#
-	SUB	#7, R1
+	MOV	R2, (R1)+	; channel#
+	MOV	R0, (R1)	; file length as #blocks
+	SUB	#9., R1
 	RETURN
 
 EIO1:	MOVB	$ERRBY, R1
@@ -80,12 +81,23 @@ DELETF::
 	BCS	EIO1
 	RE.T
 
+;; (FILE-LENGTH stream) => length
+FLENGTH::
+	.TYPEP	U.FILE
+	BCC.E
+	MOV	9.(R1), R1		; number of blocks
+	BEQ	FPOSI9
+	F.U16
+	PU.FL
+	.BASN
+	.WORD	DPUFL, V.512, $DMUL, RBAS.5	; (* 512 blocks)
+
 ;; (FILE-POSITION stream) => position
 FPOSIT::
 	.TYPEP	U.FILE
 	BCC.F
 	MOV	3(R1), R1
-	RETURN
+FPOSI9:	RETURN
 
 ;; (SAVE filename &optional main) => bool
 SAVE::

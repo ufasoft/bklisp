@@ -137,7 +137,7 @@
 .IF NE C$BK11			; system area in 042600
 .ASECT
 	. = 42604
-	.WORD	4000		; Start address
+	.WORD	ASTKUP		; Start address
 
 	. = 42700 		; End of system area
 .ENDC
@@ -157,6 +157,7 @@ S.PREV	= 0
 	.SYM	0, <T>, V.T, V.T
 ;;----------------------
 	;; Rarely used symbols at the end of OBLIST for faster parsing
+	.SYM	QUOTE,,, V.QUOT
 	.SYM	TAGBODY,,, V.TAGB
 	.SYM	GO,,, V.GO
 	.SYM	BLOCK,,, V.BLOCK
@@ -179,13 +180,17 @@ S.PREV	= 0
 	.SYM	DELETF, <DELETE-FILE>
 	.SYM	PROBEF, <PROBE-FILE>
 	.SYM	RENAMF, <RENAME-FILE>
+	.SYM	FLENGTH, <FILE-LENGTH>
 	.SYM	FPOSIT, <FILE-POSITION>
 	.SYM	0, <*ARGS*>, 0, V.ARGS
 
 	.IIF NE C$FEXT	.SYM	FDATE, <FILE-WRITE-DATE>
 .ENDC ; C$RT11
 .IF NE C$MDAR
-	.SYM	ARP, <ARRAYP>
+	.SYM	0, <ARRAY-RANK-LIMIT>, V.8
+	.SYM	0, <ARRAY-DIMENSION-LIMIT>, FIXEND-1
+	.SYM	0, <ARRAY-TOTAL-SIZE-LIMIT>, FIXEND-1
+	.SYM	ARRAYP
 	.SYM	ARTSIZ, <ARRAY-TOTAL-SIZE>
 	.SYM	ARMI, <ARRAY-ROW-MAJOR-INDEX>
 	.SYM	RMAR, <ROW-MAJOR-AREF>,,, X.RMAR
@@ -355,12 +360,10 @@ S.PREV	= 0
 	.SYM	TENTH,,,, X.TENTH
 	.SYM	CAAAR
 	.SYM	CAADR
+	.SYM	REST,,,, X.CDR
 
 	.SYM	FRADIX, <FLOAT-RADIX>
 	.SYM	SCALEF, <SCALE-FLOAT>
-	.SYM	0, <ARRAY-RANK-LIMIT>, V.8
-	.SYM	0, <ARRAY-DIMENSION-LIMIT>, FIXEND-1
-	.SYM	0, <ARRAY-TOTAL-SIZE-LIMIT>, FIXEND-1
 	.SYM	0, <LAMBDA-PARAMETERS-LIMIT>, 50.+FIXOFF
 	.SYM	0, <CALL-ARGUMENTS-LIMIT>, 50.+FIXOFF
 	.SYM	TRACE
@@ -380,7 +383,7 @@ E.TRAC:
 	.SYM	PLUSP
 	.SYM	GETF
 	.SYM	GET,,,, X.GET
-	.SYM	TRUNCA, <TRUNCATE>
+	.SYM	TRUNCATE
 	.SYM	FLOOR
 	.SYM	EVENP
 	.SYM	ODDP
@@ -486,18 +489,17 @@ E.TRAC:
 	.SYM	CADR
 	.SYM	CDAR
 	.SYM	CDDR
-	.SYM	REST,,,, X.CDR
 	.SYM	CDR,,,, X.CDR
 	.SYM	CAR,,,, X.CAR
 	;; -------------------------------------------
 	;; Order of these symbols does matter for REPL
 	.SYM	S.SUB, <->, 0, V.S
 	.SYM	S.ADD, <+>, 0, V.P
-	.SYM	V.U, <++>, 0, V.PP
-	.SYM	V.U, <+++>, 0, V.PPP
+.IIF NE C$FULL	.SYM	V.U, <++>, 0, V.PP
+.IIF NE C$FULL	.SYM	V.U, <+++>, 0, V.PPP
 	.SYM	S.MUL, <*>, 0, V.M
-	.SYM	V.U, <**>, 0, V.MM
-	.SYM	V.U, <***>, 0, V.MMM
+.IIF NE C$FULL	.SYM	V.U, <**>, 0, V.MM
+.IIF NE C$FULL	.SYM	V.U, <***>, 0, V.MMM
 	.SYM	S.DIV, </>, 0, V.D
 .IF NE C$MVAL
 	.SYM	V.U, <//>, 0, V.DD
@@ -509,11 +511,11 @@ E.TRAC:
 	.SYM	NTHVAL, <NTH-VALUE>
 	.SYM	0, <MULTIPLE-VALUES-LIMIT>, VALLIM+FIXOFF
 .ENDC
-	.SYM	QUOTE,,, V.QUOT
 	.SYM	LAST,,, V.LAST			; This is the last symbol in the OBLIST
 
 S.END:
 
+.IF NE C$FULL
 ;; List (/// // / *** ** * +++ ++ +) for rotating in REPL
 L.PREV::
 	.WORD	V.P, 0, V.PP, L.PREV, V.PPP, L.PREV+4, V.M, L.PREV+10, V.MM, L.PREV+14
@@ -521,16 +523,16 @@ L.PREV::
 .IIF NE C$MVAL,	.WORD	V.D, L.PREV+24, V.DD, L.PREV+30, V.DDD, L.PREV+34
 	.WORD	V.S, . - 6
 A.PREV::
+.ENDC ; C$FULL
 
 S.PI::	.FLT4	3.1415926535897932384626433832795
 S.RND:	.FLT4	0.94360820238906328860650774004171		; Initial *random-state*'S III
 S.ZERO:	.WORD	0, 0, 0, 0
 C.RND:	.WORD	S.RND+2, S.ZERO+2				; (CONS S.RND S.ZERO)
-S.INI::	.BYTE	<E.INI - S.INI - 1>
-E.INI::
+;S.INI::	.BYTE	<E.INI - S.INI - 1>
+;E.INI::
 	ALGN4
-S.ISTM::
-	.WORD	V.STM, S.INI + 3, 0, E.INI - S.INI - 1		; Stream for init load
+;S.ISTM::	.WORD	V.STM, S.INI + 3, 0, E.INI - S.INI - 1		; Stream for init load
 STDIN::	.WORD	V.STM, V.0, 0, V.C.NL
 
 

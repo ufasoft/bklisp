@@ -15,7 +15,7 @@ MAINSOURCES = bklisp.mac defcfg.inc bk1001.inc bk11.inc bkkeys.inc macros.inc pd
 
 SOURCES	= $(MAINSOURCES) symdef.mac
 
-all: bklisp.sav bklisp.10 bklisp.11m
+all: lisp.sav lisp.0010.bin lisp.11m
 
 lisp.sav: $(SOURCES) rt11.mlb
 	$(MACRO11) /LIST:bklisp.lst bklisp.mac+rt11.mlb/LIB

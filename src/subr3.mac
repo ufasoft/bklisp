@@ -138,11 +138,10 @@ X.SVR1:	MOV	R3, (R2)
 
 ;; (SETF (CHAR string index) new-character) => character
 X.CHAR::
-	MOV	R3, R5		; R5: new-character
 	CALL	CHAR
-	MOV	R5, R1
+	MOV	R3, R1
 	T.CHR
-	MOVB	R5, -(R3)
+	MOVB	R1, -(R2)
 	RETURN
 
 ;; (MAKE-STRING-OUTPUT-STREAM) => string-stream
