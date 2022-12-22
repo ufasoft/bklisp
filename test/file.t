@@ -7,6 +7,9 @@ OPEN
 OPEN-STREAM-P
   $ (open-stream-p stm)
   T
+FILE-LENGTH
+  $ (file-length stm)
+  5632
 FILE-POSITION
   $ (read-char stm)
   #\P

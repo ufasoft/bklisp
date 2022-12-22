@@ -27,7 +27,7 @@ SY.PREV=0
 .ASECT
 
 .GLOBL	START2
-.GLOBL	A.END, A.PREV, HEAPFR, S.ISTM, STDIN
+.GLOBL	A.END, A.PREV, HEAPFR, STDIN
 .GLOBL	V.BIFU, V.ERR, V.FLT, V.FREQ, V.FUN, V.FUNC, V.GCNT, V.GO, V.BLOCK, V.IF, V.UNLESS, V.INT, V.LAMB, V.LAST, V.LET
 .GLOBL	V.LETA, V.LIST, V.NULL, V.OPT, V.PBAS, V.PESC, V.PPP, V.PRAD, V.PROG, V.QUOT, V.REST, V.RNDS, V.FILE, V.S, V.SETF, V.SETQ
 .GLOBL	V.SPEC, V.SPOP, V.STDI, V.STM, V.STR, V.CONS, V.SYM, V.SYVA, V.T, V.TAGB, V.CHAR, V.VEC, V.PSETQ, V.QUIT
@@ -101,7 +101,32 @@ START3:	JMP	@#START2
 
 ;.IIF EQ C$BK10	.INCLUDE /init.mac/
 
-.IIF NE C$BK10	.	= ASTKUP
+.	= ASTKUP
+
+;; Roots (order does matter), used in PLACE
+ROOTS:
+;; vars cleared in RESET
+A.ROOT:
+LEXENV:	.WORD	0		; Lexical Environment
+DYNENV:	.WORD 	0		; Dynamic Environment
+.IIF NE C$FULL,	INDENT:	.BYTE	0
+.EVEN
+ERDATA:	.WORD 	0		; Error message data
+CATCH:	.WORD	0		; Stack pointer to catch errors
+C.ROOT:
+
+OBLIST:	.WORD 	V.LAST
+PRVTIM:	.WORD	V.0			; Last timestamp returned by (GET-INTERNAL-REAL-TIME)
+.IF NE C$FULL
+;;-- Order does matter, used in TRACE
+TRACLS:	.WORD	0			; A-List of traced symbols and original functions
+	.WORD	L.TRAC			; Macro for tracers
+.ENDC
+.IIF NE C$MVAL,	MVAL:	.WORD	1		; FIXNUM means result in R1, else MVAL is value list
+.IIF NE C$FULLREPLLS:	.WORD	A.PREV-4	; Special vars used by REPL
+E.ROOT:
+
+
 
 .INCLUDE /gc.mac/	; Put GC code before SUBRs to give more space for FIXNUM values
 
@@ -135,6 +160,7 @@ RESET::
 REPL:   MOV	#C.ROOT-A.ROOT, R2
 1$:	CLRB	A.ROOT-1(R2)	; Clear LEXENV, DYNENV, ERDATA, INDENT
 	SOB	R2, 1$		; R2: 0  is *STANDARD-INPUT*, used also in .CONS
+	CLR	R0		; R0: 0 to avoid reverence into the Heap in the Stack
 .IF NE C$GTLI & C$RT11
 	MOV	#LPROM, PROMPT
 .IFF
@@ -143,24 +169,28 @@ REPL:   MOV	#C.ROOT-A.ROOT, R2
 .ENDC ; C$GTLI & C$RT11
 
 	.$READ
+.IF NE C$FULL
+
 	MOV	R1, R2
-.IF NE C$RT11
+	.IF NE C$RT11
 ;	CLR	R1
 ;	TO.STM
 ;	MOVB	#C.NL, 5(R1)	; to avoid LF in FRESH-LINE
-.ENDC	; C$RT11
+	.ENDC	; C$RT11
 	MOV	#V.S, R1	; '-' Symbol
 	.SET			; (SETQ - form); R1: read form
+.ENDC ; C$FULL
 
 .IIF NE C$BK11	CLR	$SYREG	; Enable STOP key
 	; CALL	EVAL		; Don't use .EVAL to save stack space in every evaluation
 	.EVAL1
+	.PRED	FRESHT		; (FRESHLINE NIL)
+.IF NE C$FULL
 	MOV	R1, R2
-	CLR	R1
-	.FRESHL
 	MOV	#V.PPP, R1
 	.SET			; (SETQ +++ value)  to be rotated into *; R1: evaluated value
 	CLR	R2
+.ENDC ; C$FULL
 .IF NE C$MVAL
 	MOV	MVAL, R5
 	BEQ	2$
@@ -174,8 +204,7 @@ REPL:   MOV	#C.ROOT-A.ROOT, R2
 	CLR	R2		; R2: stdout
 	.POP5
 	BEQ	5$
-	.PRIN1
-	.P.CHR	C.SP
+	CALL	PRINT1		;   .PRIN1;  .P.CHR C.SP
 	BR	4$
 3$:	.P.CHR	C.SEMI
 	.PRNT
@@ -186,8 +215,10 @@ REPL:   MOV	#C.ROOT-A.ROOT, R2
 .IFF
 	.PRIN1			; Print evaluated value
 .ENDC	; C$MVAL
+.IF NE C$FULL
 	MOV	#A.PREV-4, R5
 	.SUBR	ROTATEF		; (ROTATEF - /// // / *** ** * +++ ++ +)
+.ENDC
 	BR	REPL
 
 ;;-- 12. words on BK-0010
@@ -280,9 +311,6 @@ FUNAMP:	.SYMP
 	BEQ.E			; check (SETF symbol)
 	RETURN
 
-ASUBRT:	.WORD	ASUBR1, ASUBR2, ASUBR3			; , ASUBR4
-FSUBRT:	.WORD	FSUBR1, FSUBR2, FSUBR3, E.FSUBR
-
 
 DOPREP:	POP	R3		; SP is caller's SP
 	CALL	BLENV0		; (BLOCK NIL ...
@@ -350,20 +378,13 @@ DPUFL:	MOV	(R4)+, R1
 DPUFL1:	PU.FL
 	JMP	@(R4)+
 
-.IF EQ C$BK10
-
 ;; Stack: x y  =>  y x y
 DOVER:	MOV	#20, R1
 	BR	DDUP0
 
-.ENDC ; C$BK10
-
 
 .IF NE C$FULL
 
-;; Stack: x y z  =>   x y z x
-DTUCK2:	MOV	#14, R1
-	BR	DTUCKC
 
 ;; IN: Stack: divisible;  (R4): divider
 ;; OUT: Stack: quotient, reminder
@@ -372,24 +393,16 @@ DIVREM:	MOV	(R4)+, R1	; R1: divider
 
 	MOV	R4, DIVRR4	; Save R4
 	.BASN
-	.WORD	DOVER, DOVER, $DDIV, $INT, DTUCK2, $DMUL, $DSUB, DSWAP, 1$
+	.WORD	DOVER, DOVER, $DDIV, $INT, DTUCK2, $DMUL, $DSUB, DSWAP, 1$			;!!!TODO use FLOOR
 1$:	MOV	(PC)+, R4
 DIVRR4:	.WORD	0		; restore R4
 	JMP	@(R4)+
 
 .ENDC ; C$FULL
 
-
-.IF NE C$BK10
-.	= $BUF-2	; 2422
-	.WORD	0	; used by GENSYM
-.	= $BUF
-	.BLKB	400	; used by IVEIL to read line
-
-.	= $BUFOUT	; 3022
-	.BLKB	24.	; used by BASIC $UNPCK
-E.SYS:			; End address of system area
-.ENDC	; C$BK10
+;; Stack: x y z  =>   x y z x
+DTUCK2:	MOV	#14, R1
+	BR	DTUCKC
 
 ;; Stack: x y  =>   x y x
 DTUCK:  MOV	#10, R1
@@ -411,6 +424,23 @@ DCP13:	CALL	COPY4
 B.RDNS:	.WORD	0
 DCP23:	CALL	COPY4
 	JMP	@(R4)+
+
+
+
+.IF NE C$BK10
+.	= $BUF-2	; 2422
+	.WORD	0	; used by GENSYM
+.	= $BUF
+	.BLKB	400	; used by IVEIL to read line
+
+.	= $BUFOUT	; 3022
+	.BLKB	24.	; used by BASIC $UNPCK
+E.SYS:			; End address of system area
+.ENDC	; C$BK10
+
+
+ASUBRT:	.WORD	ASUBR1, ASUBR2, ASUBR3			; , ASUBR4
+FSUBRT:	.WORD	FSUBR1, FSUBR2, FSUBR3, E.FSUBR
 
 
 
@@ -440,25 +470,6 @@ MULDIM:	MOV	#1, R5
 9$:	MOV	R5, R1		; product
 	RETURN
 .ENDC		; COMMENT OUT  TEMPORARY!!!
-
-;; Fills array elements
-;; Input: R1: dimenstion, R2: pointer, R5: array as list structure
-FILLAR:	PUSH	R0, R1
-	.POP1			; R0: dimension
-	BEQ	7$
-	SUB	#FIXOFF, R0
-	BEQ	8$
-4$:	TST	R5
-	BEQ.E			; number of elements inconsistent with dimension
-	PUSH	2(R5)
-	MOV	(R5), R5
-	CALL	FILLAR
-	POP	R5
-	SOB	R0, 4$
-	BR	8$
-7$:	MOV	R5, (R2)+
-8$:	POP	R1, R0
-	RETURN
 
 .ENDC	; C$MDAR
 
@@ -733,7 +744,7 @@ REAWRI:	MOV	#AREA+10, R0
 	CLR	(R0)
 	MOV	#256., -(R0)
 	MOV	R4, -(R0)
-	ADD	#2, (R0)	; (R0): buffer
+	ADD	#4, (R0)	; (R0): buffer
 	MOV	R1, -(R0)
 	SWAB	(R0)
 	ASR	(R0)
@@ -783,37 +794,13 @@ FIXEND::
 .INCLUDE /subr.mac/
 .INCLUDE /fsubr.mac/
 
-;; Roots (order does matter), used in PLACE
-ROOTS:
-REPLLS:	.WORD	A.PREV-4	; Special vars used by REPL
-
-;; vars cleared in RESET
-A.ROOT:
-LEXENV:	.WORD 	0		; Lexical Environment
-DYNENV:	.WORD 	0		; Dynamic Environment
-.IIF NE C$FULL,	INDENT:	.BYTE	0
-.EVEN
-ERDATA:	.WORD 	0		; Error message data
-CATCH:	.WORD	0		; Stack pointer to catch errors
-C.ROOT:
-
-OBLIST:	.WORD 	V.LAST
-PRVTIM:	.WORD	V.0			; Last timestamp returned by (GET-INTERNAL-REAL-TIME)
-.IF NE C$FULL
-;;-- Order does matter, used in TRACE
-TRACLS:	.WORD	0			; A-List of traced symbols and original functions
-	.WORD	L.TRAC			; Macro for tracers
-.ENDC
-.IIF NE C$MVAL,	MVAL:	.WORD	1		; FIXNUM means result in R1, else MVAL is value list
-E.ROOT:
-
 ;; EHEAP::	.WORD	HIMEM 	; same as $ANVP
 
 ALGN4
 A.LTYP:	.ASCIP	<Ufasoft BkLisp>
 
 ALGN4
-A.LVER:	.ASCIP	<2023.0>
+A.LVER:	.ASCIP	<2023.1>
 
 ALGN4
 A.MTYP:	.ASCIP	<PDP-11>
@@ -857,9 +844,6 @@ ALGN4
 A.TAB:	.ASCIP	<TAB>
 ;;------------
 
-
-ALGN4
-A.MS:	.ASCII	<3>/ms/<C.NL>
 
 ALGN4
 A.ROOM: .ASCII	<11.>/Bytes free/<C.NL>

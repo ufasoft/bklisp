@@ -74,6 +74,7 @@ EXTROOM::
 	MOV	#C.EXTM, R0
 	MOVB	R0, $EXTM	; Set ExtMem byte explicitly to non-(0 or 377 value) to prevent switching off
 	EMT	16		; Switch on ExtMem mode
+	MOV	#HIMEME-HEAP / 32., GCBMSZ
 .ENDC	; C$BK10
 ;	MOV	#HIMEME, EHEAP
 ;; (ROOM) => free bytes
@@ -103,13 +104,6 @@ VECTOR::
 	BR	1$
 
 
-LISTA1:	PUSH	R1
-	INC	R0
-;; (LIST* &rest objects+) => result
-LISTA::	.POP5
-	BNE	LISTA1
-	.LISTA
-	RETURN
 
 APPEN1:	TST	R5
 	BEQ	1$	; R1: last list
@@ -209,7 +203,7 @@ S.ADD::	MOV	#$DADD, R4
 ADDMUL:	ADD	#V.0, R0
 	MOV	R5, R2
 	BEQ	R.0
-	BR	REDUC2
+	JMP	REDUC2
 
 ;; (INKEY) => char-p
 INKEY::

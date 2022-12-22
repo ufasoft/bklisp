@@ -356,7 +356,8 @@ LETA::	MOV	LEXENV, R3
 	.POP5
 	BNE	9$		; Return last evaluated value
 	MOV	R4, SP		; unwind dynamic environment frames
-	POP	DYNENV, LEXENV		;!!!? Restore dynamic & lexical environments
+	POP	DYNENV		;!!!? Restore dynamic environments
+PO.LEX:	POP	LEXENV		;!!!? Restore lexical environments
 ;; (QUOTE object) => object
 QUOTE::	RETURN
 
@@ -412,10 +413,10 @@ UNWIND:	MOV	DYNENV, R3
 DOLIST::
 	CALL	DOPREP
 1$:	CLR	(R3)		; Bound var to NIL for result-form
-	.POP1			; R0: NEXT LIST ELEMENT
+	.POP1			; R0: next list element
 	BEQ	DOTIM1
-	MOV	R0, (R3)	; BIND VAR TO LIST ELEMENT OR NIL ON THE END
-	PR.PROGN		; EXECUTE BODY
+	MOV	R0, (R3)	; bind var to list element or nil on the end
+	PR.PROGN		; execute body
 	BR	1$
 
 
@@ -448,19 +449,21 @@ DEFVA2:	MOV	R3, R1		; R1: name
 
 
 ;; (TIME form) => result
-TIME::	PUSH	R1		; place in stack for EVAL result
+TIME::
+	PUSH	R1		; place in stack for EVAL result
 	MOV	R1, R5
 	PU.NOW
 	MOV	R5, R1
 	.EVAL1
-	MOV	R1, 20(SP)
+	MOV	R1, 10(SP)	; Result to return
 	PU.NOW
 	.BASN						; (floor (* -1000 (/ (- prev-real-time (GET-INTERNAL-REAL-TIME)) INTERNAL-TIME-UNITS-PER-SECOND)))
 	.WORD	$DSUB, DPFREQ, $DDIV, DPUFL, V.M.1K, $DMUL, $INT, 2$	; to get milliseconds from timer ticks
 2$:	PO.FL
 	CLR	R2
 	.PRNT
-	.P.STR	A.MS
+	.P.CHR	'm, 's
+	.P.CHR	C.NL
 POP1.R:	POP	R1		; Restore first form result
 	RETURN
 
@@ -506,8 +509,8 @@ DO::	ADD	#V.LET, R0
 	PUSH	R0, R1, #V.TAGB, #2	; LET/LET* ({var init step}*) TAGBODY #2
 	SUB	#V.LET-V.PSETQ, R0
 
-	PUSH	#V.UNLESS, (R3)+	; Stack: LET/LET*, ({var init step}*) TAGBODY #2 UNLESS test; (R3): (result-form*)
-
+	PUSH	#V.UNLESS, (R3)		; Stack: LET/LET*, ({var init step}*) TAGBODY #2 UNLESS test; 2(R3): (result-form*)
+					; DON'T change R3 to avoid reference into middle of CONS in Stack during GC
 	MOV	#V.PROGN, R1
 	.CONS				; R1: (PROGN statements)
 	PUSH	R1			; Stack: LET/LET*, ({var init step}*) TAGBODY #2 UNLESS test (PROGN statements)
@@ -543,13 +546,16 @@ DO::	ADD	#V.LET, R0
 
 	CMPB	-(R0), -(R0)		; R0: 3
 	.LISTN
-	PUSH	R1, (R3)		; Stack: LET vars (TAGBODY #2 (UNLESS test (PROGN ...) (SETQ ...) (GO #2))) (result-forms*)
+	PUSH	R1
 
-	INC	R0			; R0: 4
-	.LISTA     			; R1: expanded macro (LET vars (TAGBODY ...) result-forms*)
+	MOV	2(R3), R2
+	MOV	R0, R4			; R4: 3
+3$:	POP	R1
+	.CONS
+	MOV	R1, R2
+	SOB	R4, 3$
 
 	PUSH	R1
-	DEC	R0			; R0: 3
 	.LISTN     			; R1: expanded macro (BLOCK NIL (LET vars (TAGBODY ...) result-forms*))
 	BR	JEVAL1
 
@@ -677,9 +683,8 @@ TRACER::
 	MOVB	(R4), R0	; R0: indent
 	DECB	(R4)		; unindent
 	MOV	#A.TRCR+3, 7$+2
-5$:	CLR	R1
+5$:	.PRED	FRESHT		; (FRESHLINE NIL)
 	CLR	R2		; R2: stream
-	.FRESHL
 6$:	.P.CHR	C.SP
 	SOB	R0, 6$
 	MOV	R3, R1		; R1: sym
@@ -687,8 +692,7 @@ TRACER::
 7$:	.P.STR	A.TRCA		; Self-modifying
 	MOV	R5, R1		; R1: args or result
 	.PRIN1
-	.P.CHR	C.NL
-	RETURN
+	JMP	TERPR1		;  .P.CHR C.NL;  RETURN
 
 .ENDC ; NE C$FULL
 

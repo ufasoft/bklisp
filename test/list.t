@@ -18,8 +18,6 @@ List
   NIL
   $ (listp t)
   NIL
-  $ (rest '(1 . 2))
-  2
   $ (make-list 0)
   NIL
   $ (make-list 3)

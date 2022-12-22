@@ -155,9 +155,9 @@ FILE-STREAM - 524 bytes (12-byte struct + 512 buffer)
   +-------------------------+----------+
   | #channel 1..15                     |
   +------------------------------------+
-  | 512 bytes: current block buffer    |
+  | length  as UInt16 # of blocks      |
   +------------------------------------+
-  | reserve                            |
+  | 512 bytes: current block buffer    |
   +------------------------------------+
 
 

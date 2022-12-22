@@ -291,7 +291,7 @@ WCHFIL:	PUSH	R0		; save character
 	MOV	R1, R3
 	BIC	#777, R3
 	ADD	R2, R3
-	MOVB	R0, (R3)	; write character into buffer
+	MOVB	R0, 2(R3)	; write character into buffer
 	INC	R1   		; ++filepos
 	BIT	#777, R1
 	BNE	1$
@@ -345,9 +345,9 @@ W.STR8:	POP	R2			; R2: Stream
 
 ;; (WRITE-LINE string &optional output-stream) => string
 W.LINE::
-	CALL	W.STR
-	.P.CHR	C.NL
-	RETURN
+	PUSH	#TERPR1		;  .P.CHR C.NL;  RETURN
+	BR	W.STR
+
 
 ;; (PRINT object &optional output-stream) => object
 PRINT::	.P.CHR	C.NL

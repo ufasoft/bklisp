@@ -39,7 +39,7 @@
 .IIF NDF C$FULL, 	C$FULL 	= C$RT11 ! C$BK11	; More features of Full Common Lisp
 .IIF NDF C$MVAL,	C$MVAL	= C$FULL		; Multiple values
 .IIF NDF C$MACR,	C$MACR	= 0			; Macros
-.IIF NDF C$MDAR,	C$MDAR 	= 1			; Multi-dimensional arrays
+.IIF NDF C$MDAR,	C$MDAR 	= C$FULL			; Multi-dimensional arrays
 .IIF NDF C$RAD40,	C$RAD40	= 1			; use RADIX-40 Symbol encoding
 
 .IIF NDF C$FILE, 	C$FILE 	= C$RT11 		; File operations
