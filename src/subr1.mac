@@ -13,14 +13,14 @@ ASUBR1:
 ;; (SLEEP seconds) => nil
 SLEEP::
 .IF NE C$RT11
-	PU.FL
-	PU.NOW
+	MOV	R1, R2
+	.NOW
 	.BASN
-	.WORD	DSWAP, DPFREQ, $DMUL, $DADD, 1$
+	.WORD	DPUR12, DPFREQ, $DMUL, $DADD, 1$
 1$:	PO.FL				; R1:  (+ (GET-INTERNAL-REAL-TIME) (* INTERNAL-TIME-UNITS-PER-SECOND seconds))
 	.PUSH0
 	MOV	R0, R5
-2$:	.SUBR	GETTIM
+2$:	.NOW
 	.SUBR	NUMLT
 	BNE	2$
 .IFF
@@ -48,6 +48,29 @@ ARIBP::
 	POP	R1
 	BLO	1$
 	RE.NIL
+
+;; (ARRAY-ROW-MAJOR-INDEX array &rest subscripts) => index
+ARMI::	CLR	R4		; result index
+	.ARDMS		; R1: (ARRAY-DIMENSIONS array)
+	BR	1$
+2$:	MOV	R1, R3		; save dimensions
+
+;	.SUBR	MULDIM
+	.SUBR	S.MUL1
+	TO.U16
+
+	MOV	R1, R2		; R2: (APPLY '* (CDR dimensions))
+	.POP5
+	TO.U16			; R1: subscript
+	BEQ	5$
+4$:	ADD	R2, R4
+	SOB	R1, 4$
+5$:	MOV	R3, R1		; restore dimensions
+1$:	.POP1
+	BNE	2$		; has some dimensions
+	MOV	R4, R1		; R1: index
+	FI16.R
+
 .ENDC ; C$MDAR
 
 
@@ -102,11 +125,11 @@ MKAR::
 2$:	TO.U16
 	BR	3$
 4$:	TO.U16
-	ADD	#FIXOFF, R1
+	F.U16			; R1: dim as FIXNUM
 	.PUSH0
 5$:	.POP5
 	BNE	4$
-	.NREV0			; R1: dimensions as FIXNUMS
+	.NREV0			; R1: dimensions as FIXNUMs
 	MOV	R1, R4		; R4: dimensions
 	.SUBR	S.MUL1
 	TO.U16
@@ -114,9 +137,9 @@ MKAR::
 	PUSH	#1$
 3$:	CMP	R1, #FIXEND-FIXOFF
 	BHIS	E.DIM
-	MOV	R1, R3
-	ADD	#FIXOFF, R3
 	MOV	R1, R5
+	F.U16
+	MOV	R1, R3
 	INC	R5
 	ASL	R5
 	.ALLOC
@@ -133,9 +156,9 @@ MKAR::
 	TO.U16
 	CMP	R1, #FIXEND-FIXOFF
 	BHIS	E.DIM
-	MOV	R1, R3
-	ADD	#FIXOFF, R3
 	MOV	R1, R5
+	F.U16
+	MOV	R1, R3
 	INC	R5
 	ASL	R5
 	.ALLOC
@@ -382,6 +405,11 @@ R.HEX:	CALL	R.TOK
 	SOB	R4, 1$
 	BR	R.OCT1
 
+.IF NE C$FULL
+R.KEYW:	CALL	R.TOK
+	MOV	#V.KEYW, R2
+	BR	B.INTE			; .SUBR	NSTRUP; JMP INTERN
+.ENDC ; C$FULL
 
 R.SHARP:CLR	R3
 	.R.CHR
@@ -476,6 +504,7 @@ READ.1:	.ROCHR
 	.SBYTE	C.NL	, <R.SPACE-1$/2>
 	.SBYTE	C.FF	, <R.SPACE-1$/2>
 	.SBYTE	C.CR	, <R.SPACE-1$/2>
+.IIF NE C$FULL	.SBYTE	':	, <R.KEYW-1$/2>
 .IIF NE C$RT11	.SBYTE	C.NULL	, <R.SPACE-1$/2>
 7$:	CALL	R.TOK3
 	BNE	6$
@@ -497,19 +526,8 @@ READ.1:	.ROCHR
 3$:	ADD	#10, SP
 5$:	MOVB	R4, -(R5)	; TOKLEN = len
 	MOV	#TOKLEN+3, R1	; TOKEN AS STRING OBJECT
-	.SUBR	NSTRUP
-				;; FALLBACK
-;; (INTERN string) => symbol
-INTERN::
-	PUSH	R1
-	CALL	FINSY
-	BCS	1$		; SYMBOL already exists
-	MOV	(SP), R1
-	CALL	MKSYM1
-	MOV	OBLIST, 3(R1)
-	MOV	R1, OBLIST
-1$:	TST	(SP)+		; SP += 2
-RET.8:	RETURN
+B.INTE:	.SUBR	NSTRUP
+	JMP	INTERN
 
 
 
@@ -605,7 +623,7 @@ ARDIMS::
 .ENDC	; C$MDAR
 LISTIFY::
 	.LISTP
-	BCS	RET.8
+	BCS	SYFUN9		; RETURN
 LISTI1:	MOV	R0, R2		; CLR R2
 	BR	RCONS3
 
@@ -613,13 +631,13 @@ LISTI1:	MOV	R0, R2		; CLR R2
 SYFUN::	.PRED	FBOUNDP
 	BCC.E
 SYFUN1:	MOV	1(R1), R1
-	RETURN
+SYFUN9:	RETURN
 
 
 ;; (COPY-TREE tree) => new-tree
 CPTREE::
 	.CONSP
-	BCC	RET.8
+	BCC	SYFUN9		; RETURN
 	.POP1
 	.CPTREE
 	.SH210
@@ -632,11 +650,13 @@ MKRNDS::
 	BEQ	1$		; Copy *RANDOM-STATE*
 	CMP	R1, #V.T
 	BNE	2$		; clone state arg
-	PU.NOW			; Generate fresh random state from the current timer value
-	BR	LISTI1
+	.NOW			; Generate fresh random state from the current timer value
+	MOV	R1, R0
+	MOV	#V.0, R1
+	BR	3$
 1$:	.SYVAL	V.RNDS
 2$:	.POP1                   ; clone random-state
-	CALL	FLOAT1
+3$:	CALL	FLOAT1
 	.SH210
 	CALL	FLOAT1
 	BR	RCONS3
@@ -754,7 +774,7 @@ NREV.V:	.SVECP
 	MOV	-(R4), (R1)+
 	MOV	R5, (R4)
 	SOB	R2, 1$
-R.R0:	MOV	R0, R1		; RETURN THE MODIFIED LIST
+R.R0:	MOV	R0, R1		; return the modified list
 IDENTITY::
 R.IDE:
 	RETURN
@@ -774,14 +794,22 @@ NREV.S:	T.STR
 	SOB	R0, 1$
 9$:	RETURN
 
+.IF NE C$FULL
+;; (FLOAT-RADIX float) => 2
+FRADIX::
+	.TYPEP	U.FLT
+	BCC.E
+	MOV	#V.2, R1
+	RETURN
+.ENDC ; C$FULL
+
+
 CH2STR:	MOV	R1, R4
 	.ALL.1			; Allocate 1-Char String
 	INCB	(R1)+		; Length = 1
 	MOVB	R4, (R1)+	; Char
 INC1.R:	INC	R1	 	; Convert to String object
 	RETURN
-
-
 
 ;; (STRING x) => string
 STRING::
@@ -844,13 +872,6 @@ CADR::	.POP1
 
 .IF NE C$FULL
 
-;; (FLOAT-RADIX float) => 2
-FRADIX::
-	.TYPEP	U.FLT
-	BCC.E
-	MOV	#V.2, R1
-	RETURN
-
 CAADR::	.POP1
 	BR	CAAR
 CAAAR::	.CAR
@@ -858,7 +879,7 @@ CAAAR::	.CAR
 CAAR::	CALL	(PC)
 FIRST::
 CAR::	.POP1
-R.R0B:	BR	R.R0
+	BR	R.R0
 
 ;; (GENSYM &optional x) => new-symbol
 GENSYM::
@@ -951,47 +972,6 @@ GRACHP::
 	B.NCF
 
 
-;; (FIND-SYMBOL string) => symbol, state (in CF)
-FINSY::	MOV	#VS.NIL, R2
-	.STREQ		; (STRING= string "NIL")
-	BCS	R.R0B
-;	BCC	1$
-;	CLR	R1		; RETURN NIL
-;	BR	3$
-1$:     MOV	R1, R2
-	CALL	STR2R		; RASIC-50 failed, fallback to ASCII
-	MOV	#OBLIST - 3, R1
-	BCS	5$		; ASCII
-6$:
-	MOV	3(R1), R1
-	BEQ	7$	        ; Not found
-	MOV	R1, R5		; Compare RADIX-50 strings
-	ADD	#5, R5
-	MOV	#$BUFOUT, R4
-.IF NE C$RAD40
-8$:	CMP	(R5)+, (R4)	; ASCII names starts with ZERO word and will be filtered-out
-	BNE	6$		; strings differ
-	TST	(R4)+
-	BMI	8$		; more words
-.IFF
-8$:	CMP	(R5)+, (R4)+	; ASCII names starts with ZERO word and will be filtered-out
-	BNE	6$		; strings differ
-	CMP	R4, R3
-	BNE	8$
-.ENDC
-	BR	3$
-5$:	ADD	#12, R1
-
-2$:	MOV	-7(R1), R1
-	BNE	4$
-7$:	CLC       ; Not found
-	RETURN
-4$:	ADD	#12, R1		; R2: SYMBOL-NAME
-	.STREQ
-	BCC	2$
-	SUB	#12, R1
-3$:	SEC
-9$:	RETURN
 
 ;; (ALPHANUMERICP character) => bool
 ALNUMP::
@@ -1021,23 +1001,6 @@ CHCAI:	BPL	2$		; SELF-MODIFYING CODE!
 CHCAI1:	RETURN
 
 
-;; (CHAR-NAME character) => name
-CHNAME::
-	T.CHR
-	.CCASE
-CHNAM2:	.WORD	4
-CHNAM1:	.SBYTE	11, <CN.TAB-CHNAM2/2>		; Order does matter. used in NAME-CHAR
-	.SBYTE	12, <CN.NL-CHNAM2/2>
-	.SBYTE	15, <CN.CR-CHNAM2/2>
-	.SBYTE	40, <CN.SP-CHNAM2/2>
-RENIL2:	RE.NIL
-
-CN.CR:	ADD	#A.RETU - V.C.CR - A.SPAC + V.C.SP, R1
-CN.SP:	ADD	#A.SPAC - V.C.SP - A.NEWL + V.C.NL, R1
-CN.NL:	ADD	#A.NEWL - V.C.NL - A.TAB + V.C.HT, R1
-CN.TAB:	ADD	#A.TAB + 3 - V.C.HT, R1
-	RETURN
-
 
 
 
@@ -1059,37 +1022,6 @@ VECP::	.STRP
 SVECP::	.TYP	U.SVEC
 
 
-
-;; (UNINTERN symbol) => bool
-UNINTERN::
-	MOV	#OBLIST, R0
-1$:	MOV	R0, R2		; R2: pointer to next field of SYMBOL
-	MOV	(R2), R0
-	BEQ.F			; End of OBLIST
-.IF NE C$VM1
-	CMP	(R0)+, (R0)+	; R0 += 4
-.IFF
-	ADD	#3, R0
-.ENDC
-	CMP	R1, (R2)
-	BNE	1$		; Next symbol
-	MOV     (R0), (R2)	; Unlink symbol from OBLIST
-	CLR	(R0)
-RE.T1:	RE.T
-
-
-
-
-;; (SYMBOLP object) => bool
-SYMP::	BEQ	RE.T1
-	.TYP	U.SYM
-
-;; (ENDP list) => bool
-ENDP::	BEQ.T
-	T.CONS				; fallback to return NIL
-;; (ATOM object) => bool
-ATOM::	.CONSP
-	B.NCF
 
 
 ;; Get Word from Memory
@@ -1152,25 +1084,6 @@ OPENP::
 OPENP1:	BCC.E
 	ADD	R0, R1
 	TSTB	2(R1)
-	B.NZF
-
-;; (LISTP object) => bool
-LISTP::	BEQ	RE.T1
-CONSP::	BIT	#3, R1		; Don't use  .TYP U.CONS to avoid recursive calls in .TYCOD
-	BNE	RENIL2
-	PUSH	#R.B.CF
-;; OUT: CF=1 if R1 is heap object
-HEAPP:	CMP	#HEAP - 1, R1
-	BHIS	9$
-	CMP	R1, EHEAP
-9$:	RETURN
-
-
-
-;; (BOUNDP symbol) => bool
-BOUNDP::
-	BEQ	RE.T1
-	.GPLAC
 	B.NZF
 
 
@@ -1407,7 +1320,7 @@ SAVE::	MOV	#$AURET, R3
 
 ;; (GET-DECODED-TIME) => second, minute, hour, date, month, year, day-of-week, daylight-p, zone
 GDCTI1:	MOV	R0, R5
-	.SUBR	GETTIM
+	.NOW
 GDCTIM::
 	.DATE
 	CMP	R0, R5
@@ -1497,6 +1410,7 @@ DCUTIM::
 
 .INCLUDE /file.mac/
 
+
 ;; (LOAD filespec) => bool
 LOAD::
 	.SUBR	OPEN
@@ -1521,58 +1435,94 @@ CLOSE::
 	.OPENP			; (OPEN-STREAM-P stream)
 .IF NE C$FILE
 
-	BCC	CLOSE9		; already closed
+	BCC	CLOSE9			; already closed
 	.TYPEP	U.FILE
 	INC	R1
 	BCC	CLOSE8			; Clear string of STRING-STREAM
-	CLR	(R1)+			; Clear filename
+	TST	8.(R1)
+	BNE	2$			; file open for reading
+;; Flush current buffer
+	PUSH	R1
+	MOV	R1, R4
+	ADD	#10., R4		; R4: buffer
+	MOV	2(R1), R1
+	TO.U16				; R1: position
+	MOV	#S$WRI * 256., R3
+	CALL	REAWRI
+	POP	R1
+2$:	CLR	(R1)+			; Clear filename
 	BIT	(R1)+, (R1)+		; R1: &channel
 	MOV	(R1), R2		; R2: channel 1..8
 	BIC	MASKTB-1(R2), CHBMAP	; free channel
-CLOSE2:	.CLOSE	(R1)		; (R1): chan#
+CLOSE2:	.CLOSE	(R1)			; (R1): chan#
 
 .ENDC ; C$FILE
 
 CLOSE8:	MOV	#0, (R1)	; Clear string or filename keeping CF value unaffected
 CLOSE9:	B.NCF
 
+;; (CHAR-NAME character) => name
+CHNAME::
+	T.CHR
+	.CCASE
+CHNAM2:	.WORD	4
+CHNAM1:	.SBYTE	11, <CN.TAB-CHNAM2/2>		; Order does matter. used in NAME-CHAR
+	.SBYTE	12, <CN.NL-CHNAM2/2>
+	.SBYTE	15, <CN.CR-CHNAM2/2>
+	.SBYTE	40, <CN.SP-CHNAM2/2>
+RENIL2:	RE.NIL
 
-
-.IF NE C$MDAR
-
-;; (ARRAY-TOTAL-SIZE array) => size
-ARTSIZ::
-	.VECP
-	BCS	LENGT1
-	T.AR
-	MOV	#FIXOFF*2-1, R4
-	.IIF EQ C$VM1, DEC	R1
-	SUB	(R1), R4
-	BR	LSTLE1
-.ENDC ; C$MDAR
-
-;; (LENGTH sequence) => n
-;; ASSUME R0 == 0
-LENGTH::
-	.LISTP
-	BCC	LENGT1
-;; (LIST-LENGTH list) => length (NIL for circular list)
-LSTLEN::
-	MOV	R1, R2		; R2: SLOW POINTER
-	MOV	#FIXOFF, R4	; COUNTER
-	BR	2$
-1$:	INC	R4
-	MOV	2(R2), R2
-2$:	.POP1
-	BEQ	9$
-	INC	R4
-	CMP	R1, R2
-	BEQ.F			; CIRCULAR LIST
-	.POP1
-	BNE	1$
-9$:
-LSTLE1:	MOV	R4, R1
+CN.CR:	ADD	#A.RETU - V.C.CR - A.SPAC + V.C.SP, R1
+CN.SP:	ADD	#A.SPAC - V.C.SP - A.NEWL + V.C.NL, R1
+CN.NL:	ADD	#A.NEWL - V.C.NL - A.TAB + V.C.HT, R1
+CN.TAB:	ADD	#A.TAB + 3 - V.C.HT, R1
 	RETURN
+
+
+;; (LISTP object) => bool
+LISTP::	BEQ	ENDP		; RE.T
+CONSP::	BIT	#3, R1		; Don't use  .TYP U.CONS to avoid recursive calls in .TYCOD
+	BNE	RENIL2		; RE.NIL
+	PUSH	#R.B.CF
+;; OUT: CF=1 if R1 is heap object
+HEAPP:	CMP	#HEAP - 1, R1
+	BHIS	9$
+	CMP	R1, EHEAP
+9$:	RETURN
+
+
+
+
+;; (BOUNDP symbol) => bool
+BOUNDP::
+	BEQ	ENDP		; RE.T
+	.GPLAC
+	B.NZF
+
+
+
+.IF NE C$FULL
+;; (KEYWORDP object) => bool
+KEYWORDP::
+	MOV	#KWLIST-3, R2
+1$:	MOV	3(R2), R2
+	BEQ	BEQ.FA		; BEQ.F
+	CMP	R2, R1
+	BNE	1$
+				; Fallback
+.ENDC ; C$FULL
+;; (SYMBOLP object) => bool
+SYMP::	BEQ	ENDP		; RE.T
+	.TYP	U.SYM
+
+;; (ENDP list) => bool
+ENDP::	BEQ.T
+	T.CONS				; fallback to return NIL
+;; (ATOM object) => bool
+ATOM::	.CONSP
+	B.NCF
+
+
 
 ;; (WRITE object) => object
 WRITE::	CLR	R2		; R2: *STANDARD-OUTPUT* designator
@@ -1587,30 +1537,6 @@ FDEFINITION::
 	MOV	R2, ERDATA
 	.E.FUN
 
-;; (EVAL form) => result
-;; Evaluate form in R1 in null-environment
-EVAL::	MOV	#LEXENV, R4
-	PUSH	(R4)
-	CLR	(R4)
-	.EVAL1
-	BR	POLEX2		; POP LEXENV;  RETURN
-
-
-
-LENGT1:	.STRP
-	BCC	VECLEN
-STRLEN:	BISB	-3(R1), R0
-	MOV	R0, R1
-	FI16.R
-
-;; (SYMBOL-VALUE symbol) => value
-SYVAL::	BEQ	SYVAL2		; NIL
-	.BOUNDP
-	BCC.E
-	.GPLAC
-SYVAL1:	BEQ.E
-	MOV	(R4), R1
-SYVAL2:	RETURN
 
 
 
@@ -1620,6 +1546,54 @@ FLOAT::	.FLTP
 FLOAT1:	PU.FL
 RBAS.5: POFL.R
 
+
+
+
+
+;; (LENGTH sequence) => n
+;; ASSUME R0 == 0
+LENGTH::
+	.LISTP
+	BCC	LENGT1
+;; (LIST-LENGTH list) => length (NIL for circular list)
+LSTLEN::
+	MOV	R1, R2		; R2: SLOW POINTER
+	MOV	#FIXOFF, R4	; COUNTER
+	BR	LSTLE5
+LSTLE4:	INC	R4
+	MOV	2(R2), R2
+LSTLE5:	.POP1
+	BEQ	LSTLE1
+	INC	R4
+	CMP	R1, R2
+BEQ.FA:	BEQ.F			; CIRCULAR LIST
+	.POP1
+	BNE	LSTLE4
+LSTLE1:	MOV	R4, R1
+	RETURN
+
+
+.IF NE C$MDAR
+
+;; (ARRAY-TOTAL-SIZE array) => size
+ARTSIZ::
+	.VECP
+	BCS	LENGT1
+	T.AR
+	MOV	#FIXOFF*2-1, R4
+	.IIF EQ C$VM1, DEC	R1
+	SUB	(R1), R4
+	BR	LSTLE1		; MOV  R4, R1;  RETURN
+.ENDC ; C$MDAR
+
+;; (SYMBOL-VALUE symbol) => value
+SYVAL::	BEQ	SYVAL2		; NIL
+	.BOUNDP
+	BCC.E
+	.GPLAC
+SYVAL1:	BEQ.E
+	MOV	(R4), R1
+SYVAL2:	RETURN
 
 
 
@@ -1663,70 +1637,160 @@ EVAL1:
 	.PLACE
 	BR	SYVAL1
 
+
+;; (EVAL form) => result
+;; Evaluate form in R1 in null-environment
+EVAL::	MOV	#LEXENV, R4
+	PUSH	(R4)
+	CLR	(R4)
+	.EVAL1
+POLEX2:	JMP	PO.LEX		;  POP LEXENV;  RETURN		;!!!? Restore lexical environment
+
+LENGT1:	.STRP
+	BCS	STRLEN
+VECLEN:	T.VEC
+	BR	VECLE1
+STRLEN:	BISB	-3(R1), R0
+	MOV	R0, R1
+	FI16.R
+
+
+;;  mandatory args
+L.MAND:	TST	R5
+	BEQ.E 			; No mandatory arg
+;; Bind symbol in R1 to argument in (R5) and add to lexical environment
+INTER0:	MOV	R0, R1
+	MOV	(R5)+, R2
+;; Bind symbol in R1 to argument in R2 and add to Lexical environment
+INTER1:	MOV	(R5), R5	; R5: (CDR of args)
+INTER2:	.CONS
+	MOV	LEXENV, R2
+	.CONS
+	MOV	R1, LEXENV	; LEXENV: R1
+	BR	INTER3
+
+;; &OPTIONAL section
+L.OPT::
+	.CONSP
+	BCC	INTER0		; &OPTIONAL arg
+	.POP1			; R0: arg-name; R1: (init-form)
+	TST	R5		; &OPTIONAL (arg init-form)
+	BNE	INTER0		; Don't use init-form
+	PUSH	R1
+L.OPT1:	POP	R1
+L.OPT3:	MOV	(R1), R1	; R1: init-form
+	.EVAL1			; R1: evaluated init-form
+L.OPT2:	.SH210			; R1: arg-name; R2: evaluated init-form
+	BR	INTER2
+
+;; &REST section
+L.REST::
+	MOV	R5, R2
+	BR	INTER2
+
+.IF NE C$FULL
+;; &KEY section
+L.KEY::
+	.CONSP
+	BCC	1$		; &KEY arg
+	.POP1			; R0: arg-name; R1: (init-form)
+	PUSH	R1
+	MOV	R0, R1
+	MOV	#V.U, R3
+	CALL	FIKEYA
+	CMP	R1, #V.U
+	BEQ	L.OPT1		; init-form case
+	POP	R1
+	BR	L.OPT2
+1$:	CLR	R3
+	PUSH	#L.OPT2
+;; Find key argument in R5 list, corresponding to var in R1
+;; Returns: arg valu or R3 if the argument not found
+FIKEYA:
+	.SUBR	SYNAM
+	MOV	#V.KEYW, R2
+	.SUBR	INTERN		; (INTERN (SYMBOL-NAME arg) 'KEYWORD)
+	MOV	R1, R2
+	MOV	R5, R1
+	.SUBR	GETF		; (GETF args key R3)
+	RETURN
+
+;; &AUX section
+L.AUX::
+	CLR	R2
+	.CONSP
+	BCC	INTER2
+	.POP1
+	BR	L.OPT3		; init-form case
+.ENDC ; C$FULL
+
+
 ;; (FUNCALL R0 R1 R2)
 CALL3:	PUSH	R1, R2
 	TST	(R0)+			; R0: 2
 	.LISTN
 	MOV	R1, R5
 	MOV	R0.OFF+4(SP), R1
-	BR	FUNCALL
+;; (FUNCALL fun &rest args) => result
+FUNCALL::
+	TO.FUN
+	MOV	#ASUBRT, R2
+APPLY1:	PUSH	R1
+				;; FALLBACK
+;; IN: (SP): FUNCTION,  R5: ARGS
+APPLY$:	MOV	(SP), R3
+	CMP	R3, #E.FSUBR	; (SP): function
+	BCC	INTERP		; Interpreted Function
+	MOV	#4, R0
+1$:	MOV	#V.U, R1	; Init optional args by V.U (Unbound Value)
+	CMP	R3, (R2)+
+	BLO	2$
+	.POP5
+2$:	PUSH	R1
+ 	SOB	R0, 1$
+	POP	R4, R3, R2, R1	; Pop mandatory and &optional args, R0=0, ZF=(R1==0)
+	RETURN			; Invoke SUBR; Contract: R0: 0, R1..R4: ARGS, R5: &REST
 
 
-VECLEN:	T.VEC
-	BR	VECLE1
 
-;; INTERPRETED FUNCTION
+;; Interpreted function
 INTERP:	POP	R3		; R3: lambda-function
-	MOV	5(R3), R4	; R4: Function Environment
-	MOV	1(R3), R1	; Lambda List
-1$:	.POP1			; Bind Lambda List
-	BEQ	9$
-	CMP	R0, #V.REST
-	BEQ	8$		; &REST
-	CMP	R0, #V.OPT
-	BEQ	12$		; &OPTIONAL
-	TST	R5
-	BEQ.E 			; No mandatory arg
-4$:	PUSH	R1
-	MOV	R0, R1
-	CALL	BNARG1
-	POP	R1
-	BR	1$
+	ADD	#5, R3
+	PUSH	LEXENV		; Save LEXENV
+	MOV	(R3), LEXENV	; R4: Function Environment
+	PUSH	-(R3), -(R3)	; Function body, Lambda list
+	MOV	#L.MAND, R4	; start with mandatory args
 
-;; &OPTIONAL section
-16$:	PUSH	R1
-	MOV	R0, R1		; R1: arg spec
-	.CONSP
-	BCC	14$		; &OPTIONAL arg
-	.POP1			; R0: arg-name; R1: (init-form)
-	TST	R5		; &OPTIONAL (arg init-form)
-	BNE	13$		; Don't use init-form
-	MOV	(R1), R1	; R1: init-form
-	.EVAL1			; R1: evaluated init-form
-	.SH210			; R1: arg-name; R2: evaluated init-form
-	BR	15$
-13$:	MOV	R0, R1
-14$:	MOV	(R5)+, R2
-15$:	CALL	BNARG
-	POP	R1
-12$:	.POP1
-	BEQ	9$
-	CMP	R0, #V.REST
-	BNE	16$		; some optional args
-;; &REST section
-8$:	.CAR
-	MOV	R5, R2
-	CALL	BNARG2
-9$:	PUSH	LEXENV
-	MOV	R4, LEXENV
-	MOV	3(R3), R5	; BODY
-	CLR	R1		; Duplicate PROGN code to save 1 word (return to `POP LEXENV`) in the Stack
-10$:	.POP5
-	BEQ	11$		; Return last evaluated value
+INTER3:	POP	R1		; R1: rest of lambda-list
+	.POP1
+	BNE	3$
+	POP	R5		; R5: Function body
+				; Contract: R1==0	CLR	R1	; Duplicate PROGN code to save 1 word (return to `POP LEXENV`) in the Stack
+2$:	.POP5
+	BEQ	POLEX2		; Return last evaluated value
 	.P5EVL
-	BR	10$
-11$:
-POLEX2:	JMP	PO.LEX		;  POP LEXENV;  RETURN		;!!!? Restore lexical environment
+	BR	2$
+
+3$:	PUSH	R1
+	MOV	R0, R1		; R1: arg spec
+        .BETWE	V.REST, V.OPT+1
+        BCC	6$
+        MOV	1(R1), R4
+	BR	INTER3
+6$:	JMP	(R4)
+
+
+;; (SYMBOL-PLIST symbol) => plist
+SYPLS::	T.SYM
+VECLE1:
+.IIF EQ C$VM1,	DEC	R1
+R.CAR:	MOV	(R1), R1
+	RETURN
+
+;; (/ num &rest subtrahends) => reciprocal
+S.DIV::	MOV	#$DDIV, R4
+	INC	R0				; (/ 1 arg)
+	BR	SUBDIV
 
 ;; (STRING-UPCASE string) => cased-string
 STRUP::	TST	(R0)+
@@ -1754,65 +1818,17 @@ NSTRUP::
 R.M51:	MOV	R5, R1
 	RETURN
 
-
 ;; (APPLY fun &rest args+) => result
 APPLY::	MOV	R1, R4
 	.POP5			; R1: first arg
 	CALL	LISTA		; LIST*
 	MOV	R1, R5
 FUNCA1:	MOV	R4, R1
-;; (FUNCALL fun &rest args) => result
-FUNCALL::
-	TO.FUN
-	MOV	#ASUBRT, R2
-APPLY1:	PUSH	R1
-				;; FALLBACK
-;; IN: (SP): FUNCTION,  R5: ARGS
-APPLY$:	MOV	(SP), R3
-	CMP	R3, #E.FSUBR	; (SP): function
-	BCC	INTERP		; Interpreted Function
-	MOV	#4, R0
-1$:	MOV	#V.U, R1	; Init optional args by V.U (Unbound Value)
-	CMP	R3, (R2)+
-	BLO	2$
-	.POP5
-2$:	PUSH	R1
- 	SOB	R0, 1$
-	POP	R4, R3, R2, R1	; Pop mandatory and &optional args, R0=0, ZF=(R1==0)
-	RETURN			; Invoke SUBR; Contract: R0: 0, R1..R4: ARGS, R5: &REST
+	BR	FUNCALL
 
-
-;; (SYMBOL-PLIST symbol) => plist
-SYPLS::	T.SYM
-VECLE1:
-.IIF EQ C$VM1,	DEC	R1
-R.CAR:	MOV	(R1), R1
-	RETURN
 
 
 .IF NE C$MDAR
-
-;; (ARRAY-ROW-MAJOR-INDEX array &rest subscripts) => index
-ARMI::	CLR	R4		; result index
-	.ARDMS		; R1: (ARRAY-DIMENSIONS array)
-	BR	1$
-2$:	MOV	R1, R3		; save dimensions
-
-;	.SUBR	MULDIM
-	.SUBR	S.MUL1
-	TO.U16
-
-	MOV	R1, R2		; R2: (APPLY '* (CDR dimensions))
-	.POP5
-	TO.U16			; R1: subscript
-	BEQ	5$
-4$:	ADD	R2, R4
-	SOB	R1, 4$
-5$:	MOV	R3, R1		; restore dimensions
-1$:	.POP1
-	BNE	2$		; has some dimensions
-	MOV	R4, R1		; R1: index
-	BR	AFIX.R		; ADD	#FIXOFF, R1; RETURN
 
 ;; (SETF (AREF array &rest subscripts) new-element) => element
 X.AREF::
@@ -1833,10 +1849,6 @@ AREF::	MOV	R1, R2		; R2: array
 .ENDC	; C$MDAR
 
 
-;; (/ num &rest subtrahends) => reciprocal
-S.DIV::	MOV	#$DDIV, R4
-	INC	R0				; (/ 1 arg)
-	BR	SUBDIV
 ;; (- num &rest subtrahends) => difference
 S.SUB::	MOV	#$DSUB, R4
 SUBDIV:	ADD	#V.0, R0			; (- 0 arg)

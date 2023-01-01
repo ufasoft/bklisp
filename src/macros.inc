@@ -240,16 +240,20 @@ B.TYPP	= 340			; Base for .TYPEP
 	.TJ	, B.SUBR+22
 .ENDM
 
+;; (GET-INTERNAL-REAL-TIME)
+.MACRO	.NOW
+	.TJ	, B.SUBR+23
+.ENDM
 
 ;; (ARRAY-DIMENSIONS R1)
 .MACRO	.ARDMS
-	.TJ	, B.SUBR+23
+	.TJ	, B.SUBR+<ARDIM.-SUBRS/2>
 .ENDM
 
 ;; Filespace in R1 into 4-word RADIX-50 RT-11 filepath in $BUFOUT
 .IF NE C$FILE
 	.MACRO	.R50FN
-		.TJ	, B.SUBR+24
+		.TJ	, B.SUBR+<R50FN.-SUBRS/2>
 	.ENDM
 .ENDC
 
@@ -351,8 +355,13 @@ B.TYPP	= 340			; Base for .TYPEP
 	.TJ	, B.PRED+25
 .ENDM
 
-.MACRO	.ARP
+;; CF = *PRINT-ESCAPE*
+.MACRO	.PESC
 	.TJ	, B.PRED+26
+.ENDM
+
+.MACRO	.ARP
+	.TJ	, B.PRED+<ARP.-PREDS/2>
 .ENDM
 
 .MACRO	BEQ.E
@@ -533,11 +542,6 @@ B.TYPP	= 340			; Base for .TYPEP
 	.TJL	LISTN$
 .ENDM
 
-;; Create list of R0 elements from Stack using LIST*
-.MACRO	.LISTA
-	.TJL	LISTA$
-.ENDM
-
 ;; CF = LOWER <= R1 < UPPER
 .MACRO	.BETWE	LOWER, UPPER
 	.TJL	BETWE$
@@ -604,9 +608,10 @@ B.TYPP	= 340			; Base for .TYPEP
 	.TJL	GPLAC$
 .ENDM
 
-.MACRO	.DF2	V
+;; Set value of R2 to `v` if it is unbound
+.MACRO	.DF2	v
 	.TJL	DF2$
-	.WORD	V
+	.WORD	v
 .ENDM
 
 .MACRO	.DF1.NIL
@@ -622,7 +627,7 @@ B.TYPP	= 340			; Base for .TYPEP
 	.TJL	ATRUE$
 .ENDM
 
-;; FROM UINT16 INTO OBJECT
+;; from UInt16 into object
 .MACRO	F.U16
 	.TJL	F.U16$
 .ENDM
@@ -649,11 +654,6 @@ B.TYPP	= 340			; Base for .TYPEP
 .MACRO	TO.STM
 ;	.TJL	STMTO$
 	.TJ	STM.TO
-.ENDM
-
-;; .SUBR GETTIM; PU.FL
-.MACRO	PU.NOW
-	.TJL	NOWPU$
 .ENDM
 
 .MACRO	TO.U16
@@ -726,7 +726,7 @@ U.SPOP	= 13	; SPECIAL OPERATOR
 MAXTOK = 31.	; Max token length 4*n-1
 
 .IF NE C$BK10
-	ASTKLO	= 300
+	ASTKLO	= 320
 	ASTKUP	= 1004	; +4: space for JMP @#START instruction
 .IFF
 	ASTKLO	= 400
@@ -748,6 +748,7 @@ V.24	= FIXOFF + 24.
 V.60	= FIXOFF + 60.
 V.254	= FIXOFF + 254.
 V.255	= FIXOFF + 255.
+V.512	= FIXOFF + 512.
 V.1000	= FIXOFF + 1000.
 V.1900	= FIXOFF + 1900.
 
@@ -757,7 +758,7 @@ V.1900	= FIXOFF + 1900.
 	;; Bit.2 of HEAP address must be 0. Used by AND/OR
 	.IIF NE C$RT11,	HEAP	= 042700
 	.IIF NE C$BK11,	HEAP	= 042700	; because of system area in 042600
-	.IIF NE C$BK10,	HEAP	= 022600
+	.IIF NE C$BK10,	HEAP	= 022000
 .ENDC ; C$AMAL
 
 .IF NE C$BK10

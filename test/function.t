@@ -451,13 +451,13 @@ LOG
   48
   $ (ash 5 -1)
   2
-  $ (floor 5.9)
+  $ (prog1 (floor 5.9))
   5
-  $ (floor -5.9)
+  $ (prog1 (floor -5.9))
   -6
-  $ (truncate 5.9)
+  $ (prog1 (truncate 5.9))
   5
-  $ (truncate -5.9)
+  $ (prog1 (truncate -5.9))
   -5
   $ (rem 13 4)
   1
@@ -624,13 +624,19 @@ Function
   (1 (2 3 4))
 INTERNAL-TIME-UNITS-PER-SECOND
   $ internal-time-units-per-second
-  366
+  \d\d\d?					(re)
 SLEEP
-  $ (sleep 5)
+  $ (sleep 3)
   NIL
+ROOM
+  $ (room)
+  \d+ Bytes free (re)
+  \d+            (re)
 Random
   $ *random-state*
   (.94360820238906329 . 0)
+  $ (setq rs (make-random-state t))
+  \(\d+ \. 0\)				(re)
   $ (setq rs (make-random-state nil))
   (.94360820238906329 . 0)
   $ (random 100.0)

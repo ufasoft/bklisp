@@ -97,7 +97,7 @@
 	.ENDC
 .ENDM
 
-;; Defined symbol presentation
+;; Define symbol presentation
 .MACRO	.SYM	subr, name, val, slab, $setf, var
 	.IF	NB $setf
 		.GLOBL	$setf
@@ -132,7 +132,30 @@
 	.ENDC
 
 	ALGN4
-.ENDM
+.ENDM ; .SYM
+
+;; Define Keyword presentation
+.MACRO	.KEYW	name, slab
+	PLIST	= 0
+
+	.WORD	V.SPEC, . + 2, V.T, PLIST
+	.WORD	V.SYVA, . + 2, slab, . - 16
+	PLIST	= . - 10
+
+	.IF	NB slab
+		slab	= . + 1
+		.GLOBL	slab
+	.ENDC
+	.WORD	PLIST
+
+	.IIF	DIF, subr 0, .GLOBL	subr
+       	.WORD	subr, K.PREV
+       	K.PREV	= . - 5
+
+	.NAM	^|name|
+
+	ALGN4
+.ENDM ; .SYM
 
 .IF NE C$BK11			; system area in 042600
 .ASECT
@@ -152,6 +175,7 @@
 .ENDC ; C$AMAL
 
 S.PREV	= 0
+K.PREV	= 0
 ;;--- T must be second in memory after symbol with lame length==4, to define Bit.2 of V.T. Used by AND/OR
 	.SYM	QUIT,,, V.QUIT		; must be first, referenced in P.SYMB
 	.SYM	0, <T>, V.T, V.T
@@ -182,6 +206,9 @@ S.PREV	= 0
 	.SYM	RENAMF, <RENAME-FILE>
 	.SYM	FLENGTH, <FILE-LENGTH>
 	.SYM	FPOSIT, <FILE-POSITION>
+	.KEYW	<DIRECTION>, KW.DIR
+	.KEYW	<OUTPUT>, KW.OUT				; This is the last symbol in the KWLIST
+
 	.SYM	0, <*ARGS*>, 0, V.ARGS
 
 	.IIF NE C$FEXT	.SYM	FDATE, <FILE-WRITE-DATE>
@@ -248,8 +275,14 @@ S.PREV	= 0
 	.SYM	SLEEP
 	.SYM	ROTATEF
 
-	.SYM	V.U, <&OPTIONAL>,, V.OPT
-	.SYM	V.U, <&REST>,, V.REST
+;;-------------- Used by INTERP. Order does matter
+	.SYM	L.REST, <&REST>,, V.REST
+.IF NE C$FULL
+	.SYM	L.KEY, <&KEY>,, V.KEY
+	.SYM	L.AUX, <&AUX>,, V.AUX
+.ENDC ; C$FULL
+	.SYM	L.OPT, <&OPTIONAL>,, V.OPT
+;;-------------------
 	.SYM	CPALIS, <COPY-ALIST>
 	.SYM	CPLIST, <COPY-LIST>
 	.SYM	CPTREE, <COPY-TREE>
@@ -366,6 +399,8 @@ S.PREV	= 0
 	.SYM	SCALEF, <SCALE-FLOAT>
 	.SYM	0, <LAMBDA-PARAMETERS-LIMIT>, 50.+FIXOFF
 	.SYM	0, <CALL-ARGUMENTS-LIMIT>, 50.+FIXOFF
+	.SYM	KEYWORDP
+	.SYM	0, <KEYWORD>,, V.KEYW
 	.SYM	TRACE
 	.SYM	UNTRACE
 	.SYM	TRACER, <T*R>,, V.TRC

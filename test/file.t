@@ -22,6 +22,19 @@ CLOSE
   T
   $ (open-stream-p stm)
   NIL
+OPEN-OUTPUT
+  $ (setq stm (open "a.txt" :direction :output))
+  #<FILE-STREAM "a.txt">
+  $ (print '(+ 1 2) stm)
+  (+ 1 2)
+  $ (close stm)
+  T
+  $ (setq stm (open "a.txt"))
+  #<FILE-STREAM "a.txt">
+  $ (eval (read stm))
+  3
+  $ (close stm)
+  T
 LOAD
   $ (load "sum.lsp")
   T

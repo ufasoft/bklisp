@@ -147,14 +147,13 @@ W.CH2A: MOV	(R2)+, R4	; R4: string
 W.CH2B:	MOV	R0, R1		;!!!TODO: optimize
 	RETURN
 
-P.CHAR:	MOV	R1, R0
-	.SYVAL	V.PESC
-	BEQ	W.CHA1
+P.CHAR:	.PESC
+	BCC	W.CHAR
 	.P.CHR	'#, '\
-	MOV	R0, R1
+	MOV	R1, R0
 	.SUBR	CHNAME
 	BNE	W.STR0
-W.CHA1:	MOV	R0, R1
+	MOV	R0, R1
 ;; (WRITE-CHAR character &optional output-stream) => character
 W.CHAR::
 	T.CHR
@@ -173,12 +172,6 @@ W.CH2:	MOV	#V.CHB, R0
 	.STRP
 	BCS	W.CH2A		; To String Output Stream
 
-.IF NE C$BK10
-	W.CH3:
-	M.OUT::	.TTYOUT
-		BR	W.CH2B
-.ENDC ; C$BK10
-
 .IF NE C$BK11
 		CMPB 	R0, #C.NL
 		BNE	W.CH3
@@ -186,9 +179,6 @@ W.CH2:	MOV	#V.CHB, R0
 		MOV	#C.CR, R0		; Print CRLF as Newline sequence
 	M.OUT1::.TTYOUT
 		POP	R0
-	W.CH3:
-	M.OUT::	.TTYOUT
-		BR	W.CH2B
 .ENDC ; C$BK11
 
 .IF NE C$RT11
@@ -200,10 +190,15 @@ W.CH2:	MOV	#V.CHB, R0
 		MOV	#17, R0		; Switch back to ASCII
 	3$:	.TTYOUT
 		RETURN			; R1: char
+.IFF
+	W.CH3:
+	M.OUT::	.TTYOUT
+		BR	W.CH2B		; MOV  R0, R1
+
 .ENDC ; C$RT11
 
 
-P.FIX:	SUB	#FIXOFF, R1
+P.FIX:	TO.I16
 P.INT: 	PUSH	R2, R1
 	.SYVAL	V.PRAD
 	MOV	R1, R3		; R3: *PRINT-RADIX*
@@ -238,16 +233,19 @@ W.STR1:	POP	R3, R4		; R3: Len, R4: Ptr
 
 
 
-P.SYMB: MOV	R1, R3
-	.SYVAL	V.PESC
+P.SYMB: .PESC
 	BEQ	5$
-	TST	3(R3)		; check next pointer
+.IF NE C$FULL
+	.PRED	KEYWORDP
+	BCS	4$
+.ENDC
+	TST	3(R1)		; check next pointer
 	BNE	5$		; non-null next means the symbol is interned
-	CMP	R3, #V.QUIT
+	CMP	R1, #V.QUIT
 	BEQ	5$
-	.P.CHR	'#, ':		; Uninterned symbol prefix
-5$:	MOV	R3, R1
-	.SUBR	SYNAM
+	.P.CHR	'#		; Uninterned symbol prefix
+4$:	.P.CHR	':		; Keyword prefix
+5$:	.SUBR	SYNAM
 W.STR0:	CLR	R0
 	BR	W.STR
 P.STR:	MOV	R1, R0
@@ -255,7 +253,7 @@ P.STR:	MOV	R1, R0
 	.SWP01        		; R0: *PRINT-ESCAPE*, R1: string
 	CALL	W.STR4
 ;; (WRITE-STRING string &optional output-stream) => string
-;; IF R0 THEN ESCAPE \ AND "
+;; If R0 then escape \ AND "
 W.STR::	MOV	R1, R5		; SAVE R1
 	MOV	R1, R4
 	SUB	#3, R4
@@ -271,7 +269,7 @@ W.STR2:	MOVB	(R4)+, R1
 	.SBYTE	'\, <3$-1$/2>
 	.SBYTE	'", <3$-1$/2>
 	BR	5$
-3$:	.P.CHR	'\		; ESCAPING
+3$:	.P.CHR	'\		; Escaping
 5$:	.W.CH2
 	SOB	R3, W.STR2
 W.STR3:	MOV	R5, R1
@@ -284,21 +282,20 @@ W.STR4:	TST	R0		; print " if *PRINT-ESCAPE*
 .IF NE C$FILE
 WCHFIL:	PUSH	R0		; save character
 	MOV	(R2)+, R1	; R1: position as Object
-	TST	(R2)+		; R2: &channel
-	MOV	R2, R4		; R4: &channel
-	TST	(R2)+		; R2: &buffer
+	ADD	#6, R2
+	MOV	R2, R4		; R2, R4: buffer
 	TO.U16
 	MOV	R1, R3
-	BIC	#777, R3
-	ADD	R2, R3
-	MOVB	R0, 2(R3)	; write character into buffer
+	BIC	#177000, R3
+	ADD	R4, R3
+	MOVB	R0, (R3)	; write character into buffer
 	INC	R1   		; ++filepos
 	BIT	#777, R1
 	BNE	1$
 	MOV	#S$WRI * 256., R3
 	CALL	REAWRI
 1$:	F.U16
-	MOV	R1, -4(R4)	; save new position
+	MOV	R1, -10(R4)	; save new position
 	POP	R1		; restore character
 	RETURN
 .ENDC	; C$FILE

@@ -117,6 +117,35 @@ PROGN1:	.POP5
 	.P5EVL
 	BR	PROGN1
 
+SETF3:	PUSH	#V.SETQ, R1
+SETF4:	.POP5
+	BEQ.E
+	PUSH	R1
+	SUB	SP, R3
+	ASR	R3
+	MOV	R3, R0
+	.LISTN
+	.EVAL1
+	MOV	R1, R0
+;; (SETF {pair}*) => result*
+SETF::	.POP5
+SETF1:	BEQ	R.M01A		; MOV R0, R1; RETURN
+	MOV	SP, R3
+ 	.SYMP
+	BCS	SETF3		; (SETF fun args)
+	.POP1
+	.SWP01			; R1: symbol, R0: value
+	MOV	#V.SETF, R2
+	.SUBR	GET
+	BEQ.E
+	PUSH	#V.FUNCALL, R1
+	.SWP01
+6$:	.POP1
+	BEQ	SETF4
+	PUSH	R0
+	BR	6$
+
+
 
 .IF NE C$FULL
 
@@ -181,34 +210,6 @@ UNTRACE::
 .ENDC ; NE C$FULL
 
 
-SETF3:	PUSH	#V.SETQ, R1
-SETF4:	.POP5
-	BEQ.E
-	PUSH	R1
-	SUB	SP, R3
-	ASR	R3
-	MOV	R3, R0
-	.LISTN
-	.EVAL1
-	MOV	R1, R0
-;; (SETF {pair}*) => result*
-SETF::	.POP5
-SETF1:	BEQ	R.M01A		; MOV R0, R1; RETURN
-	MOV	SP, R3
- 	.SYMP
-	BCS	SETF3		; (SETF fun args)
-	.POP1
-	.SWP01			; R1: symbol, R0: value
-	MOV	#V.SETF, R2
-	.SUBR	GET
-	BEQ.E
-	PUSH	#V.FUNCALL, R1
-	.SWP01
-6$:	.POP1
-	BEQ	SETF4
-	PUSH	R0
-	BR	6$
-
 
 
 ;-------------------------------------------
@@ -223,6 +224,15 @@ S.POP::	.PLACE
 R.M01A:	MOV	R0, R1
 	RETURN
 
+
+;; (WHEN test-form form*) => result
+WHEN::	DEC	R0
+;; (UNLESS test-form form*) => result
+UNLESS::
+	.EVAL1
+	ADD	R0, R1
+	BHI	RENIL1
+PROGNA:	BR	PROGN
 
 
 .IF NE C$MVAL
@@ -241,6 +251,7 @@ MVALLS::
 .ENDC ; C$MVAL
 
 
+
 ;; Make '(BLOCK NIL' environment
 BLENV0:	CLR	R2
 ;; Make BLOCK-environment
@@ -255,15 +266,6 @@ BLENV:	PUSH	R1
 	MOV	R1, LEXENV	; Add BLOCK-environment
 	POP	R1
 	RETURN
-
-;; (WHEN test-form form*) => result
-WHEN::	DEC	R0
-;; (UNLESS test-form form*) => result
-UNLESS::
-	.EVAL1
-	ADD	R0, R1
-	BHI	RENIL1
-PROGNA:	BR	PROGN
 
 
 ;; (BLOCK name form*) => result
@@ -422,13 +424,16 @@ DOLIST::
 
 
 ;; (PROG2 first-form second-form form*) => result-2
-PROG2::	.EVAL1
+PROG2::
+	.EVAL1
 	.POP5
 	BEQ.E
 ;; (PROG1 first-form form*) => result-1
-PROG1::	.EVAL1
+PROG1::
+	.EVAL1
 	PUSH	R1
 	CALL	PROGN
+.IIF NE C$MVAL,	MOV	SP, MVAL	; ignore multiple values
 	BR	POP1.R
 
 ;; (DEFVAR name &optional initial-value) => name
@@ -450,15 +455,14 @@ DEFVA2:	MOV	R3, R1		; R1: name
 
 ;; (TIME form) => result
 TIME::
-	PUSH	R1		; place in stack for EVAL result
-	MOV	R1, R5
-	PU.NOW
-	MOV	R5, R1
+	MOV	R1, R0
+	.NOW
+	.SH210			; R1: form, R2: startTimestamp
 	.EVAL1
-	MOV	R1, 10(SP)	; Result to return
-	PU.NOW
-	.BASN						; (floor (* -1000 (/ (- prev-real-time (GET-INTERNAL-REAL-TIME)) INTERNAL-TIME-UNITS-PER-SECOND)))
-	.WORD	$DSUB, DPFREQ, $DDIV, DPUFL, V.M.1K, $DMUL, $INT, 2$	; to get milliseconds from timer ticks
+	PUSH	R1		; Result to return
+	.NOW
+	.BASN						; (floor (* 1000 (/ (- (GET-INTERNAL-REAL-TIME) prev-real-time) INTERNAL-TIME-UNITS-PER-SECOND)))
+	.WORD	DPUR12, $DSUB, DPFREQ, $DDIV, DPUFL, V.1000, $DMUL, $INT, 2$	; to get milliseconds from timer ticks
 2$:	PO.FL
 	CLR	R2
 	.PRNT
@@ -474,8 +478,6 @@ RETU::	.SH210          	; (RETURN-FROM NIL result)
 ;;;----------------
 
 FSUBR2:
-
-
 
 ;; (RETURN-FROM name &optional result) =>
 RETUFR::

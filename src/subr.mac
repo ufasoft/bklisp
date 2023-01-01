@@ -128,22 +128,7 @@ NCONC::	.POP5
 
 ;; (GET-INTERNAL-REAL-TIME) => internal-time
 GETTIM::
-.IF EQ C$RT11
-	MOV	#$TMCNT, R2
-	MOV	(R2)+, R1		; Read CNT
-	TSTB	(R2)			; R2: $TMCSR, test CSR.FL bit (overflow)
-	BPL	1$			; No overflow, R1 contains count
-	MOV	#F32768 + 2, R1		; Add duration of one timer cycle 65536==2*32768
-	.PUSH0
-	.PUSH0
-	MOV	@#$TMCNT, R1		; Re-read CNT because of Race cond. with two volatile vars: FL and CNT, recheck
-1$:	MOV	#$TMFMN, (R2)		; Reset Timer, R2: $TMCSR
-	NEG	R1
-	F.U16
-	.PUSH0
-	MOV	PRVTIM, R1
-	.PUSH0
-.IFF
+.IF NE C$RT11
 	.SYS	S$GTIM			; .GTIM	#AREA, #$BUFOUT
 	MOV	#$BUFOUT, R3
 	CMP	(R3), LSTTIM
@@ -184,6 +169,21 @@ GETTIM::
 	.PUSH0
 	MOV	(R3), R1		; $BUFOUT+2
 	F.U16
+	.PUSH0
+.IFF
+	MOV	#$TMCNT, R2
+	MOV	(R2)+, R1		; Read CNT
+	TSTB	(R2)			; R2: $TMCSR, test CSR.FL bit (overflow)
+	BPL	1$			; No overflow, R1 contains count
+	MOV	#F32768 + 2, R1		; Add duration of one timer cycle 65536==2*32768
+	.PUSH0
+	.PUSH0
+	MOV	@#$TMCNT, R1		; Re-read CNT because of Race cond. with two volatile vars: FL and CNT, recheck
+1$:	MOV	#$TMFMN, (R2)		; Reset Timer, R2: $TMCSR
+	NEG	R1
+	F.U16
+	.PUSH0
+	MOV	PRVTIM, R1
 	.PUSH0
 .ENDC	; C$RT11
 	MOV	R0, R5

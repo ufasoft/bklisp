@@ -79,28 +79,6 @@ R.M01:	MOV	R0, R1
 
 
 
-
-;; (DIGIT-CHAR-P char &optional (radix 10)) => weight
-DIGCHP::
-	.DF2	V.10
-	.CHRUP		; R1: (CHAR-UPCASE char)
-	ADD	#FIXOFF - V.CHB - '0, R1
-	.TI16B
-	CMP	R1, R0
-	BLO.F				; char < '0
-	CMP	R1, #9.
-	BLOS	1$
-	CMP	R1, #'A - '0
-	BLO.F
-	ADD	#10. + '0 - 'A, R1
-1$:	CMP	R1, R2		; R1: weight as int16
-	BHIS.F			; weight >= radix
-AFIX.R:	ADD	#FIXOFF, R1
-	RETURN
-
-
-
-
 .IF NE C$MDAR
 
 ;; (ROW-MAJOR-AREF array index) => element
@@ -171,8 +149,6 @@ R.M01B:	BR	R.M01		; MOV R0, R1; RETURN
 
 
 
-
-
 CH.EQ:	CMPB	R3, R4
 	B.ZF
 
@@ -201,7 +177,7 @@ EQ.NUM:	.BASN
 	.WORD	DPUR12, $DCMP, NOT
 
 ;; (UNION list-1 list-2) => result-list
-UNION::	MOV	R2, R0			; IMPLEMENTATION:  (NCONC (SET-DIFFERENCE list-1 list-2) list-2)
+UNION::	MOV	R2, R0			; implementation:  (NCONC (SET-DIFFERENCE list-1 list-2) list-2)
 ;; (SET-DIFFERENCE list-1 list-2) => result-list
 SETDIF::
 	MOV	#103401, INTDI2		; OPCODE: BCS INTDI3
@@ -212,14 +188,14 @@ INTDI3:	.POP5
 	BEQ	R.M01B		; MOV R0, R1
 INTDI1:	.MEMBER
 INTDI2:	BCS	INTDI3
-	.PUSH0			; PUSH R1 INTO R0 LIST
+	.PUSH0			; Push R1 into R0 list
 	BR	INTDI3
 
 
 
 
 ;; (SUBSETP list-1 list-2) => bool
-;;!!! INEFFICIENT BUT TERSE IMPLEMENTATION, MAKES UNNECESSARY ALLOCATIONS
+;;!!! inefficient but terse implementation, makes unnecessary allocations
 SUBSETP::
 	.SUBR	SETDIF		; (NULL (SET-DIFFERENCE list-1 list-2))
 	B.ZF
@@ -269,8 +245,6 @@ LOGTEST::
 
 
 
-
-
 ;; (READ-CHAR input-stream T)
 R.CHRT::
 	INC	R0
@@ -288,9 +262,8 @@ R.CHAR::
 .IF NE C$FILE
 	.TYPEP	U.FILE
 	BCC	1$
-	TST	(R4)+		; R4: &position
-	MOV	(R4)+, R1	; R1: position as Object
-	TST	(R4)+		; R4: &channel
+	ADD	#12, R4		; R4: buffer
+	MOV	-10(R4), R1	; R1: position as Object
 	TO.U16
 	BIT	#777, R1
 	BNE	4$
@@ -300,11 +273,11 @@ R.CHAR::
 4$:	MOV	R1, R2
 	INC	R1   		; ++filepos
 	F.U16
-	MOV	R1, -4(R4)	; save new filepos
+	MOV	R1, -10(R4)	; save new filepos
 	BIC	#^C777, R2	; R2: offset in buffer
 	ADD	R2, R4		; R4: pointer to next char - 2
 	MOV	#V.CHB, R1
-	BISB	4(R4), R1
+	BISB	(R4), R1
 ;	BEQ	R.EOF
 	RETURN
 .ENDC ; C$FILE
@@ -325,6 +298,59 @@ RCHAR9:	RETURN
 
 
 
+;; (FIND-SYMBOL string &optional package) => symbol, state (in CF)
+FINSY::
+.IF NE C$FULL
+	CALL	GEOBLS		; R2: #OBLIST OR #KWLIST
+	CMP	R2, #OBLIST
+	BNE	10$
+	PUSH	R2
+	MOV	#VS.NIL, R2
+	.STREQ			; (STRING= string "NIL")
+	POP	R2
+	BCS	R.M01B		; MOV  R0, R1;  RETURN
+10$:    SUB	#3, R2
+.IFF
+	MOV	#VS.NIL, R2
+	.STREQ			; (STRING= string "NIL")
+	BCS	R.M01B		; MOV  R0, R1;  RETURN
+	MOV	#OBLIST-3, R2
+.ENDC ; C$FULL
+	CALL	STR2R		; RADIX-40 failed, fallback to ASCII
+	BCS	5$		; ASCII
+	.SWP12			; R2: symbol-name
+6$:
+	MOV	3(R1), R1
+	BEQ	7$	        ; Not found
+	MOV	R1, R5		; Compare RADIX-50 strings
+	ADD	#5, R5
+	MOV	#$BUFOUT, R4
+.IF NE C$RAD40
+8$:	CMP	(R5)+, (R4)	; ASCII names starts with ZERO word and will be filtered-out
+	BNE	6$		; strings differ
+	TST	(R4)+
+	BMI	8$		; more words
+.IFF
+8$:	CMP	(R5)+, (R4)+	; ASCII names starts with ZERO word and will be filtered-out
+	BNE	6$		; strings differ
+	CMP	R4, R3
+	BNE	8$
+.ENDC
+	BR	3$
+5$:	.SWP12			; R2: symbol-name
+	ADD	#12, R1
+
+2$:	MOV	-7(R1), R1
+	BNE	4$
+7$:	CLC       ; Not found
+	RETURN
+4$:	ADD	#12, R1		; R2: SYMBOL-NAME
+	.STREQ
+	BCC	2$
+	SUB	#12, R1
+3$:	SEC
+9$:	RETURN
+
 ;; (FILL sequence item) => sequence
 FILL::	MOV	R2, R3		; R3: item
 	MOV	R1, R0
@@ -337,60 +363,46 @@ FILL::	MOV	R2, R3		; R3: item
 	BR	1$
 
 
-;; (SORT sequence predicate) => sorted-sequence
-SORT::	MOV	R1, R3
-	.LENGTH
-	MOV	R1, R5		; R5: length
-	MOV	R3, R1
-	.SVECP
-	BCC	4$      	; Sort List
-	SUB	#FIXOFF + 1, R5	; Sort Vector
-	BLOS	9$
-6$:	TST	(R3)+
-	MOV	R3, R4
-	PUSH	R5
-7$:	TST	(R4)+
-	.SORT34
-	SOB	R5, 7$
-	POP	R5
-	SOB	R5, 6$
-9$:	RETURN
-3$:	MOV	2(R3), R3
-	BEQ	9$
-4$:	MOV	R3, R4
-2$:	MOV	2(R4), R4
-	BEQ	3$
-	.SORT34
-	BR	2$
-
-
-
-
-.IF NE C$RT11
-
-;; (RENAME-FILE filespec new-name) => new-name
-RENAMF::
-	PUSH	R2		; Save new-name
-	.SUBR	PROBEF		; (PROBE-FILE pathspec)
-	BEQ.E
-	.R50FN
-	MOV	#$BUFOUT, R3
-	CMP	(R0)+, (R0)+	; R0: 4
-1$:	.WORD	012363,	-10.	; MOV	(R3)+, -10.(R3)		; Copy old-name into AREAT
-	SOB	R0, 1$
-	MOV	(SP), R1
-	.R50FN
-	MOV	#$BUFOUT+8., R3
-	MOV	#8., R0
-2$:	.WORD	014363,	8.	; MOV	-(R3), 8.(R3)		; Copy old-name into AREAT
-	SOB	R0, 2$
-	.SYS	S$RENA		; .RENAME #AREA, #TESTCH, #$BUFOUT
-	BCC	8$
-	JMP	EIO1
-8$:	POP	R1		; R1: new-name
+;; (INTERN string &optional package) => symbol
+INTERN::
+	PUSH	R2, R1
+	CALL	FINSY		; cannot use .SUBR because it does not return CF
+	BCS	8$		; SYMBOL with name `string` already exists
+	MOV	(SP), R1	; R1: string
+	.SUBR	MKSYM1
+	MOV	#OBLIST, R3
+.IF NE C$FULL
+	CMP	2(SP), #V.KEYW
+	BNE	4$		; non-keyword
+	MOV	R1, R2
+	.SUBR	SET		; (SET :keyword ':keyword)
+	TST	(R3)+		; R3: #KWLIST
+.ENDC ; C$FULL
+4$:	MOV	(R3), 3(R1)
+	MOV	R1, (R3)
+8$:	BIT	(SP)+, (SP)+	; SP += 4
 	RETURN
 
-.ENDC ; C$RT11
+
+;; (UNINTERN symbol &optional package) => bool
+UNINTERN::
+.IIF NE C$FULL,	CALL	GEOBLS		; R2: #OBLIST OR #KWLIST
+.IIF EQ C$FULL,	MOV	#OBLIST, R2
+1$:	MOV	R2, R0		; R0: pointer to next field of SYMBOL
+	MOV	(R0), R2
+	BEQ.F			; End of OBLIST
+.IF NE C$VM1
+	CMP	(R2)+, (R2)+	; R0 += 4
+.IFF
+	ADD	#3, R2
+.ENDC
+	CMP	R1, (R0)
+	BNE	1$		; Next symbol
+	MOV     (R2), (R0)	; Unlink symbol from OBLIST
+	CLR	(R2)
+	RE.T
+
+
 
 
 .IF NE C$RU
@@ -465,6 +477,25 @@ LOG::	PU.FL
 	.BASN
 	.WORD	DPUR2, $LOG, $DDIV, RBAS.5
 
+.IF NE C$FULL
+;; (SCALE-FLOAT float integer) => scaled-float
+SCALEF::
+	PU.FL
+	MOV	R2, R1
+	TO.I16
+	MOV	(SP), R2
+	ASL	R2
+	CLRB	R2
+	SWAB	R2		; R3: exponent
+	ADD	R2, R1		; R1: new exponent
+	SWAB	R1		; CF: 0
+	BNE.E			; resulting exponent is out of range
+	ROR	R1
+	BIC	#77600, (SP)	; Replace exponent in Stack
+	BIS	R1, (SP)
+POFLR1:	POFL.R
+.ENDC ; C$FULL
+
 
 ;; (ISQRT natural) => natural-root
 ISQRT::
@@ -488,6 +519,7 @@ FLOOR::
 	.WORD	DTUCK2, $DMUL, $DSUB, 2$
 2$:	PO.FL					; R1: reminder
 .IF NE C$MVAL
+	CLR	R0
 	.PUSH0
 	PO.FL
 	.PUSH0
@@ -740,24 +772,77 @@ EQUALP::
 
 .INCLUDE /print.mac/
 
-.IF NE C$FULL
-;; (SCALE-FLOAT float integer) => scaled-float
-SCALEF::
-	PU.FL
-	MOV	R2, R1
-	TO.I16
-	MOV	(SP), R2
-	ASL	R2
-	CLRB	R2
-	SWAB	R2		; R3: exponent
-	ADD	R2, R1		; R1: new exponent
-	SWAB	R1		; CF: 0
-	BNE.E			; resulting exponent is out of range
-	ROR	R1
-	BIC	#77600, (SP)	; Replace exponent in Stack
-	BIS	R1, (SP)
-POFLR1:	POFL.R
-.ENDC ; C$FULL
+
+
+;; (DIGIT-CHAR-P char &optional (radix 10)) => weight
+DIGCHP::
+	.DF2	V.10
+	.CHRUP		; R1: (CHAR-UPCASE char)
+	ADD	#FIXOFF - V.CHB - '0, R1
+	.TI16B
+	CMP	R1, R0
+	BLO.F				; char < '0
+	CMP	R1, #9.
+	BLOS	1$
+	CMP	R1, #'A - '0
+	BLO.F
+	ADD	#10. + '0 - 'A, R1
+1$:	CMP	R1, R2		; R1: weight as int16
+	BHIS.F			; weight >= radix
+	FI16.R
+
+;; (SORT sequence predicate) => sorted-sequence
+SORT::	MOV	R1, R3
+	.LENGTH
+	MOV	R1, R5		; R5: length
+	MOV	R3, R1
+	.SVECP
+	BCC	4$      	; Sort List
+	SUB	#FIXOFF + 1, R5	; Sort Vector
+	BLOS	9$
+6$:	TST	(R3)+
+	MOV	R3, R4
+	PUSH	R5
+7$:	TST	(R4)+
+	.SORT34
+	SOB	R5, 7$
+	POP	R5
+	SOB	R5, 6$
+9$:	RETURN
+3$:	MOV	2(R3), R3
+	BEQ	9$
+4$:	MOV	R3, R4
+2$:	MOV	2(R4), R4
+	BEQ	3$
+	.SORT34
+	BR	2$
+
+
+.IF NE C$RT11
+
+;; (RENAME-FILE filespec new-name) => new-name
+RENAMF::
+	PUSH	R2		; Save new-name
+	.SUBR	PROBEF		; (PROBE-FILE pathspec)
+	BEQ.E
+	.R50FN
+	MOV	#$BUFOUT, R3
+	CMP	(R0)+, (R0)+	; R0: 4
+1$:	.WORD	012363,	-10.	; MOV	(R3)+, -10.(R3)		; Copy old-name into AREAT
+	SOB	R0, 1$
+	MOV	(SP), R1
+	.R50FN
+	MOV	#$BUFOUT+8., R3
+	MOV	#8., R0
+2$:	.WORD	014363,	8.	; MOV	-(R3), 8.(R3)		; Copy old-name into AREAT
+	SOB	R0, 2$
+	.SYS	S$RENA		; .RENAME #AREA, #TESTCH, #$BUFOUT
+	BCC	8$
+	JMP	EIO1
+8$:	POP	R1		; R1: new-name
+	RETURN
+
+.ENDC ; C$RT11
 
 ;; (BUTLAST list &optional (n 1)) => result-list
 BUTLAST::
@@ -895,7 +980,6 @@ X.SYFU::
 	MOV	R2, 1(R1)
 R.M21:	MOV	R2, R1
 R.A:	RETURN
-
 
 
 ;; (SETF (THIRD list) value) => value

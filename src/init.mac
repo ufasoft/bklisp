@@ -37,7 +37,8 @@ EBK11:	MOV	R1, R0
 	MOV	#BK11ME, R0
  	EMT	20		; .PRINT
 	.EXIT
-	.IFF	; BK-0011 case
+.ENDC ; C$BK10
+.IF NE C$BK11
 	CMP	140010, #150414
 	BNE	INIT
 	;; Init for BK-0011M
@@ -49,7 +50,7 @@ EBK11:	MOV	R1, R0
 	MOV	#104064, M.PRI1		; EMT 64
 	.BSFUN	#0, #0			; Reset function keys for BK-0011M
 	BR	INIT2
-.ENDC	; C$BK10
+.ENDC ; C$BK11
 INIT::
 .IF NE C$BK10
 	CLR	R1
@@ -243,7 +244,7 @@ IRUERR:	MOV	#RU.ERR, R1
 
 
 MODE64:	.ASCII	<033><061><C.CR><C.NL>		; 64 columns/line
-STATUS:	.ASCII	"BkLisp 2023.1 ufasoft.com/bklisp"
+STATUS:	.ASCII	"BkLisp 2023.2 ufasoft.com/bklisp"
 .IF NE C$RT11
 	.ASCII	/ /
 .IFF

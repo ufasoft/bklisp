@@ -1,6 +1,35 @@
 Prompt
-  Lisp (.+)ufasoft.com (re)
+  Lisp (re)
   Bytes free (re)
+ARRAY-TOTAL-SIZE
+  $ (array-total-size (make-array '(2 3 5)))
+  30
+  $ (array-total-size #(1 2 3))
+  3
+ARRAY-ROW-MAJOR-INDEX
+  $ (let ((a (make-array '(4 7)))) (array-row-major-index a 1 2))
+  9
+  $ (let ((a (make-array '(2 3 4)))) (array-row-major-index a 0 2 1))
+  9
+MAKE-ARRAY
+  $ (setq ar23 (make-array '(2 3)))
+  #2A((NIL NIL NIL) (NIL NIL NIL))
+AREF
+  $ (setf (aref ar23 1 2) 'Z)
+  Z
+  $ (aref ar23 1 2)
+  Z
+  $ (aref #(A B C) 2)
+  C
+  $ (aref #(A B C) 5)
+  ОШИБКА 9
+ROW-MAJOR-AREF
+  $ (setf (row-major-aref ar23 4) 'B)
+  B
+  $ ar23
+  #2A((NIL NIL NIL) (NIL B Z))
+  $ (row-major-aref ar23 4)
+  B
 Arrays
   $ (array-dimensions #(1 2 3))
   (3)
@@ -19,32 +48,6 @@ ARRAY-IN-BOUNDS-P
   NIL
   $ (array-in-bounds-p ar23 10 12)
   NIL
-AREF
-  $ (setf (aref ar23 1 2) 'Z)
-  Z
-  $ (aref ar23 1 2)
-  Z
-  $ (aref #(A B C) 2)
-  C
-  $ (aref #(A B C) 5)
-  ОШИБКА 9
-ARRAY-TOTAL-SIZE
-  $ (array-total-size (make-array '(2 3 5)))
-  30
-  $ (array-total-size #(1 2 3))
-  3
-ARRAY-ROW-MAJOR-INDEX
-  $ (let ((a (make-array '(4 7)))) (array-row-major-index a 1 2))
-  9
-  $ (let ((a (make-array '(2 3 4)))) (array-row-major-index a 0 2 1))
-  9
-ROW-MAJOR-AREF
-  $ (setf (row-major-aref ar23 4) 'B)
-  B
-  $ ar23
-  #2A((NIL NIL NIL) (NIL B Z))
-  $ (row-major-aref ar23 4)
-  B
 ARRAYP
   $ (arrayp nil)
   NIL
@@ -61,9 +64,6 @@ Array reader
   #1A(A B)
   $ #2A((A NIL NIL) (B C D) (E F NIL))
   #2A((A NIL NIL) (B C D) (E F NIL))
-MAKE-ARRAY
-  $ (setq ar23 (make-array '(2 3)))
-  #2A((NIL NIL NIL) (NIL NIL NIL))
 ARRAY-RANK-LIMIT
   $ array-rank-limit
   \d+			 	(re)
@@ -143,6 +143,23 @@ Extended FLOOR / TRUNCATE
   1
   $ (+ (* (car /) 7) (cadr /))
   22
+KEYWORD
+  $ (keywordp :sld)
+  T
+  $ (keywordp 'a)
+  NIL
+&KEY
+  $ (defun bar (a &optional b (c (+ 2 2)) &rest d &key k) (list a b c d k))
+  BAR
+  $ (bar 1)
+  (1 NIL 4 NIL NIL)
+  $ (bar 1 2 3 :k 9)
+  (1 2 3 (:K 9) 9)
+&AUX
+  $ (defun baz (&aux (a 1) b (c (+ a 2))) (list a b c))
+  BAZ
+  $ (baz)
+  (1 NIL 3)
 End
 
   

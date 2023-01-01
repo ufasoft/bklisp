@@ -51,10 +51,5 @@ ECUTIM::
 	.WORD	$DMUL, $DADD, RBAS.5		; (+ second (* 60. (+ minute (* 60. (+ hour (* 24. day-from-1900))))))
 
 
-;; Days per month
-DAYMON:	.BYTE	0, 31.
-FEBRUA:	.BYTE	28.
-	.BYTE	31., 30., 31., 30., 31., 31., 30., 31., 30. ;, 31.
-	.EVEN
 
 .ENDC	; C$RT11

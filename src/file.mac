@@ -5,10 +5,14 @@
 .SBTTL	File operations on RT-11
 
 
-
-;; (OPEN filespec) => stream
+;; (OPEN filespec &key direction) => stream
 OPEN::
 	PUSH	R1
+	MOV	R5, R1
+	MOV	#KW.DIR, R2
+	.SUBR	GETF
+	MOV	R1, R4		; R4: direction
+	MOV	(SP), R1	; R1: filespec
 	.R50FN
 	MOV	#12.+512., R5
 	.ALLOC				; Allocate FILE-STREAM Object before .LOOKUP to avoid channel leak in case of out-of memory
@@ -23,8 +27,18 @@ OPEN7:	ROLB	R0
 CHBMAP:	.WORD	0		; bitmap of open channels
 	BNE	OPEN7
 	BIS	R0, CHBMAP
-	.LOOKUP	#AREA, R2, #$BUFOUT
-	BCS	EIO1
+	CMP	R4, #KW.OUT
+	BNE	1$
+	MOV	R1, R3
+	MOV	(SP), R1
+	.PRED	DELETF		; (DELETE-FILE filespec)
+	CLR	R4
+	.ENTER	#AREA, R2, #$BUFOUT, R4
+	MOV	R4, R0		; used to discriminate output files
+	MOV	R3, R1
+	BR	2$
+1$:	.LOOKUP	#AREA, R2, #$BUFOUT      ;!!!O use common ENTER/LOOKUO code
+2$:	BCS	EIO1
 	MOV	#V.FILE, (R1)+
 	POP	(R1)+		; filename
 	MOV	#V.0, (R1)+	; initial position
@@ -74,12 +88,15 @@ FDATE::	.SUBR	PROBEF				; (PROBE-FILE pathspec)
 
 ;; (DELETE-FILE filespec) => T
 DELETF::
-	.SUBR	PROBEF		; (PROBE-FILE pathspec)
-	BEQ.E
+;	.SUBR	PROBEF		; (PROBE-FILE pathspec)
+;!!!R	BEQ.E
 	.R50FN
 	.SYS	S$DELE		; .DELETE #AREA, #TESTCH, #$BUFOUT
-	BCS	EIO1
+	BCS	1$
 	RE.T
+1$:	CMPB	$ERRBY, #1
+	BNE     EIO1
+	RE.NIL
 
 ;; (FILE-LENGTH stream) => length
 FLENGTH::

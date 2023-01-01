@@ -41,7 +41,7 @@
 <h1>Ufasoft BkLisp - LISP для RT-11, БК-0010.01, БК-0011М<br>
 Справочник
 </h1>
-<i>Версия 2023.1</i>
+<i>Версия 2023.2</i>
 
 <p>Минимальный интерпретатор языка программирования LISP для микро-компьютеров <a href="https://ru.wikipedia.org/wiki/БК_(семейство_компьютеров)">БК-0010.01 и БК-0011М</a>
 архитектуры <a href="https://ru.wikipedia.org/wiki/PDP-11">PDP-11</a>, на процессоре <a href="https://ru.wikipedia.org/wiki/К1801ВМ1">К1801ВМ1</a>.
@@ -148,8 +148,9 @@ href="https://ru.wikipedia.org/wiki/Диалоговый_вычислитель�
 <h3>Что реализовано</h3>
 <p>Функциональность Common Lisp, которая есть в BkLisp, но обычно отсутсвует в минимальных реализациях Lisp:</p>
 <ul>
-	<li>Множественные возвращаемы значения (функция <a href="#values">VALUES</a>)</li>
+	<li>Множественные возвращаемые значения (функция <a href="#values">VALUES</a>)</li>
 	<li>Трассировка, как средство отладки (форма <a href="#trace">TRACE</a>)</li>
+	<li>Keywords</li>
 </ul>
 
 <h3>Что НЕ реализовано</h3>
@@ -190,6 +191,7 @@ href="https://ru.wikipedia.org/wiki/Диалоговый_вычислитель�
 	<li><b id="proper-list">Правильный список</b> - список, заканчивающийся NIL. <a class="clhs" href="http://clhs.lisp.se/Body/26_glo_p.htm#proper_list">CLHS</a>
 	<li><b id="dotted-list">dotted-список</b> - список, у которого завершающий атом - не nil.   <a class="clhs" href="http://clhs.lisp.se/Body/26_glo_d.htm#dotted_list">CLHS</a>
 	<li><b>простой вектор</b> - вектор, не являющийся строкой, может содержать объекты любого типа.
+	<li><b>keyword</b> - символ-константа, значением которй является он сам. Синтаксис: <b>:name</b>. <a class="clhs" href=" http://clhs.lisp.se/Body/26_glo_k.htm#keyword">CLHS</a>
 	<li><b>sequence</b> - список, простой вектор или строка.
 	<li><b>STDIN</b> - стандартный ввод, клавиатура.
 	<li><b>STDOUT</b> - стандартный вывод, экран.
@@ -1337,10 +1339,11 @@ a                   →  5
 </pre>
 
 <hr/><h4 id="find-symbol">Функция FIND-SYMBOL</h4>
-<b>find-symbol</b> string → symbol
+<b>find-symbol</b> string &optional package-designator → symbol
 <a class="clhs" href="http://clhs.lisp.se/Body/f_find_s.htm#find-symbol">CLHS</a>
 <p>Возвращает <a href="#intern">интернированный</a> символ с именем <i>string</i>. Если такой не найден - возвращает NIL.
 <p> Эта операция case-sensitive.
+<p>Если <i>package-designator</i> - символ <b>KEYWORD</b>, то символ ищется среди keyword-ов.<span class="rt11">БК-0011М</span><span class="rt11">RT-11</span>
 <h5>Примеры</h5>
 <pre>
 (find-symbol "list")  →  NIL
@@ -1375,12 +1378,23 @@ a                   →  5
  (gensym))                   →  #:G10
 </pre>
 
+<hr/><h4 id="keywordp">Функция KEYWORDP</h4>
+<b>keywordp</b> object  → bool
+<a class="clhs" href="http://clhs.lisp.se/Body/f_kwdp.htm">CLHS</a><span class="rt11">БК-0011М</span><span class="rt11">RT-11</span>
+<p>Возвращает истину если <i>object</i> - keyword.
+<h5>Примеры</h5>
+<pre>
+(keywordp :abc)  →  T
+(keywordp 1)  →  NIL
+</pre>
+
 <hr/><h4 id="intern">Функция INTERN</h4>
-<b>intern</b> string → symbol
+<b>intern</b> string &optional package-designator → symbol
 <a class="clhs" href="http://clhs.lisp.se/Body/f_intern.htm#intern">CLHS</a>
 <p>Создаёт интернированный символ с именем <i>string</i> если такого ещё нет в глобальном списке символов <a href="#oblist">oblist</a>.
 <p> Возвращает найденный или созданный символ.
 <p> Эта операция case-sensitive.
+<p>Если <i>package-designator</i> - символ <b>KEYWORD</b>, то символ ищется среди keyword-ов.<span class="rt11">БК-0011М</span><span class="rt11">RT-11</span>
 <h5>Примеры</h5>
 <pre>
 (eq 'list (intern "LIST"))          →  T
@@ -2428,14 +2442,19 @@ href="#terpri">terpri</a>), и возвращает <i>string</i>.
 </pre>
 
 <hr/><h4 id="open">Функция OPEN</h4>
-<b>open</b> filespec → file-stream
+<b>open</b> filespec &key direction → file-stream
 <a class="clhs" href="http://clhs.lisp.se/Body/f_open.htm">CLHS</a>
 <span class="rt11">RT-11</span>
 <p>Открывает файл с именем<i>filespec</i> и возвращает файловый поток.
 <p>После работы поток должен быть закрыт вызовом <a href="#close">close</a>.
+<p>Если <i>direction</i> является <b>:OUTPUT</b>, то файл создаётся для записи, существующий файл с таким именем удаляется.
 <h5>Примеры</h5>
 <pre>
 (open "a.txt")  →  #&lt;FILE-STREAM "a.txt">
+
+(setq stm (open "b.txt" :direction :output))  →  #&lt;FILE-STREAM "b.txt">
+(write-char #\X stm)                          → #\X
+(close stm)                                   → T
 </pre>
 
 <hr/><h4 id="open-stream-p">Функция OPEN-STREAM-P</h4>
@@ -2616,7 +2635,7 @@ href="#terpri">terpri</a>), и возвращает <i>string</i>.
 <a class="clhs" href="http://clhs.lisp.se/Body/f_lisp_i.htm">CLHS</a>
 
 <hr/><h4 id="lisp-implementation-version">Функция LISP-IMPLEMENTATION-VERSION</h4>
-<b>lisp-implementation-version</b> → "2023.1"
+<b>lisp-implementation-version</b> → "2023.2"
 <a class="clhs" href="http://clhs.lisp.se/Body/f_lisp_i.htm">CLHS</a>
 
 <hr/><h4 id="machine-type">Функция MACHINE-TYPE</h4>
@@ -2790,9 +2809,21 @@ href="#terpri">terpri</a>), и возвращает <i>string</i>.
 <a class="clhs" href="http://clhs.lisp.se/Body/m_lambda.htm">CLHS</a>
 <p>Определяет анонимную функцию (или <a href="https://ru.wikipedia.org/wiki/Замыкание_(программирование)">замыкание</a>) с аргументами <i>lambda-list</i> и телом <i>form*</i>.
 <h5 id="lambda-list">Список аргументов lambda-list</h5>
-<p>Представляет собой список аргументов вида <code>(var* [&amp;optional {var | (var init-form)}*] [&amp;rest var])</code>.
+<p>Представляет собой список аргументов вида:
+<pre>
+(   var*
+    [&amp;optional {var | (var init-form)}*]                      <a class="clhs" href="http://clhs.lisp.se/Body/03_dab.htm">CLHS</a>
+    [&amp;rest var]                                               <a class="clhs" href="http://clhs.lisp.se/Body/03_dac.htm">CLHS</a>
+    [&amp;key {var | (var init-form)}*]                           <a class="clhs" href="http://clhs.lisp.se/Body/03_dad.htm">CLHS</a>  <span class="rt11">БК-0011М</span><span class="rt11">RT-11</span>
+    [&amp;aux {var | (var init-form)}*]                           <a class="clhs" href="http://clhs.lisp.se/Body/03_dae.htm">CLHS</a>  <span class="rt11">БК-0011М</span><span class="rt11">RT-11</span>
+)
+
+
+</pre>.
 <p>Переменные после <b id="optional">&optional</b> необязательные. Если при вызове отсутствует аргумент, переменная привязывается к значению вычисляемой <i>init-form</i>.
 <p>Переменная после <b id="rest">&rest</b> привязывается к списку аргументов, оставшихся после обработки обязательных и необязательных.
+<p>Переменные после <b id="key">&key</b> необязательные. Если при вызове отсутствует аргумент, переменная привязывается к значению вычисляемой <i>init-form</i>. <span class="rt11">БК-0011М</span><span class="rt11">RT-11</span>
+<p>Переменные после <b id="aux">&aux</b> не вляются аргументами, это эквивалент <a href="#let*">let*<a>. <span class="rt11">БК-0011М</span><span class="rt11">RT-11</span>
 <h5>Примеры</h5>
 <pre>
 (defun adder (n)
@@ -2800,10 +2831,10 @@ href="#terpri">terpri</a>), и возвращает <i>string</i>.
 (setq add (adder 5))     →  #&lt;FUNCTION>   ; (adder 5) вернул функцию одного аргумента, прибавляющую к нему 5
 (funcall add 7)          →  12
 
-(defun bar (a &amp;optional b (c (+ 2 2)) &rest d)
-  (list a b c d))                               →  BAR
-(bar 1)                                         →  (1 NIL 4 NIL)
-(bar 1 2 3 4 5 6)                               →  (1 2 3 (4 5 6))
+(defun bar (a &amp;optional b (c (+ 2 2)) &rest d &key k)
+  (list a b c d k))                             →  BAR
+(bar 1)                                         →  (1 NIL 4 NIL NIL)
+(bar 1 2 3 :k 9)                                →  (1 2 3 (:K 9) 9)
 </pre>
 
 <hr/><h4 id="call-arguments-limit">Константа CALL-ARGUMENTS-LIMIT</h4>
@@ -3245,6 +3276,8 @@ clause ::= (test-form form*)
 
 <div class="index">
 
+<a href="#aux">&AUX</a>
+<a href="#key">&KEY</a>
 <a href="#optional">&OPTIONAL</a>
 <a href="#rest">&REST</a>
 <a href="#multiply">* функция</a>
@@ -3401,6 +3434,7 @@ clause ::= (test-form form*)
 <a href="#internal-time-units-per-second">INTERNAL-TIME-UNITS-PER-SECOND</a>
 <a href="#intersection">INTERSECTION</a>
 <a href="#isqrt">ISQRT</a>
+<a href="#keywordp">KEYWORDP</a>
 <a href="#lambda">LAMBDA</a>
 <a href="#lambda-parameters-limit">LAMBDA-PARAMETERS-LIMIT</a>
 <a href="#last">LAST</a>

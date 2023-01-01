@@ -33,7 +33,7 @@ SY.PREV=0
 .GLOBL	V.SPEC, V.SPOP, V.STDI, V.STM, V.STR, V.CONS, V.SYM, V.SYVA, V.T, V.TAGB, V.CHAR, V.VEC, V.PSETQ, V.QUIT
 
 .IF NE C$FULL
-	.GLOBL	V.TRC, L.TRAC
+	.GLOBL	 V.KEYW, V.TRC, L.TRAC, KW.DIR, KW.OUT
 .ENDC
 
 .IF NE C$BK10
@@ -51,7 +51,6 @@ SY.PREV=0
 .	= $USRSP
 	.WORD	ASTKUP
 .	= $JSW
-
 	.WORD	TTLC$ + CHNIF$ 	; Disables automatic conversion of to uppercase characters. Pass empty Command Line to KMON
 
 	. = 300
@@ -65,6 +64,7 @@ $BUFOUT::.BLKB	24.		; Output buffer
 ;;-----------------------
 
 	. = 1000
+START3:	JMP	@#START2
 .INCLUDE /init.mac/
 
 	. = ASTKUP
@@ -94,10 +94,10 @@ START:
 ;		CMP	R1, PC
 ;		BNE	1$
 	.ENDC	; C$BK11
+START3:	JMP	@#START2
 
 .ENDC ; C$RT11
 
-START3:	JMP	@#START2
 
 ;.IIF EQ C$BK10	.INCLUDE /init.mac/
 
@@ -115,15 +115,18 @@ ERDATA:	.WORD 	0		; Error message data
 CATCH:	.WORD	0		; Stack pointer to catch errors
 C.ROOT:
 
-OBLIST:	.WORD 	V.LAST
 PRVTIM:	.WORD	V.0			; Last timestamp returned by (GET-INTERNAL-REAL-TIME)
+;;------ order does matter, used in INTERN
+OBLIST:	.WORD 	V.LAST
 .IF NE C$FULL
+KWLIST:	.WORD 	KW.OUT
+;;------
 ;;-- Order does matter, used in TRACE
 TRACLS:	.WORD	0			; A-List of traced symbols and original functions
 	.WORD	L.TRAC			; Macro for tracers
 .ENDC
 .IIF NE C$MVAL,	MVAL:	.WORD	1		; FIXNUM means result in R1, else MVAL is value list
-.IIF NE C$FULLREPLLS:	.WORD	A.PREV-4	; Special vars used by REPL
+.IIF NE C$FULL,	REPLLS:	.WORD	A.PREV-4	; Special vars used by REPL
 E.ROOT:
 
 
@@ -161,10 +164,10 @@ REPL:   MOV	#C.ROOT-A.ROOT, R2
 1$:	CLRB	A.ROOT-1(R2)	; Clear LEXENV, DYNENV, ERDATA, INDENT
 	SOB	R2, 1$		; R2: 0  is *STANDARD-INPUT*, used also in .CONS
 	CLR	R0		; R0: 0 to avoid reverence into the Heap in the Stack
+	.P.CHR	C.NL
 .IF NE C$GTLI & C$RT11
 	MOV	#LPROM, PROMPT
 .IFF
-	.P.CHR	C.NL
 	.P.CHR	'>, C.SP
 .ENDC ; C$GTLI & C$RT11
 
@@ -199,8 +202,8 @@ REPL:   MOV	#C.ROOT-A.ROOT, R2
 	.CONS			; R1: values
 	MOV	R1, R5
 2$:	MOV	R5, R2
-	MOV	#V.D, R1
-	.SET			; Assign *** to be rotated into /
+	MOV	#V.MMM, R1
+	.SET			; (SET '*** R5) to be rotated into /
 	CLR	R2		; R2: stdout
 	.POP5
 	BEQ	5$
@@ -331,15 +334,6 @@ DOPREP:	POP	R3		; SP is caller's SP
 	POP	R5
 	RETURN
 
-;; Bind symbol in R1 to argument in (R5) and add to environment in R4
-BNARG1:	MOV	(R5)+, R2
-;; Bind symbol in R1 to argument in R2 and add to environment in R4
-BNARG:	MOV	(R5), R5	; R5: (CDR of args)
-BNARG2:	.CONS
-	MOV	R4, R2
-	.CONS
-	MOV	R1, R4		; R4: New environment
-	RETURN
 
 
 ;;;--- Threaded code subroutines
@@ -385,7 +379,6 @@ DOVER:	MOV	#20, R1
 
 .IF NE C$FULL
 
-
 ;; IN: Stack: divisible;  (R4): divider
 ;; OUT: Stack: quotient, reminder
 DIVREM:	MOV	(R4)+, R1	; R1: divider
@@ -397,6 +390,14 @@ DIVREM:	MOV	(R4)+, R1	; R1: divider
 1$:	MOV	(PC)+, R4
 DIVRR4:	.WORD	0		; restore R4
 	JMP	@(R4)+
+
+;; Input:  R2: package-designator. NIL or V.U for "CL", V.KEYW for "KEYWORD"
+;; Output: R2: #OBLIST or #KWLIST
+GEOBLS:	CMP	R2, #V.KEYW
+	BEQ	1$
+	MOV	#OBLIST - KWLIST + V.KEYW, R2
+1$:	ADD	#KWLIST - V.KEYW, R2
+	RETURN
 
 .ENDC ; C$FULL
 
@@ -548,10 +549,19 @@ $IVEIL:	MOV	#$BUF, R1
 PROMPT:	.WORD	0
 1$:	TSTB	(R1)+
 	BNE	1$
+	MOVB	#C.NL, -1(R1)
 	RETURN
-LPROM:	.ASCII	<C.NL>/> /<200>	; prompt
+LPROM:	.ASCII	/> /<200>	; prompt
 
 .ENDC ; C$GTLI & C$RT11
+
+
+.IF NE C$RT11
+;; Days per month
+DAYMON:	.BYTE	0, 31.
+FEBRUA:	.BYTE	28.
+	.BYTE	31., 30., 31., 30., 31., 31., 30., 31., 30. ;, 31.
+.ENDC ; C$RT11
 
 .IF NE C$RAD40
 	R40TAB:	.ASCII	/*-+12/
@@ -569,6 +579,8 @@ LPROM:	.ASCII	<C.NL>/> /<200>	; prompt
 TERM:	.ASCII	<C.SEMI>/()"'`, /
 E.TER:	.EVEN
 
+PESC:	.SYVAL	V.PESC		; R1: *PRINT-ESCAPE*
+	RETURN
 
 .IF NE C$BK11
 
@@ -735,8 +747,8 @@ R50FN9:	RETURN
 
 ;; Read/Write block
 ;; 	R1: position
-;; 	R3 high byte: operation code: S$REA for Read; S$WRI for Write
-;; 	R4: &channel field
+;; 	R3: high byte: operation code: S$REA for Read; S$WRI for Write
+;; 	R4: buffer
 ;; OUTPUT:
 ;;   CF=1:  EOF
 ;; Saves R2, R5
@@ -744,13 +756,12 @@ REAWRI:	MOV	#AREA+10, R0
 	CLR	(R0)
 	MOV	#256., -(R0)
 	MOV	R4, -(R0)
-	ADD	#4, (R0)	; (R0): buffer
 	MOV	R1, -(R0)
 	SWAB	(R0)
 	ASR	(R0)
 	BIC	#^C177, (R0)	; (R0): block number
 	MOV	R3, -(R0)
-	MOVB	(R4), (R0)	; (R0): `operation code`|channel
+	MOVB	-4(R4), (R0)	; (R0): `operation code`|channel
 	EMT	375
 	BCC	R50FN9		; RETURN
 	CMP	R3, #S$WRI * 256.
@@ -775,15 +786,16 @@ DECDMY:	CLR	R0
 	ASR	R1
 	ASR	R1
 	BIC	#^C17, R1       	; R1: month
-	CALL	1$
+	F.U16
+	.PUSH0
 	MOV	R5, R1
 	ASL	R1
 	ASL	R1
 	ASL	R1
 	SWAB	R1
 	BIC	#^C37, R1
-1$:	ADD	#FIXOFF, R1		; R1: day
-	.PUSH0				; R0: (day month year)
+	F.U16				; R1: day
+	.PUSH0                          ; R0: (day month year)
 	RETURN
 
 .ENDC ; C$RT11
@@ -869,13 +881,13 @@ V.SVER	= A.SVER + 3
 
 ALGN4
 A.TRCA:
-.IIF NE C$RT11, .ASCIP	"<- "
-.IIF EQ C$RT11, .ASCII	<2><C.LE>" "
+.IIF NE C$RT11, .ASCII	<3>/<- /
+.IIF EQ C$RT11, .ASCII	<2><C.LE>/ /
 
 ALGN4
 A.TRCR:
- IIF NE C$RT11, .ASCIP	"-> "
-.IIF EQ C$RT11, .ASCII	<2><C.RI>" "
+.IIF NE C$RT11, .ASCII	<3>/-> /
+.IIF EQ C$RT11, .ASCII	<2><C.RI>/ /
 
 .ENDC ; C$FULL
 
